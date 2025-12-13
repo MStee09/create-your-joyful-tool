@@ -34,6 +34,8 @@ import {
 // Import types
 import type {
   Product,
+  ProductMaster,
+  VendorOffering,
   Vendor,
   Season,
   Crop,
@@ -47,6 +49,11 @@ import type {
   DryUnit,
   RateUnit,
 } from './types';
+
+// Import new components
+import { ProductsListView } from './components/farm/ProductsListView';
+import { ProductDetailView } from './components/farm/ProductDetailView';
+import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
 import {
@@ -982,271 +989,67 @@ const CropDetail: React.FC<{
 };
 
 // ============================================================================
-// PRODUCTS VIEW (With Notes and PDF Upload)
+// PRODUCTS VIEW (New Architecture)
 // ============================================================================
 
-const ProductsView: React.FC<{
-  products: Product[];
+const ProductsViewNew: React.FC<{
+  productMasters: ProductMaster[];
+  vendorOfferings: VendorOffering[];
   vendors: Vendor[];
-  onUpdateProducts: (products: Product[]) => void;
-}> = ({ products, vendors, onUpdateProducts }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterVendor, setFilterVendor] = useState<string>('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  inventory: InventoryItem[];
+  onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
+  onUpdateOfferings: (offerings: VendorOffering[]) => void;
+  onUpdateInventory: (inventory: InventoryItem[]) => void;
+  onNavigateToVendor?: (vendorId: string) => void;
+}> = ({ 
+  productMasters, 
+  vendorOfferings, 
+  vendors, 
+  inventory,
+  onUpdateProductMasters, 
+  onUpdateOfferings,
+  onUpdateInventory,
+  onNavigateToVendor,
+}) => {
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesVendor = !filterVendor || p.vendorId === filterVendor;
-    return matchesSearch && matchesVendor;
-  });
+  const selectedProduct = selectedProductId 
+    ? productMasters.find(p => p.id === selectedProductId) 
+    : null;
 
-  const groupedProducts = filteredProducts.reduce((acc, product) => {
-    const vendor = vendors.find(v => v.id === product.vendorId);
-    const vendorName = vendor?.name || 'Unknown';
-    if (!acc[vendorName]) acc[vendorName] = [];
-    acc[vendorName].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
-
-  const handleStartEdit = (product: Product) => {
-    setEditingId(product.id);
-    setEditingProduct({ ...product });
+  const handleAddProduct = (product: ProductMaster) => {
+    onUpdateProductMasters([...productMasters, product]);
   };
 
-  const handleSaveEdit = () => {
-    if (!editingId || !editingProduct.name) return;
-    onUpdateProducts(products.map(p => p.id === editingId ? { ...p, ...editingProduct } as Product : p));
-    setEditingId(null);
-    setEditingProduct({});
+  const handleUpdateProduct = (product: ProductMaster) => {
+    onUpdateProductMasters(productMasters.map(p => p.id === product.id ? product : p));
   };
 
-  const handleDeleteProduct = (id: string) => {
-    if (window.confirm('Delete this product?')) {
-      onUpdateProducts(products.filter(p => p.id !== id));
-    }
-  };
-
-  const handleUpdateNotes = (id: string, notes: string) => {
-    onUpdateProducts(products.map(p => p.id === id ? { ...p, notes } : p));
-  };
-
-  const handleUploadLabel = (id: string, file: File) => {
-    if (file.type !== 'application/pdf') {
-      alert('Please upload a PDF file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      onUpdateProducts(products.map(p => p.id === id ? { ...p, labelData: base64, labelFileName: file.name } : p));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveLabel = (id: string) => {
-    onUpdateProducts(products.map(p => p.id === id ? { ...p, labelData: undefined, labelFileName: undefined } : p));
-  };
-
-  const handleViewLabel = (product: Product) => {
-    if (product.labelData) {
-      const newWindow = window.open();
-      if (newWindow) {
-        newWindow.document.write(`<iframe src="${product.labelData}" style="width:100%;height:100%;border:none;"></iframe>`);
-      }
-    }
-  };
+  if (selectedProduct) {
+    return (
+      <ProductDetailView
+        product={selectedProduct}
+        vendorOfferings={vendorOfferings}
+        vendors={vendors}
+        inventory={inventory}
+        onUpdateProduct={handleUpdateProduct}
+        onUpdateOfferings={onUpdateOfferings}
+        onUpdateInventory={onUpdateInventory}
+        onBack={() => setSelectedProductId(null)}
+        onNavigateToVendor={onNavigateToVendor}
+      />
+    );
+  }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-stone-800">Products</h2>
-          <p className="text-stone-500 mt-1">{products.length} products in catalog</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </div>
-        <select
-          value={filterVendor}
-          onChange={(e) => setFilterVendor(e.target.value)}
-          className="px-4 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="">All Vendors</option>
-          {vendors.map(v => (
-            <option key={v.id} value={v.id}>{v.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Products List */}
-      <div className="space-y-6">
-        {Object.entries(groupedProducts).map(([vendorName, vendorProducts]) => (
-          <div key={vendorName} className="bg-white rounded-xl shadow-sm border border-stone-200">
-            <div className="px-6 py-4 border-b border-stone-200 bg-stone-50 rounded-t-xl">
-              <h3 className="font-semibold text-stone-800">{vendorName}</h3>
-              <p className="text-sm text-stone-500">{vendorProducts.length} products</p>
-            </div>
-            <div className="divide-y divide-stone-100">
-              {vendorProducts.map(product => (
-                <div key={product.id} className="hover:bg-stone-50">
-                  <div className="px-6 py-4 flex items-center justify-between">
-                    {editingId === product.id ? (
-                      <div className="flex-1 grid grid-cols-5 gap-4 items-center">
-                        <input
-                          value={editingProduct.name || ''}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                          className="px-2 py-1 border border-stone-300 rounded text-sm"
-                        />
-                        <input
-                          type="number"
-                          value={editingProduct.price || 0}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
-                          className="px-2 py-1 border border-stone-300 rounded text-sm"
-                        />
-                        <select
-                          value={editingProduct.priceUnit || 'gal'}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, priceUnit: e.target.value as 'gal' | 'lbs' | 'ton' })}
-                          className="px-2 py-1 border border-stone-300 rounded text-sm bg-white"
-                        >
-                          <option value="gal">/gal</option>
-                          <option value="lbs">/lbs</option>
-                          <option value="ton">/ton</option>
-                        </select>
-                        <div className="flex gap-2">
-                          <button onClick={handleSaveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => setEditingId(null)} className="p-1 text-stone-400 hover:bg-stone-100 rounded">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                            {product.form === 'liquid' ? <Droplets className="w-5 h-5 text-blue-600" /> : <Weight className="w-5 h-5 text-amber-600" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-stone-800">{product.name}</p>
-                              {product.notes && (
-                                <span title="Has notes"><StickyNote className="w-4 h-4 text-amber-500" /></span>
-                              )}
-                              {product.labelData && (
-                                <span title="Has label PDF"><FileText className="w-4 h-4 text-blue-500" /></span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-stone-500">
-                              <span>{formatCurrency(product.price)}/{product.priceUnit}</span>
-                              {product.analysis && (
-                                <span className="px-2 py-0.5 bg-stone-100 rounded text-xs">
-                                  {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
-                                  {product.analysis.s > 0 && `-${product.analysis.s}S`}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
-                            className={`p-2 rounded-lg ${expandedId === product.id ? 'text-emerald-600 bg-emerald-50' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'}`}
-                            title="Notes & Label"
-                          >
-                            {expandedId === product.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          </button>
-                          <button onClick={() => handleStartEdit(product)} className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteProduct(product.id)} className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Expanded Notes & Label Section */}
-                  {expandedId === product.id && (
-                    <div className="px-6 pb-4 pt-0 border-t border-stone-100 bg-stone-50/50">
-                      <div className="grid grid-cols-2 gap-6 mt-4">
-                        {/* Notes Section */}
-                        <div>
-                          <label className="block text-sm font-medium text-stone-700 mb-2">Notes</label>
-                          <textarea
-                            value={product.notes || ''}
-                            onChange={(e) => handleUpdateNotes(product.id, e.target.value)}
-                            placeholder="Add notes about this product..."
-                            className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm resize-none h-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-                        </div>
-                        
-                        {/* Label PDF Section */}
-                        <div>
-                          <label className="block text-sm font-medium text-stone-700 mb-2">Product Label (PDF)</label>
-                          {product.labelData ? (
-                            <div className="flex items-center gap-3 p-3 bg-white border border-stone-200 rounded-lg">
-                              <FileText className="w-8 h-8 text-red-500" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-stone-800 truncate">{product.labelFileName || 'Label.pdf'}</p>
-                                <p className="text-xs text-stone-500">PDF attached</p>
-                              </div>
-                              <button
-                                onClick={() => handleViewLabel(product)}
-                                className="px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium"
-                              >
-                                View
-                              </button>
-                              <button
-                                onClick={() => handleRemoveLabel(product.id)}
-                                className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-stone-300 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors">
-                              <Upload className="w-5 h-5 text-stone-400" />
-                              <span className="text-sm text-stone-500">Upload PDF label</span>
-                              <input
-                                type="file"
-                                accept=".pdf"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleUploadLabel(product.id, file);
-                                }}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <ProductsListView
+      productMasters={productMasters}
+      vendorOfferings={vendorOfferings}
+      vendors={vendors}
+      inventory={inventory}
+      onSelectProduct={setSelectedProductId}
+      onAddProduct={handleAddProduct}
+    />
   );
 };
 
@@ -1585,18 +1388,20 @@ const AppContent: React.FC = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Use localStorage for state (works both authenticated and not)
+  // Use localStorage for state with migration
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('farmcalc-state-v2');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Apply migration to new structure
+        return migrateAppState(parsed);
       } catch (e) {
         console.error('Failed to parse saved state');
       }
     }
     
-    // Default state
+    // Default state - create with new structure
     const defaultSeason: Season = {
       id: generateId(),
       year: 2026,
@@ -1609,15 +1414,26 @@ const AppContent: React.FC = () => {
       createdAt: new Date(),
     };
     
-    return {
+    // Migrate initial products to new structure
+    const initialState: AppState = {
       seasons: [defaultSeason],
       products: initialProducts,
+      productMasters: [],
+      vendorOfferings: [],
       vendors: initialVendors,
       inventory: [],
       currentSeasonId: defaultSeason.id,
       currentCropId: null,
     };
+    
+    return migrateAppState(initialState);
   });
+
+  // Get legacy products for backward-compatible components
+  const legacyProducts = useMemo(() => 
+    getProductsAsLegacy(state.productMasters || [], state.vendorOfferings || []),
+    [state.productMasters, state.vendorOfferings]
+  );
 
   // Save to localStorage
   useEffect(() => {
@@ -1660,6 +1476,14 @@ const AppContent: React.FC = () => {
     setState(prev => ({ ...prev, products }));
   };
 
+  const handleUpdateProductMasters = (productMasters: ProductMaster[]) => {
+    setState(prev => ({ ...prev, productMasters }));
+  };
+
+  const handleUpdateVendorOfferings = (vendorOfferings: VendorOffering[]) => {
+    setState(prev => ({ ...prev, vendorOfferings }));
+  };
+
   const handleUpdateVendors = (vendors: Vendor[]) => {
     setState(prev => ({ ...prev, vendors }));
   };
@@ -1681,7 +1505,7 @@ const AppContent: React.FC = () => {
         return (
           <DashboardView
             season={currentSeason}
-            products={state.products}
+            products={legacyProducts}
             inventory={state.inventory}
             vendors={state.vendors}
           />
@@ -1690,7 +1514,7 @@ const AppContent: React.FC = () => {
         return (
           <CropPlannerView
             season={currentSeason}
-            products={state.products}
+            products={legacyProducts}
             vendors={state.vendors}
             inventory={state.inventory}
             onUpdateSeason={handleUpdateSeason}
@@ -1698,17 +1522,22 @@ const AppContent: React.FC = () => {
         );
       case 'products':
         return (
-          <ProductsView
-            products={state.products}
+          <ProductsViewNew
+            productMasters={state.productMasters || []}
+            vendorOfferings={state.vendorOfferings || []}
             vendors={state.vendors}
-            onUpdateProducts={handleUpdateProducts}
+            inventory={state.inventory}
+            onUpdateProductMasters={handleUpdateProductMasters}
+            onUpdateOfferings={handleUpdateVendorOfferings}
+            onUpdateInventory={handleUpdateInventory}
+            onNavigateToVendor={() => setActiveView('vendors')}
           />
         );
       case 'vendors':
         return (
           <VendorsView
             vendors={state.vendors}
-            products={state.products}
+            products={legacyProducts}
             onUpdateVendors={handleUpdateVendors}
           />
         );
@@ -1716,7 +1545,7 @@ const AppContent: React.FC = () => {
         return (
           <InventoryView
             inventory={state.inventory}
-            products={state.products}
+            products={legacyProducts}
             onUpdateInventory={handleUpdateInventory}
           />
         );
@@ -1724,7 +1553,7 @@ const AppContent: React.FC = () => {
         return (
           <EnhancedExportView
             season={currentSeason}
-            products={state.products}
+            products={legacyProducts}
             vendors={state.vendors}
             inventory={state.inventory}
           />
