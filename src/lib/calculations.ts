@@ -3,9 +3,15 @@ import type {
   DryUnit, 
   Crop, 
   Product, 
+  ProductMaster,
+  VendorOffering,
   Tier,
   NutrientSummary,
-  CropCosts
+  CropCosts,
+  InventoryItem,
+  ProductWithVendor,
+  Vendor,
+  ProductCategory,
 } from '../types';
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -45,12 +51,85 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
   }).format(value);
 };
 
+// Calculate crop costs using ProductMaster + VendorOfferings
+export const calculateCropCostsNew = (
+  crop: Crop, 
+  productMasters: ProductMaster[], 
+  vendorOfferings: VendorOffering[]
+): CropCosts => {
+  let totalCost = 0;
+  let seedTreatmentCost = 0;
+  const timingCosts: Record<string, number> = {};
+
+  // Get preferred offering for a product
+  const getPreferredOffering = (productId: string) => {
+    return vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred) 
+      || vendorOfferings.find(vo => vo.productId === productId);
+  };
+
+  // Calculate application costs
+  crop.applications.forEach(app => {
+    const product = productMasters.find(p => p.id === app.productId);
+    const offering = getPreferredOffering(app.productId);
+    const tier = crop.tiers.find(t => t.id === app.tierId);
+    if (!product || !offering || !tier) return;
+
+    const tierAcres = crop.totalAcres * (tier.percentage / 100);
+    let costPerAcre = 0;
+
+    if (product.form === 'liquid') {
+      const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      costPerAcre = gallonsPerAcre * offering.price;
+    } else {
+      const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+      const pricePerPound = offering.priceUnit === 'ton' ? offering.price / 2000 : offering.price;
+      costPerAcre = poundsPerAcre * pricePerPound;
+    }
+
+    const tierCost = costPerAcre * tierAcres;
+    totalCost += tierCost;
+
+    if (!timingCosts[app.timingId]) {
+      timingCosts[app.timingId] = 0;
+    }
+    timingCosts[app.timingId] += tierCost;
+  });
+
+  // Calculate seed treatment costs
+  crop.seedTreatments.forEach(st => {
+    const product = productMasters.find(p => p.id === st.productId);
+    const offering = getPreferredOffering(st.productId);
+    if (!product || !offering) return;
+
+    const cwtPerAcre = st.plantingRateLbsPerAcre / 100;
+    let productPerAcre = 0;
+
+    if (st.rateUnit === 'oz') {
+      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 128;
+    } else {
+      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 453.592 / 128;
+    }
+
+    const costPerAcre = productPerAcre * offering.price;
+    seedTreatmentCost += costPerAcre * crop.totalAcres;
+  });
+
+  totalCost += seedTreatmentCost;
+
+  return {
+    totalCost,
+    costPerAcre: crop.totalAcres > 0 ? totalCost / crop.totalAcres : 0,
+    timingCosts,
+    seedTreatmentCost,
+  };
+};
+
+// Legacy: Calculate crop costs using old Product interface
 export const calculateCropCosts = (crop: Crop, products: Product[]): CropCosts => {
   let totalCost = 0;
   let seedTreatmentCost = 0;
   const timingCosts: Record<string, number> = {};
 
-  // Calculate application costs
   crop.applications.forEach(app => {
     const product = products.find(p => p.id === app.productId);
     const tier = crop.tiers.find(t => t.id === app.tierId);
@@ -77,19 +156,17 @@ export const calculateCropCosts = (crop: Crop, products: Product[]): CropCosts =
     timingCosts[app.timingId] += tierCost;
   });
 
-  // Calculate seed treatment costs
   crop.seedTreatments.forEach(st => {
     const product = products.find(p => p.id === st.productId);
     if (!product) return;
 
-    // Convert rate per CWT to cost per acre based on planting rate
     const cwtPerAcre = st.plantingRateLbsPerAcre / 100;
     let productPerAcre = 0;
 
     if (st.rateUnit === 'oz') {
-      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 128; // oz to gal
+      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 128;
     } else {
-      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 453.592 / 128; // g to gal (approx)
+      productPerAcre = (st.ratePerCwt * cwtPerAcre) / 453.592 / 128;
     }
 
     const costPerAcre = productPerAcre * product.price;
@@ -106,15 +183,18 @@ export const calculateCropCosts = (crop: Crop, products: Product[]): CropCosts =
   };
 };
 
-export const calculateCropNutrientSummary = (crop: Crop, products: Product[]): NutrientSummary => {
+// Calculate nutrient summary for new product structure
+export const calculateCropNutrientSummaryNew = (
+  crop: Crop, 
+  productMasters: ProductMaster[]
+): NutrientSummary => {
   const summary: NutrientSummary = { n: 0, p: 0, k: 0, s: 0 };
 
   crop.applications.forEach(app => {
-    const product = products.find(p => p.id === app.productId);
+    const product = productMasters.find(p => p.id === app.productId);
     const tier = crop.tiers.find(t => t.id === app.tierId);
     if (!product?.analysis || !tier) return;
 
-    // Calculate lbs of product per acre
     let lbsPerAcre = 0;
     if (product.form === 'liquid') {
       const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
@@ -123,10 +203,36 @@ export const calculateCropNutrientSummary = (crop: Crop, products: Product[]): N
       lbsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
     }
 
-    // Weight by tier percentage (for simplicity, use full rate for nutrient calc)
     const tierWeight = tier.percentage / 100;
 
-    // Calculate nutrient lbs per acre
+    summary.n += (lbsPerAcre * product.analysis.n / 100) * tierWeight;
+    summary.p += (lbsPerAcre * product.analysis.p / 100) * tierWeight;
+    summary.k += (lbsPerAcre * product.analysis.k / 100) * tierWeight;
+    summary.s += (lbsPerAcre * product.analysis.s / 100) * tierWeight;
+  });
+
+  return summary;
+};
+
+// Legacy nutrient calculation
+export const calculateCropNutrientSummary = (crop: Crop, products: Product[]): NutrientSummary => {
+  const summary: NutrientSummary = { n: 0, p: 0, k: 0, s: 0 };
+
+  crop.applications.forEach(app => {
+    const product = products.find(p => p.id === app.productId);
+    const tier = crop.tiers.find(t => t.id === app.tierId);
+    if (!product?.analysis || !tier) return;
+
+    let lbsPerAcre = 0;
+    if (product.form === 'liquid') {
+      const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      lbsPerAcre = gallonsPerAcre * (product.densityLbsPerGal || 10);
+    } else {
+      lbsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+    }
+
+    const tierWeight = tier.percentage / 100;
+
     summary.n += (lbsPerAcre * product.analysis.n / 100) * tierWeight;
     summary.p += (lbsPerAcre * product.analysis.p / 100) * tierWeight;
     summary.k += (lbsPerAcre * product.analysis.k / 100) * tierWeight;
@@ -164,4 +270,121 @@ export const downloadCSV = (content: string, filename: string) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+// NEW: Conversion helpers
+export const calculateCostPerPound = (offering: VendorOffering, product: ProductMaster): number | null => {
+  if (product.form === 'liquid' && product.densityLbsPerGal) {
+    if (offering.priceUnit === 'gal') {
+      return offering.price / product.densityLbsPerGal;
+    }
+  }
+  if (offering.priceUnit === 'lbs') {
+    return offering.price;
+  }
+  if (offering.priceUnit === 'ton') {
+    return offering.price / 2000;
+  }
+  return null;
+};
+
+export const calculateCostPerGallon = (offering: VendorOffering, product: ProductMaster): number | null => {
+  if (offering.priceUnit === 'gal') {
+    return offering.price;
+  }
+  if (product.form === 'liquid' && product.densityLbsPerGal) {
+    if (offering.priceUnit === 'lbs') {
+      return offering.price * product.densityLbsPerGal;
+    }
+  }
+  return null;
+};
+
+// Get stock status
+export const getStockStatus = (
+  product: ProductMaster, 
+  inventory: InventoryItem[]
+): { totalOnHand: number; status: 'ok' | 'low' | 'out' } => {
+  const items = inventory.filter(i => i.productId === product.id);
+  const totalOnHand = items.reduce((sum, item) => sum + item.quantity, 0);
+  
+  if (totalOnHand === 0) {
+    return { totalOnHand, status: 'out' };
+  }
+  if (product.reorderPoint && totalOnHand <= product.reorderPoint) {
+    return { totalOnHand, status: 'low' };
+  }
+  return { totalOnHand, status: 'ok' };
+};
+
+// Enrich product with vendor and stock info
+export const enrichProductWithVendor = (
+  product: ProductMaster,
+  vendorOfferings: VendorOffering[],
+  vendors: Vendor[],
+  inventory: InventoryItem[]
+): ProductWithVendor => {
+  const preferredOffering = vendorOfferings.find(vo => vo.productId === product.id && vo.isPreferred)
+    || vendorOfferings.find(vo => vo.productId === product.id);
+  
+  const preferredVendor = preferredOffering 
+    ? vendors.find(v => v.id === preferredOffering.vendorId) 
+    : undefined;
+  
+  const stockInfo = getStockStatus(product, inventory);
+  
+  return {
+    ...product,
+    preferredOffering,
+    preferredVendor,
+    totalOnHand: stockInfo.totalOnHand,
+    stockStatus: stockInfo.status,
+  };
+};
+
+// Infer category from product name
+export const inferProductCategory = (name: string, form: 'liquid' | 'dry'): ProductCategory => {
+  const lowerName = name.toLowerCase();
+  
+  if (lowerName.includes('seed treatment') || lowerName.includes('seed start')) return 'seed-treatment';
+  if (lowerName.includes('fungicide') || lowerName.includes('prosaro')) return 'fungicide';
+  if (lowerName.includes('herbicide')) return 'herbicide';
+  if (lowerName.includes('insecticide')) return 'insecticide';
+  if (lowerName.includes('adjuvant')) return 'adjuvant';
+  
+  // Check for fertilizers with analysis pattern
+  if (/\d+-\d+-\d+/.test(name)) {
+    return form === 'liquid' ? 'fertilizer-liquid' : 'fertilizer-dry';
+  }
+  
+  // Common fertilizer names
+  if (['ams', 'urea', 'kcl', 'sop', 'potash'].some(f => lowerName.includes(f))) {
+    return form === 'liquid' ? 'fertilizer-liquid' : 'fertilizer-dry';
+  }
+  
+  // Biologicals
+  if (['bio', 'amino', 'humic', 'fulvic', 'carbon', 'boost'].some(f => lowerName.includes(f))) {
+    return 'biological';
+  }
+  
+  // Micronutrients
+  if (['phloem', 'micro', 'zn', 'mn', 'fe', 'cu', 'boron', 'moly', 'cobalt'].some(f => lowerName.includes(f))) {
+    return 'micronutrient';
+  }
+  
+  return 'other';
+};
+
+// Category display names
+export const CATEGORY_LABELS: Record<ProductCategory, string> = {
+  'biological': 'Biological',
+  'micronutrient': 'Micronutrient',
+  'herbicide': 'Herbicide',
+  'fungicide': 'Fungicide',
+  'insecticide': 'Insecticide',
+  'seed-treatment': 'Seed Treatment',
+  'adjuvant': 'Adjuvant',
+  'fertilizer-liquid': 'Fertilizer (Liquid)',
+  'fertilizer-dry': 'Fertilizer (Dry)',
+  'other': 'Other',
 };
