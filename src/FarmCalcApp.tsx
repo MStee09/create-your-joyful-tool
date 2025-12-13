@@ -501,25 +501,121 @@ const VendorsView: React.FC<{
 };
 
 // ============================================================================
-// INVENTORY VIEW (With Add Inventory functionality)
+// INVENTORY VIEW (Plan Readiness)
 // ============================================================================
+
+import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 
 const InventoryView: React.FC<{
   inventory: InventoryItem[];
   products: Product[];
+  season: Season | null;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
-}> = ({ inventory, products, onUpdateInventory }) => {
+}> = ({ inventory, products, season, onUpdateInventory }) => {
   const [showAddInventory, setShowAddInventory] = useState(false);
   const [newProductId, setNewProductId] = useState('');
   const [newQuantity, setNewQuantity] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editQuantity, setEditQuantity] = useState(0);
 
-  const handleUpdateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      onUpdateInventory(inventory.filter(i => i.id !== id));
-    } else {
-      onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity } : i));
-    }
-  };
+  // Calculate planned usage
+  const plannedUsage = useMemo(() => 
+    calculatePlannedUsage(season, products), 
+    [season, products]
+  );
+
+  // Build readiness data
+  const readinessData = useMemo(() => {
+    const blocking: Array<{
+      product: Product;
+      needed: number;
+      onHand: number;
+      short: number;
+      unit: 'gal' | 'lbs';
+      usages: PlannedUsageItem['usages'];
+    }> = [];
+    
+    const planned: Array<{
+      product: Product;
+      needed: number;
+      onHand: number;
+      remaining: number;
+      unit: 'gal' | 'lbs';
+      value: number;
+      usages: PlannedUsageItem['usages'];
+      inventoryId?: string;
+    }> = [];
+    
+    const unassigned: Array<{
+      product: Product;
+      onHand: number;
+      unit: 'gal' | 'lbs';
+      value: number;
+      inventoryId: string;
+    }> = [];
+    
+    // Products with planned usage
+    const plannedProductIds = new Set(plannedUsage.map(p => p.productId));
+    
+    plannedUsage.forEach(usage => {
+      const product = products.find(p => p.id === usage.productId);
+      if (!product) return;
+      
+      const invItem = inventory.find(i => i.productId === usage.productId);
+      const onHand = invItem?.quantity || 0;
+      const remaining = onHand - usage.totalNeeded;
+      
+      let value = onHand * product.price;
+      if (product.priceUnit === 'ton') {
+        value = (onHand / 2000) * product.price;
+      }
+      
+      if (remaining < 0) {
+        blocking.push({
+          product,
+          needed: usage.totalNeeded,
+          onHand,
+          short: Math.abs(remaining),
+          unit: usage.unit,
+          usages: usage.usages,
+        });
+      }
+      
+      planned.push({
+        product,
+        needed: usage.totalNeeded,
+        onHand,
+        remaining,
+        unit: usage.unit,
+        value,
+        usages: usage.usages,
+        inventoryId: invItem?.id,
+      });
+    });
+    
+    // Inventory items not in plan
+    inventory.forEach(item => {
+      if (plannedProductIds.has(item.productId)) return;
+      
+      const product = products.find(p => p.id === item.productId);
+      if (!product) return;
+      
+      let value = item.quantity * product.price;
+      if (product.priceUnit === 'ton') {
+        value = (item.quantity / 2000) * product.price;
+      }
+      
+      unassigned.push({
+        product,
+        onHand: item.quantity,
+        unit: item.unit,
+        value,
+        inventoryId: item.id,
+      });
+    });
+    
+    return { blocking, planned, unassigned };
+  }, [plannedUsage, inventory, products]);
 
   const handleAddInventory = () => {
     if (!newProductId || newQuantity <= 0) return;
@@ -547,16 +643,49 @@ const InventoryView: React.FC<{
     setNewQuantity(0);
   };
 
-  const handleDeleteInventory = (id: string) => {
+  const handleQuickAdd = (productId: string, shortAmount: number, unit: 'gal' | 'lbs') => {
+    const existing = inventory.find(i => i.productId === productId);
+    if (existing) {
+      onUpdateInventory(inventory.map(i => 
+        i.productId === productId 
+          ? { ...i, quantity: i.quantity + shortAmount } 
+          : i
+      ));
+    } else {
+      const item: InventoryItem = {
+        id: generateId(),
+        productId,
+        quantity: shortAmount,
+        unit,
+      };
+      onUpdateInventory([...inventory, item]);
+    }
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (editQuantity <= 0) {
+      onUpdateInventory(inventory.filter(i => i.id !== id));
+    } else {
+      onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity } : i));
+    }
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string) => {
     onUpdateInventory(inventory.filter(i => i.id !== id));
   };
 
+  const hasPlannedUsage = plannedUsage.length > 0;
+
   return (
     <div className="p-8">
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-stone-800">Inventory</h2>
-          <p className="text-stone-500 mt-1">Track your on-hand product quantities</p>
+          <h2 className="text-3xl font-bold text-stone-800">Inventory & Plan Readiness</h2>
+          <p className="text-stone-500 mt-1">
+            {season ? `On-hand products vs ${season.year} ${season.name}` : 'No season selected'}
+          </p>
         </div>
         <button
           onClick={() => setShowAddInventory(true)}
@@ -618,67 +747,244 @@ const InventoryView: React.FC<{
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-stone-50">
-              <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Value</th>
-              <th className="px-6 py-4 w-16"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-200">
-            {inventory.map(item => {
-              const product = products.find(p => p.id === item.productId);
-              if (!product) return null;
-              
-              let value = item.quantity * product.price;
-              if (product.priceUnit === 'ton') {
-                value = (item.quantity / 2000) * product.price;
-              }
-              
-              return (
-                <tr key={item.id} className="hover:bg-stone-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                        {product.form === 'liquid' ? <Droplets className="w-5 h-5 text-blue-600" /> : <Weight className="w-5 h-5 text-amber-600" />}
-                      </div>
-                      <span className="font-medium text-stone-800">{product.name}</span>
+      {/* Section A: Blocking Plan Execution */}
+      {readinessData.blocking.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wider">
+              Blocking Plan Execution
+            </h3>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
+            <div className="divide-y divide-red-100">
+              {readinessData.blocking.map(item => (
+                <div key={item.product.id} className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                    }`}>
+                      {item.product.form === 'liquid' 
+                        ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                        : <Weight className="w-5 h-5 text-amber-600" />}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
-                      className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
-                    />
-                    <span className="ml-2 text-stone-500">{item.unit}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right text-emerald-600 font-medium">{formatCurrency(value)}</td>
-                  <td className="px-6 py-4">
+                    <div>
+                      <p className="font-medium text-stone-800">{item.product.name}</p>
+                      <p className="text-sm text-stone-500">
+                        {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-sm text-stone-500">
+                        Need {formatNumber(item.needed, 1)} {item.unit}, have {formatNumber(item.onHand, 1)}
+                      </p>
+                      <p className="font-semibold text-red-600">
+                        Short {formatNumber(item.short, 1)} {item.unit}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => handleDeleteInventory(item.id)}
-                      className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                      onClick={() => handleQuickAdd(item.product.id, item.short, item.unit)}
+                      className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      Add {formatNumber(item.short, 1)}
                     </button>
-                  </td>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section B: Planned Usage Overview */}
+      {hasPlannedUsage && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-stone-600 uppercase tracking-wider mb-3">
+            Planned Usage Overview
+          </h3>
+          <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-stone-50">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Planned</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Remaining</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Value</th>
+                  <th className="px-6 py-4 w-24"></th>
                 </tr>
-              );
-            })}
-            {inventory.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-stone-400">
-                  No inventory items. Click "Add Inventory" to track products you have on hand.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-stone-200">
+                {readinessData.planned.map(item => (
+                  <tr key={item.product.id} className="hover:bg-stone-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                        }`}>
+                          {item.product.form === 'liquid' 
+                            ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                            : <Weight className="w-5 h-5 text-amber-600" />}
+                        </div>
+                        <div>
+                          <span className="font-medium text-stone-800">{item.product.name}</span>
+                          <p className="text-xs text-stone-400">
+                            {item.usages.map(u => `${u.cropName} → ${u.timingName}`).join(', ')}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {editingId === item.inventoryId ? (
+                        <input
+                          type="number"
+                          value={editQuantity}
+                          onChange={(e) => setEditQuantity(Number(e.target.value))}
+                          className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
+                          autoFocus
+                          onBlur={() => item.inventoryId && handleSaveEdit(item.inventoryId)}
+                          onKeyDown={(e) => e.key === 'Enter' && item.inventoryId && handleSaveEdit(item.inventoryId)}
+                        />
+                      ) : (
+                        <span className="text-stone-700">{formatNumber(item.onHand, 1)} {item.unit}</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right text-stone-600">
+                      {formatNumber(item.needed, 1)} {item.unit}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`font-semibold ${item.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {item.remaining >= 0 ? '+' : ''}{formatNumber(item.remaining, 1)} {item.unit}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-stone-600">
+                      {formatCurrency(item.value)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-1">
+                        {item.inventoryId && editingId !== item.inventoryId && (
+                          <button
+                            onClick={() => {
+                              setEditingId(item.inventoryId!);
+                              setEditQuantity(item.onHand);
+                            }}
+                            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {!item.inventoryId && (
+                          <button
+                            onClick={() => handleQuickAdd(item.product.id, 0, item.unit)}
+                            className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                            title="Add to inventory"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Section C: Unassigned Inventory */}
+      {readinessData.unassigned.length > 0 && (
+        <div className="opacity-60 hover:opacity-100 transition-opacity">
+          <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">
+            Unassigned Inventory
+          </h3>
+          <div className="bg-stone-50 rounded-xl border border-stone-200 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-stone-100/50">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-stone-400 uppercase">Product</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-stone-400 uppercase">On Hand</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-stone-400 uppercase">Value</th>
+                  <th className="px-6 py-3 w-24"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-200">
+                {readinessData.unassigned.map(item => (
+                  <tr key={item.inventoryId} className="hover:bg-white">
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          item.product.form === 'liquid' ? 'bg-blue-100/50' : 'bg-amber-100/50'
+                        }`}>
+                          {item.product.form === 'liquid' 
+                            ? <Droplets className="w-4 h-4 text-blue-500" /> 
+                            : <Weight className="w-4 h-4 text-amber-500" />}
+                        </div>
+                        <span className="font-medium text-stone-600">{item.product.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-right text-stone-500">
+                      {formatNumber(item.onHand, 1)} {item.unit}
+                    </td>
+                    <td className="px-6 py-3 text-right text-stone-500">
+                      {formatCurrency(item.value)}
+                    </td>
+                    <td className="px-6 py-3">
+                      <button
+                        onClick={() => handleDelete(item.inventoryId)}
+                        className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Empty States */}
+      {!hasPlannedUsage && inventory.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
+          <Warehouse className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+          <h3 className="font-semibold text-stone-800 mb-2">No Inventory & No Plan</h3>
+          <p className="text-stone-500 max-w-md mx-auto">
+            Add applications to your crop plans to see what you need, then add inventory to track what you have on hand.
+          </p>
+        </div>
+      )}
+
+      {!hasPlannedUsage && inventory.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <Calendar className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-amber-800">No Planned Applications</h3>
+              <p className="text-amber-700 text-sm mt-1">
+                Add applications to your crop plans to see plan readiness. Currently showing all inventory without usage context.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasPlannedUsage && readinessData.blocking.length === 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3">
+            <Check className="w-5 h-5 text-emerald-600" />
+            <div>
+              <h3 className="font-semibold text-emerald-800">Ready to Execute</h3>
+              <p className="text-emerald-700 text-sm">
+                You have enough inventory to cover all planned applications.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -977,6 +1283,7 @@ const AppContent: React.FC = () => {
           <InventoryView
             inventory={state.inventory}
             products={legacyProducts}
+            season={currentSeason}
             onUpdateInventory={handleUpdateInventory}
           />
         );

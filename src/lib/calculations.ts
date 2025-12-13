@@ -388,3 +388,111 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   'fertilizer-dry': 'Fertilizer (Dry)',
   'other': 'Other',
 };
+
+// Planned usage calculation for inventory readiness
+export interface ProductUsage {
+  cropName: string;
+  timingName: string;
+  acresTreated: number;
+  quantityNeeded: number;
+}
+
+export interface PlannedUsageItem {
+  productId: string;
+  totalNeeded: number;
+  unit: 'gal' | 'lbs';
+  usages: ProductUsage[];
+}
+
+export const calculatePlannedUsage = (
+  season: { crops: Array<{ 
+    name: string; 
+    totalAcres: number; 
+    tiers: Array<{ id: string; percentage: number }>;
+    applicationTimings: Array<{ id: string; name: string }>;
+    applications: Array<{ productId: string; timingId: string; tierId: string; rate: number; rateUnit: string }>;
+    seedTreatments: Array<{ productId: string; ratePerCwt: number; rateUnit: string; plantingRateLbsPerAcre: number }>;
+  }> } | null,
+  products: Product[]
+): PlannedUsageItem[] => {
+  if (!season) return [];
+  
+  const usageMap = new Map<string, PlannedUsageItem>();
+  
+  season.crops.forEach(crop => {
+    // Calculate application usage
+    crop.applications.forEach(app => {
+      const product = products.find(p => p.id === app.productId);
+      if (!product) return;
+      
+      const tier = crop.tiers.find(t => t.id === app.tierId);
+      const tierAcres = tier ? crop.totalAcres * (tier.percentage / 100) : crop.totalAcres;
+      const timing = crop.applicationTimings.find(t => t.id === app.timingId);
+      
+      let quantityPerAcre = 0;
+      if (product.form === 'liquid') {
+        quantityPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      } else {
+        quantityPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+      }
+      
+      const totalQuantity = quantityPerAcre * tierAcres;
+      const unit: 'gal' | 'lbs' = product.form === 'liquid' ? 'gal' : 'lbs';
+      
+      if (!usageMap.has(app.productId)) {
+        usageMap.set(app.productId, {
+          productId: app.productId,
+          totalNeeded: 0,
+          unit,
+          usages: [],
+        });
+      }
+      
+      const item = usageMap.get(app.productId)!;
+      item.totalNeeded += totalQuantity;
+      item.usages.push({
+        cropName: crop.name,
+        timingName: timing?.name || 'Unknown',
+        acresTreated: tierAcres,
+        quantityNeeded: totalQuantity,
+      });
+    });
+    
+    // Calculate seed treatment usage
+    crop.seedTreatments.forEach(st => {
+      const product = products.find(p => p.id === st.productId);
+      if (!product) return;
+      
+      const cwtPerAcre = st.plantingRateLbsPerAcre / 100;
+      let productPerAcre = 0;
+      
+      if (st.rateUnit === 'oz') {
+        productPerAcre = (st.ratePerCwt * cwtPerAcre) / 128; // oz to gallons
+      } else {
+        productPerAcre = (st.ratePerCwt * cwtPerAcre) / 453.592 / 128; // grams to gallons
+      }
+      
+      const totalQuantity = productPerAcre * crop.totalAcres;
+      
+      if (!usageMap.has(st.productId)) {
+        usageMap.set(st.productId, {
+          productId: st.productId,
+          totalNeeded: 0,
+          unit: 'gal',
+          usages: [],
+        });
+      }
+      
+      const item = usageMap.get(st.productId)!;
+      item.totalNeeded += totalQuantity;
+      item.usages.push({
+        cropName: crop.name,
+        timingName: 'Seed Treatment',
+        acresTreated: crop.totalAcres,
+        quantityNeeded: totalQuantity,
+      });
+    });
+  });
+  
+  return Array.from(usageMap.values());
+};
