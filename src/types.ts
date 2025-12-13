@@ -30,6 +30,8 @@ export interface Product {
   analysis?: NutrientAnalysis;
   densityLbsPerGal?: number;
   notes?: string;
+  labelData?: string; // Base64 encoded PDF label
+  labelFileName?: string;
 }
 
 export interface Tier {
