@@ -1,15 +1,24 @@
 import React, { useMemo } from 'react';
 import { Leaf, DollarSign, BarChart3, Package } from 'lucide-react';
 import type { Season, Product } from '@/types/farm';
+import type { ProductPurpose } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import type { LiquidUnit, DryUnit } from '@/types/farm';
+import { RolesNeededQueue } from './RolesNeededQueue';
 
 interface DashboardViewProps {
   season: Season | null;
   products: Product[];
+  purposes?: Record<string, ProductPurpose>;
+  onNavigateToProduct?: (productId: string) => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ season, products }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ 
+  season, 
+  products, 
+  purposes = {},
+  onNavigateToProduct,
+}) => {
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
     
@@ -84,6 +93,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ season, products }
     });
   }, [season, products]);
 
+  // Get products used in the current season's plan
+  const productsInPlan = useMemo(() => {
+    if (!season) return [];
+    const productIds = new Set<string>();
+    season.crops.forEach(crop => {
+      crop.applications.forEach(app => {
+        productIds.add(app.productId);
+      });
+    });
+    return products.filter(p => productIds.has(p.id));
+  }, [season, products]);
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -144,43 +165,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ season, products }
         </div>
       </div>
 
-      {/* Crop Summary Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-border">
-        <div className="px-6 py-4 border-b border-border">
-          <h3 className="font-semibold text-foreground">Crop Cost Summary</h3>
+      {/* Two-column layout for queue and table */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column - Roles Needed Queue */}
+        <div className="lg:col-span-1">
+          {productsInPlan.length > 0 && onNavigateToProduct && (
+            <RolesNeededQueue
+              products={productsInPlan}
+              purposes={purposes}
+              onSelectProduct={onNavigateToProduct}
+              maxVisible={6}
+            />
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-muted/50">
-                <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applications</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {cropSummaries.map((crop, idx) => (
-                <tr key={idx} className="hover:bg-muted/30">
-                  <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">{crop.applicationCount}</td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
-                  <td className="px-6 py-4 text-right font-semibold text-primary">{formatCurrency(crop.costPerAcre)}</td>
+
+        {/* Right column - Crop Summary Table */}
+        <div className="lg:col-span-2 bg-card rounded-xl shadow-sm border border-border">
+          <div className="px-6 py-4 border-b border-border">
+            <h3 className="font-semibold text-foreground">Crop Cost Summary</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applications</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
                 </tr>
-              ))}
-              {cropSummaries.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                    No crops configured. Add crops in the Crop Plans section.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {cropSummaries.map((crop, idx) => (
+                  <tr key={idx} className="hover:bg-muted/30">
+                    <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
+                    <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
+                    <td className="px-6 py-4 text-right text-muted-foreground">{crop.applicationCount}</td>
+                    <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
+                    <td className="px-6 py-4 text-right font-semibold text-primary">{formatCurrency(crop.costPerAcre)}</td>
+                  </tr>
+                ))}
+                {cropSummaries.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                      No crops configured. Add crops in the Crop Plans section.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

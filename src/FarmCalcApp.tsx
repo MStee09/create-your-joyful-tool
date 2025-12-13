@@ -236,7 +236,8 @@ const DashboardView: React.FC<{
   products: Product[];
   inventory: InventoryItem[];
   vendors: Vendor[];
-}> = ({ season, products, inventory, vendors }) => {
+  onNavigateToProduct?: (productId: string) => void;
+}> = ({ season, products, inventory, vendors, onNavigateToProduct }) => {
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
     
@@ -1242,6 +1243,10 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             inventory={state.inventory}
             vendors={state.vendors}
+            onNavigateToProduct={(productId) => {
+              setActiveView('products');
+              // Product detail navigation handled within ProductsViewNew
+            }}
           />
         );
       case 'crops':
