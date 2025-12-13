@@ -1314,7 +1314,19 @@ const AppContent: React.FC = () => {
 
   // Use localStorage for state with migration
   const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('farmcalc-state-v2');
+    // Try new key first
+    let saved = localStorage.getItem('farmcalc-state-v2');
+    
+    // If no v2 data, check old key and migrate
+    if (!saved) {
+      const oldSaved = localStorage.getItem('farmcalc-state');
+      if (oldSaved) {
+        saved = oldSaved;
+        // Clear old key after reading
+        localStorage.removeItem('farmcalc-state');
+      }
+    }
+    
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -1325,32 +1337,8 @@ const AppContent: React.FC = () => {
       }
     }
     
-    // Default state - create with new structure
-    const defaultSeason: Season = {
-      id: generateId(),
-      year: 2026,
-      name: 'Growing Season',
-      crops: [
-        createDefaultCrop('Corn', 132),
-        createDefaultCrop('Edible Beans', 158),
-        createDefaultCrop('Small Grains', 130),
-      ],
-      createdAt: new Date(),
-    };
-    
-    // Migrate initial products to new structure
-    const initialState: AppState = {
-      seasons: [defaultSeason],
-      products: initialProducts,
-      productMasters: [],
-      vendorOfferings: [],
-      vendors: initialVendors,
-      inventory: [],
-      currentSeasonId: defaultSeason.id,
-      currentCropId: null,
-    };
-    
-    return migrateAppState(initialState);
+    // Default state - use initialState from file which has complete crop plans
+    return migrateAppState(defaultInitialState);
   });
 
   // Get legacy products for backward-compatible components
