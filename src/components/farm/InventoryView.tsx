@@ -1,40 +1,88 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Droplets, Weight } from 'lucide-react';
-import type { InventoryItem, Product, Vendor } from '@/types/farm';
+import { Plus, Trash2, Droplets, Weight, Package } from 'lucide-react';
+import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
 import { formatCurrency, generateId } from '@/utils/farmUtils';
+import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
+import { InventoryAddModal } from './InventoryAddModal';
+import { formatInventoryDisplay } from '@/lib/packagingUtils';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
   products: Product[];
   vendors?: Vendor[];
+  currentSeason?: Season | null;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
-export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, products, vendors = [], onUpdateInventory }) => {
-  const [showAddInventory, setShowAddInventory] = useState(false);
-  const [newInventoryProductId, setNewInventoryProductId] = useState('');
-  const [newInventoryQuantity, setNewInventoryQuantity] = useState(0);
+export const InventoryView: React.FC<InventoryViewProps> = ({ 
+  inventory, 
+  products, 
+  vendors = [], 
+  currentSeason = null,
+  onUpdateInventory 
+}) => {
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
 
-  const handleAddInventory = () => {
-    if (!newInventoryProductId || newInventoryQuantity <= 0) return;
-    const product = products.find(p => p.id === newInventoryProductId);
-    if (!product) return;
+  const handleSelectProduct = (product: Product, context: ProductWithContext) => {
+    setSelectedProduct(product);
+    setProductContext(context);
+    setShowProductSelector(false);
+    setShowAddModal(true);
+  };
+
+  const handleBackToSelector = () => {
+    setShowAddModal(false);
+    setShowProductSelector(true);
+  };
+
+  const handleAddInventory = (item: InventoryItem) => {
+    // Check if we have existing inventory for this product with same packaging
+    const existing = inventory.find(i => 
+      i.productId === item.productId && 
+      i.packagingName === item.packagingName &&
+      i.packagingSize === item.packagingSize
+    );
     
-    const existing = inventory.find(i => i.productId === newInventoryProductId);
     if (existing) {
-      onUpdateInventory(inventory.map(i => i.productId === newInventoryProductId ? { ...i, quantity: i.quantity + newInventoryQuantity } : i));
+      // Merge quantities
+      onUpdateInventory(inventory.map(i => 
+        i.id === existing.id 
+          ? { 
+              ...i, 
+              quantity: i.quantity + item.quantity,
+              containerCount: (i.containerCount || 0) + (item.containerCount || 0)
+            } 
+          : i
+      ));
     } else {
-      const item: InventoryItem = { id: generateId(), productId: newInventoryProductId, quantity: newInventoryQuantity, unit: product.form === 'liquid' ? 'gal' : 'lbs' };
       onUpdateInventory([...inventory, item]);
     }
-    setShowAddInventory(false);
-    setNewInventoryProductId('');
-    setNewInventoryQuantity(0);
+    
+    setShowAddModal(false);
+    setSelectedProduct(null);
+    setProductContext(null);
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) onUpdateInventory(inventory.filter(i => i.id !== id));
-    else onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity } : i));
+    if (quantity <= 0) {
+      onUpdateInventory(inventory.filter(i => i.id !== id));
+    } else {
+      const item = inventory.find(i => i.id === id);
+      if (item && item.packagingSize && item.containerCount) {
+        // Update container count based on new quantity
+        const newContainerCount = Math.round(quantity / item.packagingSize);
+        onUpdateInventory(inventory.map(i => 
+          i.id === id 
+            ? { ...i, quantity, containerCount: newContainerCount } 
+            : i
+        ));
+      } else {
+        onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity } : i));
+      }
+    }
   };
 
   // Get vendor name for a product
@@ -50,49 +98,41 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
           <h2 className="text-3xl font-bold text-foreground">Inventory</h2>
           <p className="text-muted-foreground mt-1">Track your on-hand product quantities</p>
         </div>
-        <button onClick={() => setShowAddInventory(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90">
+        <button 
+          onClick={() => setShowProductSelector(true)} 
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
+        >
           <Plus className="w-5 h-5" />Add Inventory
         </button>
       </div>
 
-      {showAddInventory && (
-        <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-md m-4">
-            <div className="px-6 py-4 border-b border-border"><h3 className="font-semibold text-lg">Add Inventory</h3></div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Product</label>
-                <select value={newInventoryProductId} onChange={(e) => setNewInventoryProductId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg bg-background">
-                  <option value="">Select a product...</option>
-                  {products.map(p => {
-                    const vendorName = getVendorName(p.vendorId);
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {vendorName ? `${vendorName} - ` : ''}{p.name}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Quantity</label>
-                <input type="number" value={newInventoryQuantity} onChange={(e) => setNewInventoryQuantity(Number(e.target.value))} className="w-full px-3 py-2 border border-input rounded-lg bg-background" min={0} />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
-              <button onClick={() => setShowAddInventory(false)} className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg">Cancel</button>
-              <button onClick={handleAddInventory} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium">Add Inventory</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Product Selector Modal */}
+      <ProductSelectorModal
+        open={showProductSelector}
+        onOpenChange={setShowProductSelector}
+        products={products}
+        vendors={vendors}
+        inventory={inventory}
+        currentSeason={currentSeason}
+        onSelectProduct={handleSelectProduct}
+      />
+
+      {/* Inventory Add Modal */}
+      <InventoryAddModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        selectedProduct={selectedProduct}
+        productContext={productContext}
+        onBack={handleBackToSelector}
+        onAdd={handleAddInventory}
+      />
 
       <div className="bg-card rounded-xl shadow-sm border border-border">
         <table className="w-full">
           <thead>
             <tr className="bg-muted/50">
               <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Product</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">On Hand</th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">On Hand</th>
               <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Value</th>
               <th className="px-6 py-4 w-24"></th>
             </tr>
@@ -102,13 +142,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
               const product = products.find(p => p.id === item.productId);
               if (!product) return null;
               const vendorName = getVendorName(product.vendorId);
-              const value = product.form === 'liquid' ? item.quantity * product.price : item.quantity * (product.priceUnit === 'ton' ? product.price / 2000 : product.price);
+              const value = product.form === 'liquid' 
+                ? item.quantity * product.price 
+                : item.quantity * (product.priceUnit === 'ton' ? product.price / 2000 : product.price);
+              
+              // Format container-based display
+              const display = formatInventoryDisplay(
+                item.containerCount,
+                item.packagingName,
+                item.packagingSize,
+                item.quantity,
+                item.unit
+              );
+              
               return (
                 <tr key={item.id} className="hover:bg-muted/30">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                        {product.form === 'liquid' ? <Droplets className="w-4 h-4 text-blue" /> : <Weight className="w-4 h-4 text-amber" />}
+                        {product.form === 'liquid' ? <Droplets className="w-4 h-4 text-blue-600" /> : <Weight className="w-4 h-4 text-amber-600" />}
                       </div>
                       <div>
                         {vendorName && (
@@ -120,22 +172,52 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <input type="number" value={item.quantity} onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))} className="w-24 px-2 py-1 text-right border border-input rounded bg-background" min={0} />
-                      <span className="text-muted-foreground">{item.unit}</span>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {/* Container-based display */}
+                      {item.containerCount && item.packagingName ? (
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{display.primary}</p>
+                            <p className="text-xs text-muted-foreground">{display.secondary}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            value={item.quantity} 
+                            onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))} 
+                            className="w-24 px-2 py-1 text-right border border-input rounded bg-background" 
+                            min={0} 
+                          />
+                          <span className="text-muted-foreground">{item.unit}</span>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right font-medium text-primary">{formatCurrency(value)}</td>
                   <td className="px-6 py-4">
-                    <button onClick={() => onUpdateInventory(inventory.filter(i => i.id !== item.id))} className="p-2 text-muted-foreground hover:text-destructive rounded-lg">
+                    <button 
+                      onClick={() => onUpdateInventory(inventory.filter(i => i.id !== item.id))} 
+                      className="p-2 text-muted-foreground hover:text-destructive rounded-lg"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
               );
             })}
-            {inventory.length === 0 && <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No inventory items. Add products you have on hand.</td></tr>}
+            {inventory.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>No inventory items</p>
+                  <p className="text-sm">Add products you have on hand</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -506,6 +506,9 @@ const VendorsView: React.FC<{
 // ============================================================================
 
 import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
+import { ProductSelectorModal, type ProductWithContext } from './components/farm/ProductSelectorModal';
+import { InventoryAddModal } from './components/farm/InventoryAddModal';
+import { formatInventoryDisplay } from './lib/packagingUtils';
 
 const InventoryView: React.FC<{
   inventory: InventoryItem[];
@@ -514,9 +517,10 @@ const InventoryView: React.FC<{
   season: Season | null;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }> = ({ inventory, products, vendors, season, onUpdateInventory }) => {
-  const [showAddInventory, setShowAddInventory] = useState(false);
-  const [newProductId, setNewProductId] = useState('');
-  const [newQuantity, setNewQuantity] = useState(0);
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState(0);
 
@@ -535,6 +539,7 @@ const InventoryView: React.FC<{
       short: number;
       unit: 'gal' | 'lbs';
       usages: PlannedUsageItem['usages'];
+      inventoryItem?: InventoryItem;
     }> = [];
     
     const planned: Array<{
@@ -546,6 +551,7 @@ const InventoryView: React.FC<{
       value: number;
       usages: PlannedUsageItem['usages'];
       inventoryId?: string;
+      inventoryItem?: InventoryItem;
     }> = [];
     
     const unassigned: Array<{
@@ -554,6 +560,7 @@ const InventoryView: React.FC<{
       unit: 'gal' | 'lbs';
       value: number;
       inventoryId: string;
+      inventoryItem: InventoryItem;
     }> = [];
     
     // Products with planned usage
@@ -580,6 +587,7 @@ const InventoryView: React.FC<{
           short: Math.abs(remaining),
           unit: usage.unit,
           usages: usage.usages,
+          inventoryItem: invItem,
         });
       }
       
@@ -592,6 +600,7 @@ const InventoryView: React.FC<{
         value,
         usages: usage.usages,
         inventoryId: invItem?.id,
+        inventoryItem: invItem,
       });
     });
     
@@ -613,62 +622,92 @@ const InventoryView: React.FC<{
         unit: item.unit,
         value,
         inventoryId: item.id,
+        inventoryItem: item,
       });
     });
     
     return { blocking, planned, unassigned };
   }, [plannedUsage, inventory, products]);
 
-  const handleAddInventory = () => {
-    if (!newProductId || newQuantity <= 0) return;
-    const product = products.find(p => p.id === newProductId);
-    if (!product) return;
-
-    const existing = inventory.find(i => i.productId === newProductId);
-    if (existing) {
-      onUpdateInventory(inventory.map(i => 
-        i.productId === newProductId 
-          ? { ...i, quantity: i.quantity + newQuantity } 
-          : i
-      ));
-    } else {
-      const item: InventoryItem = {
-        id: generateId(),
-        productId: newProductId,
-        quantity: newQuantity,
-        unit: product.form === 'liquid' ? 'gal' : 'lbs',
-      };
-      onUpdateInventory([...inventory, item]);
-    }
-    setShowAddInventory(false);
-    setNewProductId('');
-    setNewQuantity(0);
+  const handleSelectProduct = (product: Product, context: ProductWithContext) => {
+    setSelectedProduct(product);
+    setProductContext(context);
+    setShowProductSelector(false);
+    setShowAddModal(true);
   };
 
-  const handleQuickAdd = (productId: string, shortAmount: number, unit: 'gal' | 'lbs') => {
-    const existing = inventory.find(i => i.productId === productId);
+  const handleBackToSelector = () => {
+    setShowAddModal(false);
+    setShowProductSelector(true);
+  };
+
+  const handleAddInventory = (item: InventoryItem) => {
+    // Check if we have existing inventory for this product with same packaging
+    const existing = inventory.find(i => 
+      i.productId === item.productId && 
+      i.packagingName === item.packagingName &&
+      i.packagingSize === item.packagingSize
+    );
+    
     if (existing) {
+      // Merge quantities
       onUpdateInventory(inventory.map(i => 
-        i.productId === productId 
-          ? { ...i, quantity: i.quantity + shortAmount } 
+        i.id === existing.id 
+          ? { 
+              ...i, 
+              quantity: i.quantity + item.quantity,
+              containerCount: (i.containerCount || 0) + (item.containerCount || 0)
+            } 
           : i
       ));
     } else {
-      const item: InventoryItem = {
-        id: generateId(),
-        productId,
-        quantity: shortAmount,
-        unit,
-      };
       onUpdateInventory([...inventory, item]);
     }
+    
+    setShowAddModal(false);
+    setSelectedProduct(null);
+    setProductContext(null);
+  };
+
+  const handleQuickAddFromBlocking = (productId: string, shortAmount: number, unit: 'gal' | 'lbs') => {
+    // Open the modal with context for this product
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
+    const vendor = vendors.find(v => v.id === product.vendorId);
+    const invItems = inventory.filter(i => i.productId === productId);
+    const onHand = invItems.reduce((sum, i) => sum + i.quantity, 0);
+    const usageItem = plannedUsage.find(u => u.productId === productId);
+    const plannedNeeded = usageItem?.totalNeeded || 0;
+    const usedIn = usageItem?.usages.map(u => `${u.cropName} → ${u.timingName}`) || [];
+    
+    const context: ProductWithContext = {
+      product,
+      vendor,
+      plannedUsage: plannedNeeded,
+      onHand,
+      status: shortAmount > 0 ? 'short' : 'ok',
+      shortfall: shortAmount,
+      usedIn,
+    };
+    
+    setSelectedProduct(product);
+    setProductContext(context);
+    setShowAddModal(true);
   };
 
   const handleSaveEdit = (id: string) => {
     if (editQuantity <= 0) {
       onUpdateInventory(inventory.filter(i => i.id !== id));
     } else {
-      onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity } : i));
+      const item = inventory.find(i => i.id === id);
+      if (item && item.packagingSize && item.containerCount) {
+        // Update container count based on new quantity
+        const newContainerCount = Math.round(editQuantity / item.packagingSize);
+        onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity, containerCount: newContainerCount } : i));
+      } else {
+        onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity } : i));
+      }
     }
     setEditingId(null);
   };
@@ -678,6 +717,20 @@ const InventoryView: React.FC<{
   };
 
   const hasPlannedUsage = plannedUsage.length > 0;
+
+  // Helper to format inventory display
+  const formatOnHand = (invItem?: InventoryItem, quantity?: number, unit?: 'gal' | 'lbs') => {
+    if (!invItem) {
+      return { primary: `${formatNumber(quantity || 0, 1)} ${unit || 'gal'}`, secondary: '' };
+    }
+    return formatInventoryDisplay(
+      invItem.containerCount,
+      invItem.packagingName,
+      invItem.packagingSize,
+      invItem.quantity,
+      invItem.unit
+    );
+  };
 
   return (
     <div className="p-8">
@@ -690,7 +743,7 @@ const InventoryView: React.FC<{
           </p>
         </div>
         <button
-          onClick={() => setShowAddInventory(true)}
+          onClick={() => setShowProductSelector(true)}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
         >
           <Plus className="w-5 h-5" />
@@ -698,61 +751,26 @@ const InventoryView: React.FC<{
         </button>
       </div>
 
-      {/* Add Inventory Modal */}
-      {showAddInventory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md m-4">
-            <div className="px-6 py-4 border-b border-stone-200">
-              <h3 className="font-semibold text-lg text-stone-800">Add Inventory</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Product</label>
-                <select
-                  value={newProductId}
-                  onChange={(e) => setNewProductId(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Select a product...</option>
-                  {products.map(p => {
-                    const vendor = vendors.find(v => v.id === p.vendorId);
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {vendor ? `${vendor.name} - ` : ''}{p.name}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  value={newQuantity}
-                  onChange={(e) => setNewQuantity(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  min={0}
-                  placeholder="Enter quantity"
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-stone-200 flex justify-end gap-3">
-              <button
-                onClick={() => { setShowAddInventory(false); setNewProductId(''); setNewQuantity(0); }}
-                className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddInventory}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
-              >
-                Add Inventory
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Product Selector Modal */}
+      <ProductSelectorModal
+        open={showProductSelector}
+        onOpenChange={setShowProductSelector}
+        products={products}
+        vendors={vendors}
+        inventory={inventory}
+        currentSeason={season}
+        onSelectProduct={handleSelectProduct}
+      />
+
+      {/* Inventory Add Modal */}
+      <InventoryAddModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        selectedProduct={selectedProduct}
+        productContext={productContext}
+        onBack={handleBackToSelector}
+        onAdd={handleAddInventory}
+      />
 
       {/* Section A: Blocking Plan Execution */}
       {readinessData.blocking.length > 0 && (
@@ -795,7 +813,7 @@ const InventoryView: React.FC<{
                       </p>
                     </div>
                     <button
-                      onClick={() => handleQuickAdd(item.product.id, item.short, item.unit)}
+                      onClick={() => handleQuickAddFromBlocking(item.product.id, item.short, item.unit)}
                       className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
                     >
                       Add {formatNumber(item.short, 1)}
@@ -887,7 +905,7 @@ const InventoryView: React.FC<{
                         )}
                         {!item.inventoryId && (
                           <button
-                            onClick={() => handleQuickAdd(item.product.id, 0, item.unit)}
+                            onClick={() => handleQuickAddFromBlocking(item.product.id, 0, item.unit)}
                             className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
                             title="Add to inventory"
                           >

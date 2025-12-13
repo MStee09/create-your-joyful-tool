@@ -80,11 +80,25 @@ export interface Season {
   createdAt: Date;
 }
 
+export interface PackagingOption {
+  id: string;
+  productId: string;
+  vendorId?: string;
+  name: string;        // "Tote", "Drum", "Jug", "Twin-Pack"
+  unitSize: number;    // 275, 30, 2.5
+  unitType: 'gal' | 'lbs';
+  isDefault?: boolean;
+}
+
 export interface InventoryItem {
   id: string;
   productId: string;
   quantity: number;
   unit: 'gal' | 'lbs';
+  // Container-based tracking
+  packagingName?: string;      // "Drum", "Tote", etc.
+  packagingSize?: number;      // Size per container
+  containerCount?: number;     // Number of containers
 }
 
 export interface AppState {
