@@ -510,9 +510,10 @@ import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 const InventoryView: React.FC<{
   inventory: InventoryItem[];
   products: Product[];
+  vendors: Vendor[];
   season: Season | null;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
-}> = ({ inventory, products, season, onUpdateInventory }) => {
+}> = ({ inventory, products, vendors, season, onUpdateInventory }) => {
   const [showAddInventory, setShowAddInventory] = useState(false);
   const [newProductId, setNewProductId] = useState('');
   const [newQuantity, setNewQuantity] = useState(0);
@@ -713,9 +714,14 @@ const InventoryView: React.FC<{
                   className="w-full px-3 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="">Select a product...</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  {products.map(p => {
+                    const vendor = vendors.find(v => v.id === p.vendorId);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {vendor ? `${vendor.name} - ` : ''}{p.name}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -771,6 +777,9 @@ const InventoryView: React.FC<{
                     </div>
                     <div>
                       <p className="font-medium text-stone-800">{item.product.name}</p>
+                      <p className="text-[10px] text-stone-400 uppercase tracking-wide">
+                        {vendors.find(v => v.id === item.product.vendorId)?.name || ''}
+                      </p>
                       <p className="text-sm text-stone-500">
                         {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
                       </p>
@@ -1288,6 +1297,7 @@ const AppContent: React.FC = () => {
           <InventoryView
             inventory={state.inventory}
             products={legacyProducts}
+            vendors={state.vendors}
             season={currentSeason}
             onUpdateInventory={handleUpdateInventory}
           />

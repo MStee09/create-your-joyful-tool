@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageSquare, Edit3 } from 'lucide-react';
-import type { Application, Product, LiquidUnit, DryUnit } from '@/types/farm';
+import type { Application, Product, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
 import type { ProductPurpose, ProductRole, ApplicationOverride } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 interface ProductRowReadableProps {
   application: Application;
   product: Product | undefined;
+  vendor?: Vendor | null;
   totalAcres: number;
   acresPercentage: number;
   purpose?: ProductPurpose | null;
@@ -48,6 +49,7 @@ const SHORT_ROLE_LABELS: Record<ProductRole, string> = {
 export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   application,
   product,
+  vendor,
   totalAcres,
   acresPercentage,
   purpose,
@@ -119,6 +121,13 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       
       <div className={`flex items-start justify-between ${getWeightOpacity()}`}>
         <div className="flex-1">
+          {/* Vendor name above product name */}
+          {vendor && (
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+              {vendor.name}
+            </p>
+          )}
+          
           {/* Product name with role chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-medium text-foreground">{product.name}</h4>

@@ -239,6 +239,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                 timing={timing}
                 crop={crop}
                 products={products}
+                vendors={vendors}
                 purposes={purposes}
                 onEditApplication={setEditingApplication}
                 onAddApplication={handleAddApplication}

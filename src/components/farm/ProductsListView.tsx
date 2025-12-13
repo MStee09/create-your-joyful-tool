@@ -245,6 +245,12 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                       }
                     </div>
                     <div>
+                      {/* Vendor name above product name */}
+                      {product.vendor && (
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                          {product.vendor.name}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{product.name}</span>
                         {product.generalNotes && <StickyNote className="w-4 h-4 text-amber-500" />}
@@ -262,21 +268,14 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {product.preferredOffering && (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                              {product.vendor?.name}
-                            </span>
-                            <span>•</span>
-                            <span>
-                              {formatCurrency(product.preferredOffering.price)}/{product.preferredOffering.priceUnit}
-                            </span>
-                          </>
+                         {product.preferredOffering && (
+                          <span>
+                            {formatCurrency(product.preferredOffering.price)}/{product.preferredOffering.priceUnit}
+                          </span>
                         )}
                         {product.analysis && (
                           <>
-                            <span>•</span>
+                            {product.preferredOffering && <span>•</span>}
                             <span className="px-1.5 py-0.5 bg-muted rounded text-xs">
                               {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
                               {product.analysis.s > 0 && `-${product.analysis.s}S`}
