@@ -15,3 +15,4 @@ export { SettingsView } from './SettingsView';
 export { ProductHoverCard } from './ProductHoverCard';
 export { AnalysisReviewModal } from './AnalysisReviewModal';
 export { ProductPurposeEditor } from './ProductPurposeEditor';
+export { FunctionCoverageBar } from './FunctionCoverageBar';
