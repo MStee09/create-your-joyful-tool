@@ -15,6 +15,7 @@ import {
   Trash2,
   Sparkles,
   Loader2,
+  BadgeCheck,
 } from 'lucide-react';
 import type { 
   ProductMaster, 
@@ -34,8 +35,9 @@ import {
 import { Breadcrumb } from './Breadcrumb';
 import { VendorOfferingsTable } from './VendorOfferingsTable';
 import { ProductPurposeEditor } from './ProductPurposeEditor';
+import { RoleSuggestionPanel } from './RoleSuggestionPanel';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
-import type { ProductPurpose, ProductRole } from '@/types/productIntelligence';
+import type { ProductPurpose, ProductRole, RoleSuggestion } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -68,6 +70,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [editingReorder, setEditingReorder] = useState(false);
   const [reorderValue, setReorderValue] = useState(product.reorderPoint || 0);
   const [isSuggestingRoles, setIsSuggestingRoles] = useState(false);
+  
+  // Role suggestion review state
+  const [pendingSuggestions, setPendingSuggestions] = useState<RoleSuggestion[] | null>(null);
+  const [suggestionSourceInfo, setSuggestionSourceInfo] = useState<string>('');
 
   // Product intelligence
   const { getPurpose, savePurpose, getAnalysis } = useProductIntelligence();
@@ -166,7 +172,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     savePurpose(product.id, newPurpose);
   };
 
-  // AI-powered role suggestion
+  // AI-powered role suggestion - now opens review panel instead of auto-saving
   const handleSuggestRoles = async () => {
     setIsSuggestingRoles(true);
     try {
@@ -181,16 +187,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
       if (error) throw error;
 
-      const suggestedRoles: ProductRole[] = data.roles || [];
-      if (suggestedRoles.length > 0) {
-        const newPurpose: ProductPurpose = {
-          ...purpose,
-          id: purpose?.id || crypto.randomUUID(),
-          productId: product.id,
-          roles: suggestedRoles,
-        };
-        savePurpose(product.id, newPurpose);
-        toast.success(`Suggested ${suggestedRoles.length} roles based on product analysis`);
+      // New format with suggestions array
+      const suggestions: RoleSuggestion[] = data.suggestions || [];
+      const sourceInfo: string = data.sourceInfo || 'Based on product information';
+      
+      if (suggestions.length > 0) {
+        // Show review panel instead of auto-saving
+        setPendingSuggestions(suggestions);
+        setSuggestionSourceInfo(sourceInfo);
       } else {
         toast.info('No roles could be suggested. Try adding more product details.');
       }
@@ -200,6 +204,25 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     } finally {
       setIsSuggestingRoles(false);
     }
+  };
+
+  // Handle accepting roles from the review panel
+  const handleAcceptRoles = (roles: ProductRole[]) => {
+    const newPurpose: ProductPurpose = {
+      ...purpose,
+      id: purpose?.id || crypto.randomUUID(),
+      productId: product.id,
+      roles,
+      rolesConfirmed: true,
+      confirmedAt: new Date().toISOString(),
+    };
+    savePurpose(product.id, newPurpose);
+    setPendingSuggestions(null);
+    toast.success(`Confirmed ${roles.length} role${roles.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleCancelSuggestions = () => {
+    setPendingSuggestions(null);
   };
 
   const StockStatusBadge = () => {
@@ -394,27 +417,48 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           {/* Purpose & Roles Card */}
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground">Purpose & Roles</h3>
-              <button
-                onClick={handleSuggestRoles}
-                disabled={isSuggestingRoles}
-                className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
-              >
-                {isSuggestingRoles ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground">Purpose & Roles</h3>
+                {purpose?.rolesConfirmed && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                    <BadgeCheck className="w-3 h-3" />
+                    Confirmed
+                  </span>
                 )}
-                {isSuggestingRoles ? 'Analyzing...' : 'Auto-suggest Roles'}
-              </button>
+              </div>
+              {!pendingSuggestions && (
+                <button
+                  onClick={handleSuggestRoles}
+                  disabled={isSuggestingRoles}
+                  className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
+                >
+                  {isSuggestingRoles ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {isSuggestingRoles ? 'Analyzing...' : 'AI Suggest Roles'}
+                </button>
+              )}
             </div>
             
-            <ProductPurposeEditor
-              purpose={purpose}
-              analysis={analysis}
-              productName={product.name}
-              onUpdate={handleUpdatePurpose}
-            />
+            {/* Show suggestion review panel when suggestions are pending */}
+            {pendingSuggestions ? (
+              <RoleSuggestionPanel
+                suggestions={pendingSuggestions}
+                sourceInfo={suggestionSourceInfo}
+                onAcceptAll={handleAcceptRoles}
+                onAcceptSelected={handleAcceptRoles}
+                onCancel={handleCancelSuggestions}
+              />
+            ) : (
+              <ProductPurposeEditor
+                purpose={purpose}
+                analysis={analysis}
+                productName={product.name}
+                onUpdate={handleUpdatePurpose}
+              />
+            )}
           </div>
 
           {/* Inventory Lots */}

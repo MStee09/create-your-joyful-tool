@@ -41,8 +41,28 @@ Classification rules:
    - Chelated micros → fertility-micro, uptake-translocation
    - Amino acids → stress-mitigation, biostimulant
 
-Return ONLY a JSON object with a "roles" array of strings. No explanation.
-Example: {"roles": ["fertility-macro", "nitrogen-conversion"]}`;
+For EACH role you assign, you MUST provide:
+1. confidence: "high", "medium", or "low"
+   - high: Clear match based on NPK analysis or explicit product claims
+   - medium: Reasonable inference from category or ingredients
+   - low: Possible role based on context, needs human verification
+2. explanation: One sentence explaining why this role applies
+3. evidence: 1-3 bullet points of specific facts from the provided data that support this role
+
+Return a JSON object with this structure:
+{
+  "suggestions": [
+    {
+      "role": "fertility-macro",
+      "confidence": "high",
+      "explanation": "Contains 10-34-0 NPK, a high-phosphorus starter fertilizer",
+      "evidence": ["P content of 34% exceeds 10% threshold", "Classified as fertilizer-liquid"]
+    }
+  ],
+  "sourceInfo": "Based on product name, category, and NPK analysis"
+}
+
+Return ONLY the JSON object, no additional text.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -118,11 +138,11 @@ serve(async (req) => {
     }
 
     // Parse JSON from response (handle markdown code blocks)
-    let rolesData;
+    let responseData;
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        rolesData = JSON.parse(jsonMatch[0]);
+        responseData = JSON.parse(jsonMatch[0]);
       } else {
         throw new Error('No JSON found in response');
       }
@@ -138,9 +158,42 @@ serve(async (req) => {
       'nitrogen-conversion', 'rooting-vigor', 'water-conditioning', 'adjuvant'
     ];
     
-    const roles = (rolesData.roles || []).filter((r: string) => validRoles.includes(r));
+    const validConfidences = ['high', 'medium', 'low'];
+    
+    // Handle new format with suggestions array
+    if (responseData.suggestions && Array.isArray(responseData.suggestions)) {
+      const suggestions = responseData.suggestions
+        .filter((s: any) => validRoles.includes(s.role))
+        .map((s: any) => ({
+          role: s.role,
+          confidence: validConfidences.includes(s.confidence) ? s.confidence : 'medium',
+          explanation: s.explanation || 'No explanation provided',
+          evidence: Array.isArray(s.evidence) ? s.evidence : [],
+        }));
 
-    return new Response(JSON.stringify({ roles }), {
+      return new Response(JSON.stringify({ 
+        suggestions,
+        sourceInfo: responseData.sourceInfo || 'Based on provided product information',
+        analyzedAt: new Date().toISOString(),
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    // Fallback for legacy format (just roles array)
+    const roles = (responseData.roles || []).filter((r: string) => validRoles.includes(r));
+    const legacySuggestions = roles.map((role: string) => ({
+      role,
+      confidence: 'medium' as const,
+      explanation: 'Role suggested based on product analysis',
+      evidence: [],
+    }));
+
+    return new Response(JSON.stringify({ 
+      suggestions: legacySuggestions,
+      sourceInfo: 'Based on provided product information',
+      analyzedAt: new Date().toISOString(),
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
