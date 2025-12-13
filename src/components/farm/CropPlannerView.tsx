@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
-import { CropDetail } from './CropDetail';
+import { CropPlanningView } from './CropPlanningView';
 
 interface CropPlannerViewProps {
   season: Season | null;
@@ -149,7 +149,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
       {/* Crop Detail */}
       <div className="flex-1 overflow-y-auto">
         {activeCrop ? (
-          <CropDetail
+          <CropPlanningView
             crop={activeCrop}
             products={products}
             vendors={vendors}

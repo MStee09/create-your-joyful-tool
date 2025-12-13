@@ -49,6 +49,9 @@ export interface Application {
   rate: number;
   rateUnit: RateUnit;
   tierId: string;
+  // New comprehension-first fields
+  acresPercentage?: number; // 0-100, replaces tier dependency
+  role?: string; // e.g., "Biology / Carbon", "Stress mitigation"
 }
 
 export interface SeedTreatment {
