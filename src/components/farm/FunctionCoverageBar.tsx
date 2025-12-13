@@ -1,8 +1,13 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
 import type { Crop, Product } from '@/types/farm';
 import type { ProductPurpose } from '@/types/productIntelligence';
 import { FUNCTION_CATEGORIES, getTimingPhase, getRoleFunctionCategory } from '@/lib/functionCategories';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface FunctionCoverageBarProps {
   crop: Crop;
@@ -10,16 +15,37 @@ interface FunctionCoverageBarProps {
   purposes: Record<string, ProductPurpose>;
 }
 
+interface ProductContribution {
+  name: string;
+  acres: number;
+  timing: string;
+}
+
+interface PhaseData {
+  percent: number;
+  products: ProductContribution[];
+}
+
+interface FunctionCoverage {
+  early: PhaseData;
+  mid: PhaseData;
+  late: PhaseData;
+}
+
 export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
   crop,
   products,
   purposes,
 }) => {
-  // Build coverage map: functionId -> { early: boolean, mid: boolean, late: boolean }
-  const coverage: Record<string, { early: boolean; mid: boolean; late: boolean }> = {};
+  // Build coverage map: functionId -> { early, mid, late } with weighted percentages
+  const coverage: Record<string, FunctionCoverage> = {};
   
   FUNCTION_CATEGORIES.forEach(cat => {
-    coverage[cat.id] = { early: false, mid: false, late: false };
+    coverage[cat.id] = { 
+      early: { percent: 0, products: [] },
+      mid: { percent: 0, products: [] },
+      late: { percent: 0, products: [] }
+    };
   });
 
   // Iterate through timings and their applications
@@ -31,13 +57,14 @@ export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
       const product = products.find(p => p.id === app.productId);
       if (!product) return;
       
+      const acresPercent = app.acresPercentage ?? 100;
+      
       // Get roles from purpose or application.role fallback
       const purpose = purposes[product.id];
-      const roles = purpose?.roles || [];
+      const roles: string[] = purpose?.roles ? [...purpose.roles] : [];
       
       // Also check if app has a role string we can match
       if (app.role) {
-        // Simple string matching for legacy roles
         const roleStr = app.role.toLowerCase();
         if (roleStr.includes('root')) roles.push('rooting-vigor');
         if (roleStr.includes('carbon') || roleStr.includes('biology')) roles.push('carbon-biology-food');
@@ -45,50 +72,151 @@ export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
         if (roleStr.includes('nitrogen') || roleStr.includes('n eff')) roles.push('nitrogen-conversion');
       }
       
-      roles.forEach(role => {
-        const cat = getRoleFunctionCategory(role);
+      // Deduplicate roles
+      const uniqueRoles = [...new Set(roles)];
+      
+      uniqueRoles.forEach(roleStr => {
+        const cat = getRoleFunctionCategory(roleStr as any);
         if (cat && coverage[cat.id]) {
-          coverage[cat.id][phase] = true;
+          const phaseData = coverage[cat.id][phase];
+          
+          // Add contribution (will cap later)
+          phaseData.products.push({
+            name: product.name,
+            acres: acresPercent,
+            timing: timing.name
+          });
+          
+          // Sum percentages (cap at 100)
+          phaseData.percent = Math.min(100, phaseData.percent + acresPercent);
         }
       });
     });
   });
 
-  const PhaseIndicator: React.FC<{ covered: boolean; label: string }> = ({ covered, label }) => (
-    <span className={`flex items-center gap-0.5 text-xs ${covered ? 'text-emerald-600' : 'text-muted-foreground/50'}`}>
-      {covered ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-      <span className="hidden sm:inline">{label}</span>
-    </span>
+  const phaseColors = {
+    early: 'bg-emerald-500',
+    mid: 'bg-amber-500',
+    late: 'bg-sky-500'
+  };
+
+  const phaseLabels = {
+    early: 'Early',
+    mid: 'Mid',
+    late: 'Late'
+  };
+
+  const PhaseBar: React.FC<{ 
+    phase: 'early' | 'mid' | 'late'; 
+    data: PhaseData;
+    functionLabel: string;
+  }> = ({ phase, data, functionLabel }) => {
+    const hasContribution = data.percent > 0;
+    
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden cursor-default">
+            <div 
+              className={`h-full ${phaseColors[phase]} transition-all duration-300`}
+              style={{ width: `${data.percent}%` }}
+            />
+          </div>
+        </TooltipTrigger>
+        {hasContribution && (
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              <p className="font-medium mb-1">
+                {functionLabel} — {phaseLabels[phase]} ({Math.round(data.percent)}%)
+              </p>
+              <p className="text-muted-foreground text-xs mb-1">Driven by:</p>
+              <ul className="text-xs space-y-0.5">
+                {data.products.map((p, i) => (
+                  <li key={i}>• {p.name} ({p.acres}%) – {p.timing}</li>
+                ))}
+              </ul>
+            </div>
+          </TooltipContent>
+        )}
+      </Tooltip>
+    );
+  };
+
+  // Check if there's any coverage at all
+  const hasAnyCoverage = Object.values(coverage).some(
+    c => c.early.percent > 0 || c.mid.percent > 0 || c.late.percent > 0
   );
 
+  if (!hasAnyCoverage) {
+    return (
+      <div className="bg-card rounded-lg border border-border p-4">
+        <p className="text-sm text-muted-foreground">
+          Add product roles to see function coverage across the season.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
-      <h4 className="text-sm font-medium text-muted-foreground mb-3">Function Coverage</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <TooltipProvider delayDuration={100}>
+      <div className="bg-card rounded-lg border border-border p-4 space-y-2">
+        {/* Legend */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+          <span className="flex items-center gap-1.5">
+            <div className={`w-3 h-2 rounded-sm ${phaseColors.early}`} />
+            Early
+          </span>
+          <span className="flex items-center gap-1.5">
+            <div className={`w-3 h-2 rounded-sm ${phaseColors.mid}`} />
+            Mid
+          </span>
+          <span className="flex items-center gap-1.5">
+            <div className={`w-3 h-2 rounded-sm ${phaseColors.late}`} />
+            Late
+          </span>
+        </div>
+
+        {/* Function rows */}
         {FUNCTION_CATEGORIES.map(cat => {
           const cov = coverage[cat.id];
-          const hasCoverage = cov.early || cov.mid || cov.late;
+          const totalPresence = cov.early.percent + cov.mid.percent + cov.late.percent;
+          
+          // Only show functions that have some coverage
+          if (totalPresence === 0) return null;
           
           return (
-            <div 
-              key={cat.id}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                hasCoverage ? 'bg-secondary/50' : 'bg-muted/30'
-              }`}
-            >
-              <span className="text-base">{cat.icon}</span>
-              <span className={`text-sm font-medium flex-1 ${hasCoverage ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {cat.label}
-              </span>
-              <div className="flex items-center gap-1">
-                <PhaseIndicator covered={cov.early} label="E" />
-                <PhaseIndicator covered={cov.mid} label="M" />
-                <PhaseIndicator covered={cov.late} label="L" />
+            <div key={cat.id} className="flex items-center gap-3">
+              {/* Icon + Label */}
+              <div className="flex items-center gap-2 w-32 shrink-0">
+                <span className="text-base">{cat.icon}</span>
+                <span className="text-sm font-medium text-foreground truncate">
+                  {cat.label}
+                </span>
+              </div>
+              
+              {/* Three-segment bar */}
+              <div className="flex-1 flex gap-0.5">
+                <PhaseBar phase="early" data={cov.early} functionLabel={cat.label} />
+                <PhaseBar phase="mid" data={cov.mid} functionLabel={cat.label} />
+                <PhaseBar phase="late" data={cov.late} functionLabel={cat.label} />
               </div>
             </div>
           );
         })}
+
+        {/* Show uncovered functions hint */}
+        {FUNCTION_CATEGORIES.some(cat => {
+          const cov = coverage[cat.id];
+          return cov.early.percent === 0 && cov.mid.percent === 0 && cov.late.percent === 0;
+        }) && (
+          <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+            {FUNCTION_CATEGORIES.filter(cat => {
+              const cov = coverage[cat.id];
+              return cov.early.percent === 0 && cov.mid.percent === 0 && cov.late.percent === 0;
+            }).map(c => c.icon).join(' ')} not covered
+          </p>
+        )}
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
