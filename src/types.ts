@@ -24,12 +24,47 @@ export interface NutrientAnalysis {
   s: number;
 }
 
+export interface VendorContact {
+  id: string;
+  name: string;
+  role?: string; // "sales rep", "agronomist", "logistics"
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface VendorDocument {
+  id: string;
+  name: string;
+  type: 'catalog' | 'pricing' | 'agreement' | 'other';
+  data?: string; // Base64 encoded
+  fileName?: string;
+  url?: string;
+}
+
+export type VendorTag = 'primary-biological' | 'primary-fertility' | 'primary-crop-protection' | 'specialty' | 'local' | 'national';
+
 export interface Vendor {
   id: string;
   name: string;
+  
+  // Legacy contact fields (kept for migration)
   contactEmail?: string;
   contactPhone?: string;
-  notes?: string;
+  
+  // Enhanced contact info
+  website?: string;
+  contacts: VendorContact[];
+  
+  // Documents
+  documents: VendorDocument[];
+  
+  // Tags & classification
+  tags: VendorTag[];
+  
+  // Notes
+  generalNotes?: string;
+  freightNotes?: string; // "Freight included on totes", "Spring-only pricing"
 }
 
 // NEW: Vendor Offering - separates pricing from product master

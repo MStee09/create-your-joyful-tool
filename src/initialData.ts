@@ -11,17 +11,17 @@ const id = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(3
 // VENDORS
 // ============================================================================
 export const initialVendors: Vendor[] = [
-  { id: 'v1', name: 'BioAg Management' },
-  { id: 'v2', name: 'Hafa Industries' },
-  { id: 'v3', name: 'BW Fusion' },
-  { id: 'v4', name: 'Soil Biotics' },
-  { id: 'v5', name: 'QLF' },
-  { id: 'v6', name: 'Professional Agronomy' },
-  { id: 'v7', name: 'Growth Tech LLC' },
-  { id: 'v8', name: 'Dry Fertilizer' },
-  { id: 'v9', name: 'Sabbath Soil' },
-  { id: 'v10', name: 'AquaYield' },
-  { id: 'v11', name: 'Interpose Ag' },
+  { id: 'v1', name: 'BioAg Management', contacts: [], documents: [], tags: ['primary-biological'] },
+  { id: 'v2', name: 'Hafa Industries', contacts: [], documents: [], tags: [] },
+  { id: 'v3', name: 'BW Fusion', contacts: [], documents: [], tags: [] },
+  { id: 'v4', name: 'Soil Biotics', contacts: [], documents: [], tags: [] },
+  { id: 'v5', name: 'QLF', contacts: [], documents: [], tags: [] },
+  { id: 'v6', name: 'Professional Agronomy', contacts: [], documents: [], tags: [] },
+  { id: 'v7', name: 'Growth Tech LLC', contacts: [], documents: [], tags: [] },
+  { id: 'v8', name: 'Dry Fertilizer', contacts: [], documents: [], tags: ['primary-fertility'] },
+  { id: 'v9', name: 'Sabbath Soil', contacts: [], documents: [], tags: [] },
+  { id: 'v10', name: 'AquaYield', contacts: [], documents: [], tags: ['specialty'] },
+  { id: 'v11', name: 'Interpose Ag', contacts: [], documents: [], tags: [] },
 ];
 
 // ============================================================================

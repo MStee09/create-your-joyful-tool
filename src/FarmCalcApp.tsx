@@ -53,6 +53,7 @@ import type {
 // Import new components
 import { ProductsListView } from './components/farm/ProductsListView';
 import { ProductDetailView } from './components/farm/ProductDetailView';
+import { VendorsViewNew } from './components/farm/VendorsViewNew';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -1463,10 +1464,13 @@ const AppContent: React.FC = () => {
         );
       case 'vendors':
         return (
-          <VendorsView
+          <VendorsViewNew
             vendors={state.vendors}
-            products={legacyProducts}
+            productMasters={state.productMasters || []}
+            vendorOfferings={state.vendorOfferings || []}
+            inventory={state.inventory}
             onUpdateVendors={handleUpdateVendors}
+            onNavigateToProduct={() => setActiveView('products')}
           />
         );
       case 'inventory':
