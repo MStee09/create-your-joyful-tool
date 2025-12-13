@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import { Download, FileSpreadsheet, Building2, Leaf } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, LiquidUnit, DryUnit } from '../types';
 import { convertToGallons, convertToPounds, downloadCSV, formatCurrency, calculateCropCosts } from '../lib/calculations';
@@ -10,12 +10,12 @@ interface EnhancedExportViewProps {
   inventory: InventoryItem[];
 }
 
-export const EnhancedExportView: React.FC<EnhancedExportViewProps> = ({
+export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewProps>(({
   season,
   products,
   vendors,
   inventory,
-}) => {
+}, ref) => {
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
 
   const generateFarmPlanCSV = () => {
@@ -231,4 +231,6 @@ export const EnhancedExportView: React.FC<EnhancedExportViewProps> = ({
       )}
     </div>
   );
-};
+});
+
+EnhancedExportView.displayName = 'EnhancedExportView';

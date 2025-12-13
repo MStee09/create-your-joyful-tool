@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -26,6 +26,9 @@ import {
   Cloud,
   CloudOff,
   RefreshCw,
+  FileText,
+  Upload,
+  StickyNote,
 } from 'lucide-react';
 
 // Import types
@@ -979,7 +982,7 @@ const CropDetail: React.FC<{
 };
 
 // ============================================================================
-// PRODUCTS VIEW (Simplified - keeping from original)
+// PRODUCTS VIEW (With Notes and PDF Upload)
 // ============================================================================
 
 const ProductsView: React.FC<{
@@ -991,6 +994,7 @@ const ProductsView: React.FC<{
   const [filterVendor, setFilterVendor] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -1024,6 +1028,40 @@ const ProductsView: React.FC<{
     }
   };
 
+  const handleUpdateNotes = (id: string, notes: string) => {
+    onUpdateProducts(products.map(p => p.id === id ? { ...p, notes } : p));
+  };
+
+  const handleUploadLabel = (id: string, file: File) => {
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a PDF file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      onUpdateProducts(products.map(p => p.id === id ? { ...p, labelData: base64, labelFileName: file.name } : p));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLabel = (id: string) => {
+    onUpdateProducts(products.map(p => p.id === id ? { ...p, labelData: undefined, labelFileName: undefined } : p));
+  };
+
+  const handleViewLabel = (product: Product) => {
+    if (product.labelData) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(`<iframe src="${product.labelData}" style="width:100%;height:100%;border:none;"></iframe>`);
+      }
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -1041,13 +1079,13 @@ const ProductsView: React.FC<{
             placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full px-4 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
         <select
           value={filterVendor}
           onChange={(e) => setFilterVendor(e.target.value)}
-          className="px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-4 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="">All Vendors</option>
           {vendors.map(v => (
@@ -1066,66 +1104,141 @@ const ProductsView: React.FC<{
             </div>
             <div className="divide-y divide-stone-100">
               {vendorProducts.map(product => (
-                <div key={product.id} className="px-6 py-4 flex items-center justify-between hover:bg-stone-50">
-                  {editingId === product.id ? (
-                    <div className="flex-1 grid grid-cols-5 gap-4 items-center">
-                      <input
-                        value={editingProduct.name || ''}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                        className="px-2 py-1 border border-stone-300 rounded text-sm"
-                      />
-                      <input
-                        type="number"
-                        value={editingProduct.price || 0}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
-                        className="px-2 py-1 border border-stone-300 rounded text-sm"
-                      />
-                      <select
-                        value={editingProduct.priceUnit || 'gal'}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, priceUnit: e.target.value as 'gal' | 'lbs' | 'ton' })}
-                        className="px-2 py-1 border border-stone-300 rounded text-sm"
-                      >
-                        <option value="gal">/gal</option>
-                        <option value="lbs">/lbs</option>
-                        <option value="ton">/ton</option>
-                      </select>
-                      <div className="flex gap-2">
-                        <button onClick={handleSaveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setEditingId(null)} className="p-1 text-stone-400 hover:bg-stone-100 rounded">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                          {product.form === 'liquid' ? <Droplets className="w-5 h-5 text-blue-600" /> : <Weight className="w-5 h-5 text-amber-600" />}
+                <div key={product.id} className="hover:bg-stone-50">
+                  <div className="px-6 py-4 flex items-center justify-between">
+                    {editingId === product.id ? (
+                      <div className="flex-1 grid grid-cols-5 gap-4 items-center">
+                        <input
+                          value={editingProduct.name || ''}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                          className="px-2 py-1 border border-stone-300 rounded text-sm"
+                        />
+                        <input
+                          type="number"
+                          value={editingProduct.price || 0}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
+                          className="px-2 py-1 border border-stone-300 rounded text-sm"
+                        />
+                        <select
+                          value={editingProduct.priceUnit || 'gal'}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, priceUnit: e.target.value as 'gal' | 'lbs' | 'ton' })}
+                          className="px-2 py-1 border border-stone-300 rounded text-sm bg-white"
+                        >
+                          <option value="gal">/gal</option>
+                          <option value="lbs">/lbs</option>
+                          <option value="ton">/ton</option>
+                        </select>
+                        <div className="flex gap-2">
+                          <button onClick={handleSaveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="p-1 text-stone-400 hover:bg-stone-100 rounded">
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div>
-                          <p className="font-medium text-stone-800">{product.name}</p>
-                          <div className="flex items-center gap-2 text-sm text-stone-500">
-                            <span>{formatCurrency(product.price)}/{product.priceUnit}</span>
-                            {product.analysis && (
-                              <span className="px-2 py-0.5 bg-stone-100 rounded text-xs">
-                                {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
-                                {product.analysis.s > 0 && `-${product.analysis.s}S`}
-                              </span>
-                            )}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
+                            {product.form === 'liquid' ? <Droplets className="w-5 h-5 text-blue-600" /> : <Weight className="w-5 h-5 text-amber-600" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-stone-800">{product.name}</p>
+                              {product.notes && (
+                                <span title="Has notes"><StickyNote className="w-4 h-4 text-amber-500" /></span>
+                              )}
+                              {product.labelData && (
+                                <span title="Has label PDF"><FileText className="w-4 h-4 text-blue-500" /></span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-stone-500">
+                              <span>{formatCurrency(product.price)}/{product.priceUnit}</span>
+                              {product.analysis && (
+                                <span className="px-2 py-0.5 bg-stone-100 rounded text-xs">
+                                  {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
+                                  {product.analysis.s > 0 && `-${product.analysis.s}S`}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setExpandedId(expandedId === product.id ? null : product.id)}
+                            className={`p-2 rounded-lg ${expandedId === product.id ? 'text-emerald-600 bg-emerald-50' : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'}`}
+                            title="Notes & Label"
+                          >
+                            {expandedId === product.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                          <button onClick={() => handleStartEdit(product)} className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(product.id)} className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Expanded Notes & Label Section */}
+                  {expandedId === product.id && (
+                    <div className="px-6 pb-4 pt-0 border-t border-stone-100 bg-stone-50/50">
+                      <div className="grid grid-cols-2 gap-6 mt-4">
+                        {/* Notes Section */}
+                        <div>
+                          <label className="block text-sm font-medium text-stone-700 mb-2">Notes</label>
+                          <textarea
+                            value={product.notes || ''}
+                            onChange={(e) => handleUpdateNotes(product.id, e.target.value)}
+                            placeholder="Add notes about this product..."
+                            className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm resize-none h-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                        
+                        {/* Label PDF Section */}
+                        <div>
+                          <label className="block text-sm font-medium text-stone-700 mb-2">Product Label (PDF)</label>
+                          {product.labelData ? (
+                            <div className="flex items-center gap-3 p-3 bg-white border border-stone-200 rounded-lg">
+                              <FileText className="w-8 h-8 text-red-500" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-stone-800 truncate">{product.labelFileName || 'Label.pdf'}</p>
+                                <p className="text-xs text-stone-500">PDF attached</p>
+                              </div>
+                              <button
+                                onClick={() => handleViewLabel(product)}
+                                className="px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleRemoveLabel(product.id)}
+                                className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-stone-300 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors">
+                              <Upload className="w-5 h-5 text-stone-400" />
+                              <span className="text-sm text-stone-500">Upload PDF label</span>
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleUploadLabel(product.id, file);
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleStartEdit(product)} className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDeleteProduct(product.id)} className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1176,7 +1289,7 @@ const VendorsView: React.FC<{
 };
 
 // ============================================================================
-// INVENTORY VIEW (Simplified)
+// INVENTORY VIEW (With Add Inventory functionality)
 // ============================================================================
 
 const InventoryView: React.FC<{
@@ -1184,6 +1297,10 @@ const InventoryView: React.FC<{
   products: Product[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }> = ({ inventory, products, onUpdateInventory }) => {
+  const [showAddInventory, setShowAddInventory] = useState(false);
+  const [newProductId, setNewProductId] = useState('');
+  const [newQuantity, setNewQuantity] = useState(0);
+
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
       onUpdateInventory(inventory.filter(i => i.id !== id));
@@ -1192,12 +1309,102 @@ const InventoryView: React.FC<{
     }
   };
 
+  const handleAddInventory = () => {
+    if (!newProductId || newQuantity <= 0) return;
+    const product = products.find(p => p.id === newProductId);
+    if (!product) return;
+
+    const existing = inventory.find(i => i.productId === newProductId);
+    if (existing) {
+      onUpdateInventory(inventory.map(i => 
+        i.productId === newProductId 
+          ? { ...i, quantity: i.quantity + newQuantity } 
+          : i
+      ));
+    } else {
+      const item: InventoryItem = {
+        id: generateId(),
+        productId: newProductId,
+        quantity: newQuantity,
+        unit: product.form === 'liquid' ? 'gal' : 'lbs',
+      };
+      onUpdateInventory([...inventory, item]);
+    }
+    setShowAddInventory(false);
+    setNewProductId('');
+    setNewQuantity(0);
+  };
+
+  const handleDeleteInventory = (id: string) => {
+    onUpdateInventory(inventory.filter(i => i.id !== id));
+  };
+
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-stone-800">Inventory</h2>
-        <p className="text-stone-500 mt-1">Track your on-hand product quantities</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-3xl font-bold text-stone-800">Inventory</h2>
+          <p className="text-stone-500 mt-1">Track your on-hand product quantities</p>
+        </div>
+        <button
+          onClick={() => setShowAddInventory(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
+        >
+          <Plus className="w-5 h-5" />
+          Add Inventory
+        </button>
       </div>
+
+      {/* Add Inventory Modal */}
+      {showAddInventory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md m-4">
+            <div className="px-6 py-4 border-b border-stone-200">
+              <h3 className="font-semibold text-lg text-stone-800">Add Inventory</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Product</label>
+                <select
+                  value={newProductId}
+                  onChange={(e) => setNewProductId(e.target.value)}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Select a product...</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Quantity</label>
+                <input
+                  type="number"
+                  value={newQuantity}
+                  onChange={(e) => setNewQuantity(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  min={0}
+                  placeholder="Enter quantity"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowAddInventory(false); setNewProductId(''); setNewQuantity(0); }}
+                className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddInventory}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
+              >
+                Add Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-stone-200">
         <table className="w-full">
@@ -1206,6 +1413,7 @@ const InventoryView: React.FC<{
               <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
               <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
               <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Value</th>
+              <th className="px-6 py-4 w-16"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-200">
@@ -1219,8 +1427,15 @@ const InventoryView: React.FC<{
               }
               
               return (
-                <tr key={item.id}>
-                  <td className="px-6 py-4 font-medium text-stone-800">{product.name}</td>
+                <tr key={item.id} className="hover:bg-stone-50">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
+                        {product.form === 'liquid' ? <Droplets className="w-5 h-5 text-blue-600" /> : <Weight className="w-5 h-5 text-amber-600" />}
+                      </div>
+                      <span className="font-medium text-stone-800">{product.name}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <input
                       type="number"
@@ -1231,13 +1446,21 @@ const InventoryView: React.FC<{
                     <span className="ml-2 text-stone-500">{item.unit}</span>
                   </td>
                   <td className="px-6 py-4 text-right text-emerald-600 font-medium">{formatCurrency(value)}</td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => handleDeleteInventory(item.id)}
+                      className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {inventory.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-stone-400">
-                  No inventory items tracked yet.
+                <td colSpan={4} className="px-6 py-8 text-center text-stone-400">
+                  No inventory items. Click "Add Inventory" to track products you have on hand.
                 </td>
               </tr>
             )}
