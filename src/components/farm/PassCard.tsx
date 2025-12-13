@@ -1,33 +1,49 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product } from '@/types/farm';
-import type { ProductPurpose } from '@/types/productIntelligence';
+import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
 import { calculatePassSummary, getApplicationAcresPercentage } from '@/lib/cropCalculations';
 import { FUNCTION_CATEGORIES, getRoleFunctionCategory } from '@/lib/functionCategories';
+import { cn } from '@/lib/utils';
 
 interface PassCardProps {
   timing: ApplicationTiming;
   crop: Crop;
   products: Product[];
   purposes?: Record<string, ProductPurpose>;
+  applicationOverrides?: Record<string, ApplicationOverride>;
   onEditApplication: (app: Application) => void;
   onAddApplication: (timingId: string) => void;
   onDuplicateTiming: (timingId: string) => void;
   onDeleteTiming: (timingId: string) => void;
+  onUpdateApplicationOverride?: (override: ApplicationOverride) => void;
   defaultExpanded?: boolean;
 }
+
+// Function category chip styles
+const FUNCTION_CHIP_STYLES: Record<string, { bg: string; text: string }> = {
+  'Rooting': { bg: 'bg-orange-500/15', text: 'text-orange-600' },
+  'Carbon & Biology': { bg: 'bg-amber-500/15', text: 'text-amber-600' },
+  'N Efficiency': { bg: 'bg-lime-500/15', text: 'text-lime-600' },
+  'Stress': { bg: 'bg-rose-500/15', text: 'text-rose-600' },
+  'Fertility': { bg: 'bg-emerald-500/15', text: 'text-emerald-600' },
+  'Uptake': { bg: 'bg-blue-500/15', text: 'text-blue-600' },
+  'Water & Adj': { bg: 'bg-sky-500/15', text: 'text-sky-600' },
+};
 
 export const PassCard: React.FC<PassCardProps> = ({
   timing,
   crop,
   products,
   purposes = {},
+  applicationOverrides = {},
   onEditApplication,
   onAddApplication,
   onDuplicateTiming,
   onDeleteTiming,
+  onUpdateApplicationOverride,
   defaultExpanded = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -38,9 +54,10 @@ export const PassCard: React.FC<PassCardProps> = ({
   const hasNutrients = summary.nutrients.n > 0 || summary.nutrients.p > 0 || 
                        summary.nutrients.k > 0 || summary.nutrients.s > 0;
 
-  // Aggregate functions for this pass
-  const passFunctions = React.useMemo(() => {
+  // Aggregate functions for this pass and count products missing roles
+  const { passFunctions, missingRolesCount } = React.useMemo(() => {
     const functionSet = new Set<string>();
+    let missingCount = 0;
     
     summary.applications.forEach(app => {
       const product = products.find(p => p.id === app.productId);
@@ -49,6 +66,11 @@ export const PassCard: React.FC<PassCardProps> = ({
       // Get roles from purpose
       const purpose = purposes[product.id];
       const roles = purpose?.roles || [];
+      
+      // Check if product is missing roles
+      if (!roles.length || !purpose?.rolesConfirmed) {
+        missingCount++;
+      }
       
       // Also check legacy role string
       if (app.role) {
@@ -66,7 +88,10 @@ export const PassCard: React.FC<PassCardProps> = ({
       });
     });
     
-    return Array.from(functionSet);
+    return {
+      passFunctions: Array.from(functionSet),
+      missingRolesCount: missingCount,
+    };
   }, [summary.applications, products, purposes]);
 
   return (
@@ -86,13 +111,45 @@ export const PassCard: React.FC<PassCardProps> = ({
           )}
           
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-foreground uppercase tracking-wide">
                 {timing.name}
               </h3>
+              
+              {/* Function chips */}
               {passFunctions.length > 0 && (
-                <span className="text-sm text-primary/80 font-medium">
-                  {passFunctions.join(' • ')}
+                <div className="flex items-center gap-1">
+                  {passFunctions.slice(0, 3).map(func => {
+                    const style = FUNCTION_CHIP_STYLES[func] || { bg: 'bg-muted', text: 'text-muted-foreground' };
+                    return (
+                      <span
+                        key={func}
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-medium',
+                          style.bg,
+                          style.text
+                        )}
+                      >
+                        {func}
+                      </span>
+                    );
+                  })}
+                  {passFunctions.length > 3 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{passFunctions.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Missing roles indicator */}
+              {missingRolesCount > 0 && (
+                <span 
+                  className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-600 rounded-full text-xs"
+                  title={`${missingRolesCount} product${missingRolesCount !== 1 ? 's' : ''} need roles`}
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  {missingRolesCount}
                 </span>
               )}
             </div>
@@ -143,6 +200,8 @@ export const PassCard: React.FC<PassCardProps> = ({
             summary.applications.map(app => {
               const product = products.find(p => p.id === app.productId);
               const acresPercentage = getApplicationAcresPercentage(app, crop);
+              const purpose = product ? purposes[product.id] : null;
+              const override = applicationOverrides[app.id];
               
               return (
                 <ProductRowReadable
@@ -151,7 +210,10 @@ export const PassCard: React.FC<PassCardProps> = ({
                   product={product}
                   totalAcres={crop.totalAcres}
                   acresPercentage={acresPercentage}
+                  purpose={purpose}
+                  override={override}
                   onEdit={() => onEditApplication(app)}
+                  onUpdateOverride={onUpdateApplicationOverride}
                 />
               );
             })
@@ -169,3 +231,4 @@ export const PassCard: React.FC<PassCardProps> = ({
     </div>
   );
 };
+
