@@ -142,21 +142,6 @@ export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
     );
   };
 
-  // Check if there's any coverage at all
-  const hasAnyCoverage = Object.values(coverage).some(
-    c => c.early.percent > 0 || c.mid.percent > 0 || c.late.percent > 0
-  );
-
-  if (!hasAnyCoverage) {
-    return (
-      <div className="bg-card rounded-lg border border-border p-4">
-        <p className="text-sm text-muted-foreground">
-          Add product roles to see function coverage across the season.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <TooltipProvider delayDuration={100}>
       <div className="bg-card rounded-lg border border-border p-4 space-y-2">
@@ -176,20 +161,20 @@ export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
           </span>
         </div>
 
-        {/* Function rows */}
+        {/* Function rows - always show all functions */}
         {FUNCTION_CATEGORIES.map(cat => {
           const cov = coverage[cat.id];
-          const totalPresence = cov.early.percent + cov.mid.percent + cov.late.percent;
-          
-          // Only show functions that have some coverage
-          if (totalPresence === 0) return null;
+          const hasCoverage = cov.early.percent > 0 || cov.mid.percent > 0 || cov.late.percent > 0;
           
           return (
-            <div key={cat.id} className="flex items-center gap-3">
+            <div 
+              key={cat.id} 
+              className={`flex items-center gap-3 ${!hasCoverage ? 'opacity-50' : ''}`}
+            >
               {/* Icon + Label */}
               <div className="flex items-center gap-2 w-32 shrink-0">
                 <span className="text-base">{cat.icon}</span>
-                <span className="text-sm font-medium text-foreground truncate">
+                <span className={`text-sm font-medium truncate ${hasCoverage ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {cat.label}
                 </span>
               </div>
@@ -204,18 +189,6 @@ export const FunctionCoverageBar: React.FC<FunctionCoverageBarProps> = ({
           );
         })}
 
-        {/* Show uncovered functions hint */}
-        {FUNCTION_CATEGORIES.some(cat => {
-          const cov = coverage[cat.id];
-          return cov.early.percent === 0 && cov.mid.percent === 0 && cov.late.percent === 0;
-        }) && (
-          <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
-            {FUNCTION_CATEGORIES.filter(cat => {
-              const cov = coverage[cat.id];
-              return cov.early.percent === 0 && cov.mid.percent === 0 && cov.late.percent === 0;
-            }).map(c => c.icon).join(' ')} not covered
-          </p>
-        )}
       </div>
     </TooltipProvider>
   );
