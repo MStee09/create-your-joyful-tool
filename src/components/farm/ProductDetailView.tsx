@@ -13,6 +13,8 @@ import {
   XCircle,
   Plus,
   Trash2,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import type { 
   ProductMaster, 
@@ -31,7 +33,12 @@ import {
 } from '@/lib/calculations';
 import { Breadcrumb } from './Breadcrumb';
 import { VendorOfferingsTable } from './VendorOfferingsTable';
-
+import { ProductPurposeEditor } from './ProductPurposeEditor';
+import { useProductIntelligence } from '@/hooks/useProductIntelligence';
+import type { ProductPurpose, ProductRole } from '@/types/productIntelligence';
+import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 interface ProductDetailViewProps {
   product: ProductMaster;
   vendorOfferings: VendorOffering[];
@@ -55,11 +62,17 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onBack,
   onNavigateToVendor,
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'notes'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'purpose' | 'notes'>('details');
   const [editingDensity, setEditingDensity] = useState(false);
   const [densityValue, setDensityValue] = useState(product.densityLbsPerGal || 0);
   const [editingReorder, setEditingReorder] = useState(false);
   const [reorderValue, setReorderValue] = useState(product.reorderPoint || 0);
+  const [isSuggestingRoles, setIsSuggestingRoles] = useState(false);
+
+  // Product intelligence
+  const { getPurpose, savePurpose, getAnalysis } = useProductIntelligence();
+  const purpose = getPurpose(product.id);
+  const analysis = getAnalysis(product.id);
 
   // Get stock info
   const productInventory = inventory.filter(i => i.productId === product.id);
@@ -147,6 +160,46 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const handleUpdateCategory = (category: ProductCategory) => {
     onUpdateProduct({ ...product, category });
+  };
+
+  const handleUpdatePurpose = (newPurpose: ProductPurpose) => {
+    savePurpose(product.id, newPurpose);
+  };
+
+  // AI-powered role suggestion
+  const handleSuggestRoles = async () => {
+    setIsSuggestingRoles(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-roles', {
+        body: {
+          productName: product.name,
+          category: product.category,
+          analysis: product.analysis,
+          activeIngredients: product.activeIngredients,
+        },
+      });
+
+      if (error) throw error;
+
+      const suggestedRoles: ProductRole[] = data.roles || [];
+      if (suggestedRoles.length > 0) {
+        const newPurpose: ProductPurpose = {
+          ...purpose,
+          id: purpose?.id || crypto.randomUUID(),
+          productId: product.id,
+          roles: suggestedRoles,
+        };
+        savePurpose(product.id, newPurpose);
+        toast.success(`Suggested ${suggestedRoles.length} roles based on product analysis`);
+      } else {
+        toast.info('No roles could be suggested. Try adding more product details.');
+      }
+    } catch (error) {
+      console.error('Role suggestion failed:', error);
+      toast.error('Failed to suggest roles');
+    } finally {
+      setIsSuggestingRoles(false);
+    }
   };
 
   const StockStatusBadge = () => {
@@ -335,6 +388,32 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               vendors={vendors}
               onUpdateOfferings={onUpdateOfferings}
               onNavigateToVendor={onNavigateToVendor}
+            />
+          </div>
+
+          {/* Purpose & Roles Card */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground">Purpose & Roles</h3>
+              <button
+                onClick={handleSuggestRoles}
+                disabled={isSuggestingRoles}
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
+              >
+                {isSuggestingRoles ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {isSuggestingRoles ? 'Analyzing...' : 'Auto-suggest Roles'}
+              </button>
+            </div>
+            
+            <ProductPurposeEditor
+              purpose={purpose}
+              analysis={analysis}
+              productName={product.name}
+              onUpdate={handleUpdatePurpose}
             />
           </div>
 
