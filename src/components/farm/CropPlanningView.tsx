@@ -5,7 +5,9 @@ import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
+import { FunctionCoverageBar } from './FunctionCoverageBar';
 import { calculateSeasonSummary } from '@/lib/cropCalculations';
+import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 
 interface CropPlanningViewProps {
   crop: Crop;
@@ -30,6 +32,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [newTimingName, setNewTimingName] = useState('');
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [showTierManager, setShowTierManager] = useState(false);
+
+  // Get product intelligence for function summaries
+  const { purposes } = useProductIntelligence();
 
   // Calculate season summary
   const summary = useMemo(() => 
@@ -132,6 +137,11 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         summary={summary}
       />
 
+      {/* Function Coverage Bar */}
+      <div className="px-6 pt-4">
+        <FunctionCoverageBar crop={crop} products={products} purposes={purposes} />
+      </div>
+
       {/* Main Content - Scrollable vertical timeline */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* Acres Editor & Settings Row */}
@@ -229,6 +239,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                 timing={timing}
                 crop={crop}
                 products={products}
+                purposes={purposes}
                 onEditApplication={setEditingApplication}
                 onAddApplication={handleAddApplication}
                 onDuplicateTiming={handleDuplicateTiming}
