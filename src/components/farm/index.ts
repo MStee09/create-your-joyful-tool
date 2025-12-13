@@ -12,3 +12,6 @@ export { VendorsView } from './VendorsView';
 export { InventoryView } from './InventoryView';
 export { ExportView } from './ExportView';
 export { SettingsView } from './SettingsView';
+export { ProductHoverCard } from './ProductHoverCard';
+export { AnalysisReviewModal } from './AnalysisReviewModal';
+export { ProductPurposeEditor } from './ProductPurposeEditor';
