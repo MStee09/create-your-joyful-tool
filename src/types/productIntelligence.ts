@@ -87,12 +87,31 @@ export interface ProductAnalysis {
   sourceFileName?: string;
 }
 
+// Individual role suggestion with confidence and evidence
+export interface RoleSuggestion {
+  role: ProductRole;
+  confidence: 'high' | 'medium' | 'low';
+  explanation: string;
+  evidence: string[];
+}
+
+// Result from AI role suggestion
+export interface RoleSuggestionResult {
+  suggestions: RoleSuggestion[];
+  analyzedAt: string;
+  sourceInfo: string;
+}
+
 export interface ProductPurpose {
   id: string;
   productId: string;
   
   // Auto-suggested roles (multi-select)
   roles: ProductRole[];
+  
+  // Whether roles have been reviewed/confirmed by user
+  rolesConfirmed?: boolean;
+  confirmedAt?: string;
   
   // "Why it's in my program" (user-authored)
   primaryObjective?: string;
