@@ -5,3 +5,5 @@ export { CropDetail } from './CropDetail';
 export { ProductsView } from './ProductsView';
 export { VendorsView } from './VendorsView';
 export { InventoryView } from './InventoryView';
+export { ExportView } from './ExportView';
+export { SettingsView } from './SettingsView';
