@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Droplets, Weight } from 'lucide-react';
-import type { InventoryItem, Product } from '@/types/farm';
+import type { InventoryItem, Product, Vendor } from '@/types/farm';
 import { formatCurrency, generateId } from '@/utils/farmUtils';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
   products: Product[];
+  vendors?: Vendor[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
-export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, products, onUpdateInventory }) => {
+export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, products, vendors = [], onUpdateInventory }) => {
   const [showAddInventory, setShowAddInventory] = useState(false);
   const [newInventoryProductId, setNewInventoryProductId] = useState('');
   const [newInventoryQuantity, setNewInventoryQuantity] = useState(0);
@@ -36,6 +37,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
     else onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity } : i));
   };
 
+  // Get vendor name for a product
+  const getVendorName = (vendorId: string) => {
+    const vendor = vendors.find(v => v.id === vendorId);
+    return vendor?.name;
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -57,7 +64,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
                 <label className="block text-sm font-medium mb-1">Product</label>
                 <select value={newInventoryProductId} onChange={(e) => setNewInventoryProductId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg bg-background">
                   <option value="">Select a product...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {products.map(p => {
+                    const vendorName = getVendorName(p.vendorId);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {vendorName ? `${vendorName} - ` : ''}{p.name}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -87,6 +101,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
             {inventory.map(item => {
               const product = products.find(p => p.id === item.productId);
               if (!product) return null;
+              const vendorName = getVendorName(product.vendorId);
               const value = product.form === 'liquid' ? item.quantity * product.price : item.quantity * (product.priceUnit === 'ton' ? product.price / 2000 : product.price);
               return (
                 <tr key={item.id} className="hover:bg-muted/30">
@@ -95,7 +110,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, product
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
                         {product.form === 'liquid' ? <Droplets className="w-4 h-4 text-blue" /> : <Weight className="w-4 h-4 text-amber" />}
                       </div>
-                      <span className="font-medium">{product.name}</span>
+                      <div>
+                        {vendorName && (
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                            {vendorName}
+                          </p>
+                        )}
+                        <span className="font-medium">{product.name}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">

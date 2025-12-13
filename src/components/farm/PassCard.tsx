@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle } from 'lucide-react';
-import type { ApplicationTiming, Application, Crop, Product } from '@/types/farm';
+import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
@@ -12,6 +12,7 @@ interface PassCardProps {
   timing: ApplicationTiming;
   crop: Crop;
   products: Product[];
+  vendors?: Vendor[];
   purposes?: Record<string, ProductPurpose>;
   applicationOverrides?: Record<string, ApplicationOverride>;
   onEditApplication: (app: Application) => void;
@@ -37,6 +38,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   timing,
   crop,
   products,
+  vendors = [],
   purposes = {},
   applicationOverrides = {},
   onEditApplication,
@@ -199,6 +201,7 @@ export const PassCard: React.FC<PassCardProps> = ({
           ) : (
             summary.applications.map(app => {
               const product = products.find(p => p.id === app.productId);
+              const vendor = product ? vendors.find(v => v.id === product.vendorId) : null;
               const acresPercentage = getApplicationAcresPercentage(app, crop);
               const purpose = product ? purposes[product.id] : null;
               const override = applicationOverrides[app.id];
@@ -208,6 +211,7 @@ export const PassCard: React.FC<PassCardProps> = ({
                   key={app.id}
                   application={app}
                   product={product}
+                  vendor={vendor}
                   totalAcres={crop.totalAcres}
                   acresPercentage={acresPercentage}
                   purpose={purpose}
