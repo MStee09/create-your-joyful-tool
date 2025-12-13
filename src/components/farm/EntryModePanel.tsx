@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit } from '@/types/farm';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
@@ -62,6 +62,18 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
       }
     }
   }, [productId, product, rateUnit]);
+
+  // ESC key to close
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const handleSave = () => {
     if (!application) return;

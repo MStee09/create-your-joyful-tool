@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product } from '@/types/farm';
+import type { ProductPurpose } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
 import { calculatePassSummary, getApplicationAcresPercentage } from '@/lib/cropCalculations';
+import { FUNCTION_CATEGORIES, getRoleFunctionCategory } from '@/lib/functionCategories';
 
 interface PassCardProps {
   timing: ApplicationTiming;
   crop: Crop;
   products: Product[];
+  purposes?: Record<string, ProductPurpose>;
   onEditApplication: (app: Application) => void;
   onAddApplication: (timingId: string) => void;
   onDuplicateTiming: (timingId: string) => void;
@@ -20,6 +23,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   timing,
   crop,
   products,
+  purposes = {},
   onEditApplication,
   onAddApplication,
   onDuplicateTiming,
@@ -33,6 +37,37 @@ export const PassCard: React.FC<PassCardProps> = ({
   
   const hasNutrients = summary.nutrients.n > 0 || summary.nutrients.p > 0 || 
                        summary.nutrients.k > 0 || summary.nutrients.s > 0;
+
+  // Aggregate functions for this pass
+  const passFunctions = React.useMemo(() => {
+    const functionSet = new Set<string>();
+    
+    summary.applications.forEach(app => {
+      const product = products.find(p => p.id === app.productId);
+      if (!product) return;
+      
+      // Get roles from purpose
+      const purpose = purposes[product.id];
+      const roles = purpose?.roles || [];
+      
+      // Also check legacy role string
+      if (app.role) {
+        const roleStr = app.role.toLowerCase();
+        if (roleStr.includes('root')) roles.push('rooting-vigor');
+        if (roleStr.includes('carbon') || roleStr.includes('biology')) roles.push('carbon-biology-food');
+        if (roleStr.includes('stress')) roles.push('stress-mitigation');
+        if (roleStr.includes('nitrogen') || roleStr.includes('n eff')) roles.push('nitrogen-conversion');
+        if (roleStr.includes('fertil') || roleStr.includes('macro')) roles.push('fertility-macro');
+      }
+      
+      roles.forEach(role => {
+        const cat = getRoleFunctionCategory(role);
+        if (cat) functionSet.add(cat.label);
+      });
+    });
+    
+    return Array.from(functionSet);
+  }, [summary.applications, products, purposes]);
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden transition-all">
@@ -51,9 +86,16 @@ export const PassCard: React.FC<PassCardProps> = ({
           )}
           
           <div>
-            <h3 className="font-semibold text-foreground uppercase tracking-wide">
-              {timing.name}
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold text-foreground uppercase tracking-wide">
+                {timing.name}
+              </h3>
+              {passFunctions.length > 0 && (
+                <span className="text-sm text-primary/80 font-medium">
+                  {passFunctions.join(' • ')}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-0.5">
               Avg acres: {formatNumber(summary.avgAcresPercentage, 0)}% • {summary.applications.length} product{summary.applications.length !== 1 ? 's' : ''}
               {hasNutrients && (
