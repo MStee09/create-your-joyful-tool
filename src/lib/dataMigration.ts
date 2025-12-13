@@ -2,6 +2,7 @@ import type {
   Product, 
   ProductMaster, 
   VendorOffering, 
+  Vendor,
   AppState,
   ProductCategory 
 } from '../types';
@@ -47,6 +48,16 @@ export const migrateProducts = (
   return { productMasters, vendorOfferings };
 };
 
+// Migrate vendors to have required fields
+export const migrateVendors = (vendors: Vendor[]): Vendor[] => {
+  return vendors.map(vendor => ({
+    ...vendor,
+    contacts: vendor.contacts || [],
+    documents: vendor.documents || [],
+    tags: vendor.tags || [],
+  }));
+};
+
 // Check if migration is needed and perform it
 export const migrateAppState = (state: AppState): AppState => {
   // If already at current version, no migration needed
@@ -54,23 +65,22 @@ export const migrateAppState = (state: AppState): AppState => {
     return state;
   }
 
+  let migratedState = { ...state };
+
   // If we have old products but no productMasters, migrate
   if (state.products?.length > 0 && (!state.productMasters || state.productMasters.length === 0)) {
     const { productMasters, vendorOfferings } = migrateProducts(state.products);
-    
-    return {
-      ...state,
-      productMasters,
-      vendorOfferings,
-      dataVersion: CURRENT_DATA_VERSION,
-    };
+    migratedState.productMasters = productMasters;
+    migratedState.vendorOfferings = vendorOfferings;
   }
 
-  // If we have productMasters already, just update version
+  // Migrate vendors to have required fields
+  migratedState.vendors = migrateVendors(migratedState.vendors || []);
+
   return {
-    ...state,
-    productMasters: state.productMasters || [],
-    vendorOfferings: state.vendorOfferings || [],
+    ...migratedState,
+    productMasters: migratedState.productMasters || [],
+    vendorOfferings: migratedState.vendorOfferings || [],
     dataVersion: CURRENT_DATA_VERSION,
   };
 };
