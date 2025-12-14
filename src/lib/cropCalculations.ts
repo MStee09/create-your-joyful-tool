@@ -1,12 +1,29 @@
 import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit } from '@/types/farm';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
 
+export interface CoverageGroup {
+  acresPercentage: number;
+  tierLabel: 'Core' | 'Selective' | 'Trial';
+  applications: Application[];
+  costPerTreatedAcre: number;
+  costPerFieldAcre: number;
+  acresTreated: number;
+}
+
+export type PassPattern = 'uniform' | 'selective' | 'trial';
+
 export interface PassSummary {
   timing: ApplicationTiming;
   applications: Application[];
   totalCost: number;
   avgAcresPercentage: number;
   nutrients: { n: number; p: number; k: number; s: number };
+  // Multi-modal fields
+  coverageGroups: CoverageGroup[];
+  passPattern: PassPattern;
+  dominantAcres: number;
+  costPerTreatedAcre: number;
+  costPerFieldAcre: number;
 }
 
 export interface SeasonSummary {
@@ -77,6 +94,82 @@ export const calculateApplicationNutrients = (
   return result;
 };
 
+// Get tier label based on acres percentage
+const getTierLabel = (acresPercentage: number): CoverageGroup['tierLabel'] => {
+  if (acresPercentage >= 75) return 'Core';
+  if (acresPercentage >= 40) return 'Selective';
+  return 'Trial';
+};
+
+// Bucket acres percentage for grouping (allows ±5% variance in same group)
+const bucketAcres = (acresPercentage: number): number => {
+  if (acresPercentage >= 95) return 100;
+  if (acresPercentage >= 55 && acresPercentage <= 70) return 60;
+  if (acresPercentage >= 20 && acresPercentage <= 30) return 25;
+  return Math.round(acresPercentage / 10) * 10; // Round to nearest 10
+};
+
+// Calculate coverage groups for a pass
+export const calculateCoverageGroups = (
+  applications: Application[],
+  crop: Crop,
+  products: Product[]
+): CoverageGroup[] => {
+  const groupMap = new Map<number, { apps: Application[]; costSum: number }>();
+
+  applications.forEach(app => {
+    const product = products.find(p => p.id === app.productId);
+    const acresPercentage = getApplicationAcresPercentage(app, crop);
+    const bucket = bucketAcres(acresPercentage);
+    const costPerAcre = calculateApplicationCostPerAcre(app, product);
+
+    if (!groupMap.has(bucket)) {
+      groupMap.set(bucket, { apps: [], costSum: 0 });
+    }
+    const group = groupMap.get(bucket)!;
+    group.apps.push(app);
+    group.costSum += costPerAcre;
+  });
+
+  // Convert to array and sort by acres descending
+  return Array.from(groupMap.entries())
+    .map(([acresPercentage, { apps, costSum }]) => ({
+      acresPercentage,
+      tierLabel: getTierLabel(acresPercentage),
+      applications: apps,
+      costPerTreatedAcre: costSum,
+      costPerFieldAcre: costSum * (acresPercentage / 100),
+      acresTreated: crop.totalAcres * (acresPercentage / 100),
+    }))
+    .sort((a, b) => b.acresPercentage - a.acresPercentage);
+};
+
+// Determine pass pattern
+export const determinePassPattern = (coverageGroups: CoverageGroup[]): PassPattern => {
+  if (coverageGroups.length === 0) return 'uniform';
+  
+  // Check if all products have same acres (±5%)
+  const acresValues = coverageGroups.map(g => g.acresPercentage);
+  const maxAcres = Math.max(...acresValues);
+  const minAcres = Math.min(...acresValues);
+  
+  if (maxAcres - minAcres <= 10 && coverageGroups.length === 1) {
+    // Uniform - all same tier
+    if (maxAcres <= 30) return 'trial';
+    return 'uniform';
+  }
+  
+  // Check if majority is trial
+  const totalApps = coverageGroups.reduce((sum, g) => sum + g.applications.length, 0);
+  const trialApps = coverageGroups
+    .filter(g => g.acresPercentage <= 30)
+    .reduce((sum, g) => sum + g.applications.length, 0);
+  
+  if (trialApps / totalApps > 0.5) return 'trial';
+  
+  return 'selective';
+};
+
 // Calculate pass summary
 export const calculatePassSummary = (
   timing: ApplicationTiming,
@@ -105,12 +198,31 @@ export const calculatePassSummary = (
     nutrients.s += appNutrients.s * weight;
   });
 
+  // Calculate coverage groups
+  const coverageGroups = calculateCoverageGroups(applications, crop, products);
+  const passPattern = determinePassPattern(coverageGroups);
+  
+  // Find dominant acres (most products)
+  const dominantGroup = coverageGroups.reduce((max, g) => 
+    g.applications.length > (max?.applications.length || 0) ? g : max, 
+    coverageGroups[0]
+  );
+  
+  // Calculate total cost per treated/field acre
+  const totalCostPerTreated = coverageGroups.reduce((sum, g) => sum + g.costPerTreatedAcre, 0);
+  const totalCostPerField = coverageGroups.reduce((sum, g) => sum + g.costPerFieldAcre, 0);
+
   return {
     timing,
     applications,
     totalCost,
     avgAcresPercentage: applications.length > 0 ? totalAcresPercentage / applications.length : 0,
     nutrients,
+    coverageGroups,
+    passPattern,
+    dominantAcres: dominantGroup?.acresPercentage || 100,
+    costPerTreatedAcre: totalCostPerTreated,
+    costPerFieldAcre: totalCostPerField,
   };
 };
 

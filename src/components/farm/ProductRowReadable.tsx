@@ -89,9 +89,17 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   // Visual weight based on acres percentage
   const getWeightOpacity = () => {
     if (acresPercentage >= 90) return 'opacity-100';
-    if (acresPercentage >= 50) return 'opacity-80';
-    if (acresPercentage >= 25) return 'opacity-60';
-    return 'opacity-50';
+    if (acresPercentage >= 50) return 'opacity-85';
+    if (acresPercentage >= 25) return 'opacity-70';
+    return 'opacity-55';
+  };
+  
+  // Bar height class based on acres
+  const getBarHeightClass = () => {
+    if (acresPercentage >= 90) return 'h-full';
+    if (acresPercentage >= 60) return 'h-3/4';
+    if (acresPercentage >= 40) return 'h-1/2';
+    return 'h-1/4';
   };
 
   const handleSaveWhyHere = () => {
@@ -111,11 +119,13 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       className="group relative pl-5 pr-4 py-3 bg-secondary/30 hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer"
       onClick={onEdit}
     >
-      {/* Visual weight bar */}
-      <div className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg overflow-hidden bg-muted">
+      {/* Visual weight bar - height represents tier commitment */}
+      <div className="absolute left-0 top-0 bottom-0 w-2 rounded-l-lg overflow-hidden bg-muted flex items-end">
         <div 
-          className="w-full bg-primary transition-all origin-bottom"
-          style={{ height: `${Math.min(100, acresPercentage)}%` }}
+          className={cn(
+            'w-full bg-primary transition-all',
+            getBarHeightClass()
+          )}
         />
       </div>
       
