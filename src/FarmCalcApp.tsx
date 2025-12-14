@@ -523,8 +523,9 @@ const InventoryView: React.FC<{
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editQuantity, setEditQuantity] = useState(0);
-  const [editPackaging, setEditPackaging] = useState<string>('');
+  const [editPackagingType, setEditPackagingType] = useState<string>('Bulk');
+  const [editPackagingSize, setEditPackagingSize] = useState<number>(0);
+  const [editContainerCount, setEditContainerCount] = useState<number>(1);
   
   // Persist Plan Readiness collapsed state
   const [planReadinessOpen, setPlanReadinessOpen] = useState(() => {
@@ -709,41 +710,29 @@ const InventoryView: React.FC<{
   };
 
   const handleSaveEdit = (id: string, product: Product) => {
-    if (editQuantity <= 0) {
+    const isBulk = editPackagingType === 'Bulk';
+    const totalQuantity = isBulk ? editContainerCount : editPackagingSize * editContainerCount;
+    
+    if (totalQuantity <= 0) {
       onUpdateInventory(inventory.filter(i => i.id !== id));
     } else {
-      const item = inventory.find(i => i.id === id);
-      if (item) {
-        // Parse the selected packaging
-        const packagingOptions = getDefaultPackagingOptions(product.form);
-        const [name, sizeStr] = editPackaging.split('|');
-        const size = parseFloat(sizeStr);
-        const selectedPkg = packagingOptions.find(p => p.name === name && p.unitSize === size);
-        
-        if (selectedPkg) {
-          // Calculate container count from new quantity and packaging
-          const newContainerCount = Math.round(editQuantity / selectedPkg.unitSize);
-          onUpdateInventory(inventory.map(i => i.id === id ? { 
-            ...i, 
-            quantity: editQuantity,
-            packagingName: selectedPkg.name,
-            packagingSize: selectedPkg.unitSize,
-            unit: selectedPkg.unitType,
-            containerCount: newContainerCount > 0 ? newContainerCount : 1
-          } : i));
-        } else {
-          // Bulk mode - no packaging
-          onUpdateInventory(inventory.map(i => i.id === id ? { 
-            ...i, 
-            quantity: editQuantity,
-            packagingName: undefined,
-            packagingSize: undefined,
-            containerCount: undefined
-          } : i));
-        }
-      }
+      onUpdateInventory(inventory.map(i => i.id === id ? { 
+        ...i, 
+        quantity: totalQuantity,
+        unit: product.form === 'liquid' ? 'gal' : 'lbs',
+        packagingName: isBulk ? undefined : editPackagingType,
+        packagingSize: isBulk ? undefined : editPackagingSize,
+        containerCount: isBulk ? undefined : editContainerCount
+      } : i));
     }
     setEditingId(null);
+  };
+  
+  // Get default size for a packaging type
+  const getDefaultSizeForType = (type: string, form: 'liquid' | 'dry'): number => {
+    const defaults = getDefaultPackagingOptions(form);
+    const match = defaults.find(d => d.name === type);
+    return match?.unitSize || (form === 'liquid' ? 30 : 50);
   };
 
   const handleDelete = (id: string) => {
@@ -863,30 +852,74 @@ const InventoryView: React.FC<{
                     <td className="px-6 py-4 text-right">
                       {editingId === item.id ? (
                         <div className="space-y-2">
-                          <select
-                            value={editPackaging}
-                            onChange={(e) => setEditPackaging(e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-stone-300 rounded bg-white"
-                          >
-                            <option value="">Bulk (no packaging)</option>
-                            {getDefaultPackagingOptions(product.form).map((opt) => (
-                              <option key={`${opt.name}|${opt.unitSize}`} value={`${opt.name}|${opt.unitSize}`}>
-                                {opt.name} – {opt.unitSize} {opt.unitType}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              value={editQuantity}
-                              onChange={(e) => setEditQuantity(Number(e.target.value))}
-                              className="w-20 px-2 py-1 text-right border border-stone-300 rounded"
-                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id, product)}
-                            />
-                            <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                          {/* Row 1: Packaging Type + Custom Size */}
+                          <div className="flex items-center gap-2 justify-end">
+                            <select
+                              value={editPackagingType}
+                              onChange={(e) => {
+                                const newType = e.target.value;
+                                setEditPackagingType(newType);
+                                if (newType !== 'Bulk') {
+                                  setEditPackagingSize(getDefaultSizeForType(newType, product.form));
+                                }
+                              }}
+                              className="px-2 py-1 text-sm border border-stone-300 rounded bg-white"
+                            >
+                              <option value="Bulk">Bulk</option>
+                              <option value="Tote">Tote</option>
+                              <option value="Drum">Drum</option>
+                              <option value="Jug">Jug</option>
+                              <option value="Pail">Pail</option>
+                              <option value="Bag">Bag</option>
+                            </select>
+                            
+                            {editPackagingType !== 'Bulk' && (
+                              <>
+                                <input
+                                  type="number"
+                                  value={editPackagingSize}
+                                  onChange={(e) => setEditPackagingSize(Number(e.target.value))}
+                                  className="w-16 px-2 py-1 text-right border border-stone-300 rounded"
+                                />
+                                <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                              </>
+                            )}
+                          </div>
+                          
+                          {/* Row 2: Count + Total */}
+                          <div className="flex items-center gap-2 justify-end">
+                            {editPackagingType !== 'Bulk' ? (
+                              <>
+                                <span className="text-stone-500">×</span>
+                                <input
+                                  type="number"
+                                  value={editContainerCount}
+                                  onChange={(e) => setEditContainerCount(Number(e.target.value))}
+                                  className="w-14 px-2 py-1 text-right border border-stone-300 rounded"
+                                  min={1}
+                                />
+                                <span className="text-xs text-stone-400">
+                                  = {editPackagingSize * editContainerCount} {product.form === 'liquid' ? 'gal' : 'lbs'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <input
+                                  type="number"
+                                  value={editContainerCount}
+                                  onChange={(e) => setEditContainerCount(Number(e.target.value))}
+                                  className="w-20 px-2 py-1 text-right border border-stone-300 rounded"
+                                />
+                                <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                              </>
+                            )}
+                          </div>
+                          
+                          {/* Row 3: Save/Cancel */}
+                          <div className="flex items-center gap-1 justify-end">
                             <button
                               onClick={() => handleSaveEdit(item.id, product)}
-                              className="ml-2 px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                              className="px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
                             >
                               Save
                             </button>
@@ -916,12 +949,16 @@ const InventoryView: React.FC<{
                           <button
                             onClick={() => {
                               setEditingId(item.id);
-                              setEditQuantity(item.quantity);
-                              // Set current packaging if exists
-                              if (item.packagingName && item.packagingSize) {
-                                setEditPackaging(`${item.packagingName}|${item.packagingSize}`);
+                              // Initialize from existing item
+                              if (item.packagingName && item.packagingSize && item.containerCount) {
+                                setEditPackagingType(item.packagingName);
+                                setEditPackagingSize(item.packagingSize);
+                                setEditContainerCount(item.containerCount);
                               } else {
-                                setEditPackaging('');
+                                // Bulk mode
+                                setEditPackagingType('Bulk');
+                                setEditPackagingSize(0);
+                                setEditContainerCount(item.quantity);
                               }
                             }}
                             className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
