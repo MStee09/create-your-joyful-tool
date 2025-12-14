@@ -71,6 +71,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [reorderValue, setReorderValue] = useState(product.reorderPoint || 0);
   const [isSuggestingRoles, setIsSuggestingRoles] = useState(false);
   
+  // Inline name editing
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(product.name);
+  
   // Role suggestion review state
   const [pendingSuggestions, setPendingSuggestions] = useState<RoleSuggestion[] | null>(null);
   const [suggestionSourceInfo, setSuggestionSourceInfo] = useState<string>('');
@@ -166,6 +170,40 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const handleUpdateCategory = (category: ProductCategory) => {
     onUpdateProduct({ ...product, category });
+  };
+
+  // Inline name editing handlers
+  const handleSaveName = () => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== product.name) {
+      onUpdateProduct({ ...product, name: trimmed });
+    } else {
+      setNameValue(product.name);
+    }
+    setEditingName(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveName();
+    }
+    if (e.key === 'Escape') {
+      setNameValue(product.name);
+      setEditingName(false);
+    }
+  };
+
+  // Form toggle handler
+  const handleToggleForm = (newForm: 'liquid' | 'dry') => {
+    if (newForm === product.form) return;
+    onUpdateProduct({
+      ...product,
+      form: newForm,
+      defaultUnit: newForm === 'liquid' ? 'gal' : 'lbs',
+      // Clear density if switching to dry
+      densityLbsPerGal: newForm === 'dry' ? undefined : product.densityLbsPerGal,
+    });
   };
 
   const handleUpdatePurpose = (newPurpose: ProductPurpose) => {
@@ -267,14 +305,52 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             <button onClick={onBack} className="p-2 hover:bg-muted rounded-lg">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
-            <h2 className="text-3xl font-bold text-foreground">{product.name}</h2>
+            {editingName ? (
+              <input
+                autoFocus
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onBlur={handleSaveName}
+                onKeyDown={handleNameKeyDown}
+                className="text-3xl font-bold bg-transparent border-b-2 border-primary outline-none text-foreground"
+              />
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <h2 className="text-3xl font-bold text-foreground">{product.name}</h2>
+                <button 
+                  onClick={() => { setEditingName(true); setNameValue(product.name); }}
+                  className="p-1 opacity-50 hover:opacity-100 transition-opacity"
+                  title="Edit product name"
+                >
+                  <Edit2 className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 ml-11">
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-              product.form === 'liquid' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-            }`}>
-              {product.form === 'liquid' ? 'Liquid' : 'Dry'}
-            </span>
+            {/* Form Toggle */}
+            <div className="flex rounded overflow-hidden border border-border">
+              <button
+                onClick={() => handleToggleForm('liquid')}
+                className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                  product.form === 'liquid' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                Liquid
+              </button>
+              <button
+                onClick={() => handleToggleForm('dry')}
+                className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                  product.form === 'dry' 
+                    ? 'bg-amber-100 text-amber-700' 
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                Dry
+              </button>
+            </div>
             <select
               value={product.category}
               onChange={(e) => handleUpdateCategory(e.target.value as ProductCategory)}
