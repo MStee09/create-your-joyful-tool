@@ -21,12 +21,12 @@ export const convertToPounds = (value: number, unit: DryUnit): number => {
   }
 };
 
-export const formatCurrency = (value: number): string => {
+export const formatCurrency = (value: number, decimals: number = 2): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(value);
 };
 
