@@ -509,6 +509,7 @@ import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 import { ProductSelectorModal, type ProductWithContext } from './components/farm/ProductSelectorModal';
 import { InventoryAddModal } from './components/farm/InventoryAddModal';
 import { formatInventoryDisplay } from './lib/packagingUtils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/ui/collapsible';
 
 const InventoryView: React.FC<{
   inventory: InventoryItem[];
@@ -523,6 +524,16 @@ const InventoryView: React.FC<{
   const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState(0);
+  
+  // Persist Plan Readiness collapsed state
+  const [planReadinessOpen, setPlanReadinessOpen] = useState(() => {
+    const saved = localStorage.getItem('inventory-plan-readiness-open');
+    return saved === 'true'; // Default to closed
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('inventory-plan-readiness-open', String(planReadinessOpen));
+  }, [planReadinessOpen]);
 
   // Calculate planned usage
   const plannedUsage = useMemo(() => 
@@ -732,14 +743,35 @@ const InventoryView: React.FC<{
     );
   };
 
+  // Combine all inventory for simple on-hand view
+  const allInventoryItems = useMemo(() => {
+    return inventory.map(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (!product) return null;
+      const vendor = vendors.find(v => v.id === product.vendorId);
+      let value = item.quantity * product.price;
+      if (product.priceUnit === 'ton') {
+        value = (item.quantity / 2000) * product.price;
+      }
+      const display = formatOnHand(item);
+      return { item, product, vendor, value, display };
+    }).filter(Boolean) as Array<{
+      item: InventoryItem;
+      product: Product;
+      vendor: Vendor | undefined;
+      value: number;
+      display: { primary: string; secondary: string };
+    }>;
+  }, [inventory, products, vendors]);
+
   return (
     <div className="p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-stone-800">Inventory & Plan Readiness</h2>
+          <h2 className="text-3xl font-bold text-stone-800">Inventory</h2>
           <p className="text-stone-500 mt-1">
-            {season ? `On-hand products vs ${season.year} ${season.name}` : 'No season selected'}
+            Track your on-hand product quantities
           </p>
         </div>
         <button
@@ -772,146 +804,81 @@ const InventoryView: React.FC<{
         onAdd={handleAddInventory}
       />
 
-      {/* Section A: Blocking Plan Execution */}
-      {readinessData.blocking.length > 0 && (
+      {/* Simple On-Hand Inventory Table */}
+      {allInventoryItems.length > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wider">
-              Blocking Plan Execution
-            </h3>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
-            <div className="divide-y divide-red-100">
-              {readinessData.blocking.map(item => (
-                <div key={item.product.id} className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                    }`}>
-                      {item.product.form === 'liquid' 
-                        ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                        : <Weight className="w-5 h-5 text-amber-600" />}
-                    </div>
-                    <div>
-                      <p className="font-medium text-stone-800">{item.product.name}</p>
-                      <p className="text-[10px] text-stone-400 uppercase tracking-wide">
-                        {vendors.find(v => v.id === item.product.vendorId)?.name || ''}
-                      </p>
-                      <p className="text-sm text-stone-500">
-                        {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-sm text-stone-500">
-                        Need {formatNumber(item.needed, 1)} {item.unit}, have {formatNumber(item.onHand, 1)}
-                      </p>
-                      <p className="font-semibold text-red-600">
-                        Short {formatNumber(item.short, 1)} {item.unit}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleQuickAddFromBlocking(item.product.id, item.short, item.unit)}
-                      className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
-                    >
-                      Add {formatNumber(item.short, 1)}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Section B: Planned Usage Overview */}
-      {hasPlannedUsage && (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-stone-600 uppercase tracking-wider mb-3">
-            Planned Usage Overview
-          </h3>
           <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="bg-stone-50">
                   <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
                   <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
-                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Planned</th>
-                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Remaining</th>
                   <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Value</th>
                   <th className="px-6 py-4 w-24"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
-                {readinessData.planned.map(item => (
-                  <tr key={item.product.id} className="hover:bg-stone-50">
+                {allInventoryItems.map(({ item, product, vendor, value, display }) => (
+                  <tr key={item.id} className="hover:bg-stone-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                          product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
                         }`}>
-                          {item.product.form === 'liquid' 
+                          {product.form === 'liquid' 
                             ? <Droplets className="w-5 h-5 text-blue-600" /> 
                             : <Weight className="w-5 h-5 text-amber-600" />}
                         </div>
                         <div>
-                          <span className="font-medium text-stone-800">{item.product.name}</span>
-                          <p className="text-xs text-stone-400">
-                            {item.usages.map(u => `${u.cropName} → ${u.timingName}`).join(', ')}
+                          <p className="text-[10px] text-stone-400 uppercase tracking-wide">
+                            {vendor?.name || ''}
                           </p>
+                          <span className="font-medium text-stone-800">{product.name}</span>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {editingId === item.inventoryId ? (
+                      {editingId === item.id ? (
                         <input
                           type="number"
                           value={editQuantity}
                           onChange={(e) => setEditQuantity(Number(e.target.value))}
                           className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
                           autoFocus
-                          onBlur={() => item.inventoryId && handleSaveEdit(item.inventoryId)}
-                          onKeyDown={(e) => e.key === 'Enter' && item.inventoryId && handleSaveEdit(item.inventoryId)}
+                          onBlur={() => handleSaveEdit(item.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
                         />
                       ) : (
-                        <span className="text-stone-700">{formatNumber(item.onHand, 1)} {item.unit}</span>
+                        <div className="text-right">
+                          <span className="text-stone-700">{display.primary}</span>
+                          {display.secondary && (
+                            <p className="text-xs text-stone-400">{display.secondary}</p>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right text-stone-600">
-                      {formatNumber(item.needed, 1)} {item.unit}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`font-semibold ${item.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {item.remaining >= 0 ? '+' : ''}{formatNumber(item.remaining, 1)} {item.unit}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right text-stone-600">
-                      {formatCurrency(item.value)}
+                      {formatCurrency(value)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
-                        {item.inventoryId && editingId !== item.inventoryId && (
+                        {editingId !== item.id && (
                           <button
                             onClick={() => {
-                              setEditingId(item.inventoryId!);
-                              setEditQuantity(item.onHand);
+                              setEditingId(item.id);
+                              setEditQuantity(item.quantity);
                             }}
                             className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                         )}
-                        {!item.inventoryId && (
-                          <button
-                            onClick={() => handleQuickAddFromBlocking(item.product.id, 0, item.unit)}
-                            className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                            title="Add to inventory"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -922,96 +889,144 @@ const InventoryView: React.FC<{
         </div>
       )}
 
-      {/* Section C: Unassigned Inventory */}
-      {readinessData.unassigned.length > 0 && (
-        <div className="opacity-60 hover:opacity-100 transition-opacity">
-          <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">
-            Unassigned Inventory
-          </h3>
-          <div className="bg-stone-50 rounded-xl border border-stone-200 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-stone-100/50">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-stone-400 uppercase">Product</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-stone-400 uppercase">On Hand</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-stone-400 uppercase">Value</th>
-                  <th className="px-6 py-3 w-24"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-200">
-                {readinessData.unassigned.map(item => (
-                  <tr key={item.inventoryId} className="hover:bg-white">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          item.product.form === 'liquid' ? 'bg-blue-100/50' : 'bg-amber-100/50'
-                        }`}>
-                          {item.product.form === 'liquid' 
-                            ? <Droplets className="w-4 h-4 text-blue-500" /> 
-                            : <Weight className="w-4 h-4 text-amber-500" />}
-                        </div>
-                        <span className="font-medium text-stone-600">{item.product.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-right text-stone-500">
-                      {formatNumber(item.onHand, 1)} {item.unit}
-                    </td>
-                    <td className="px-6 py-3 text-right text-stone-500">
-                      {formatCurrency(item.value)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <button
-                        onClick={() => handleDelete(item.inventoryId)}
-                        className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Empty States */}
-      {!hasPlannedUsage && inventory.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
+      {/* Empty State - No inventory */}
+      {allInventoryItems.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center mb-6">
           <Warehouse className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="font-semibold text-stone-800 mb-2">No Inventory & No Plan</h3>
+          <h3 className="font-semibold text-stone-800 mb-2">No Inventory Items</h3>
           <p className="text-stone-500 max-w-md mx-auto">
-            Add applications to your crop plans to see what you need, then add inventory to track what you have on hand.
+            Add products to track what you have on hand.
           </p>
         </div>
       )}
 
-      {!hasPlannedUsage && inventory.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
-          <div className="flex items-start gap-3">
-            <Calendar className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-amber-800">No Planned Applications</h3>
-              <p className="text-amber-700 text-sm mt-1">
-                Add applications to your crop plans to see plan readiness. Currently showing all inventory without usage context.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Collapsible Plan Readiness Section */}
+      {hasPlannedUsage && (
+        <Collapsible open={planReadinessOpen} onOpenChange={setPlanReadinessOpen}>
+          <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors">
+            <span className="flex items-center gap-2 text-sm font-medium text-stone-700">
+              <ChevronRight className={`w-4 h-4 transition-transform ${planReadinessOpen ? 'rotate-90' : ''}`} />
+              Plan Readiness
+            </span>
+            {readinessData.blocking.length > 0 ? (
+              <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                {readinessData.blocking.length} items blocking
+              </span>
+            ) : (
+              <span className="px-2 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">
+                Ready to execute
+              </span>
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-6">
+            {/* Blocking Section (inside collapsible) */}
+            {readinessData.blocking.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wider">
+                    Blocking Plan Execution
+                  </h3>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
+                  <div className="divide-y divide-red-100">
+                    {readinessData.blocking.map(item => (
+                      <div key={item.product.id} className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                          }`}>
+                            {item.product.form === 'liquid' 
+                              ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                              : <Weight className="w-5 h-5 text-amber-600" />}
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-stone-400 uppercase tracking-wide">
+                              {vendors.find(v => v.id === item.product.vendorId)?.name || ''}
+                            </p>
+                            <p className="font-medium text-stone-800">{item.product.name}</p>
+                            <p className="text-sm text-stone-500">
+                              {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-sm text-stone-500">
+                              Need {formatNumber(item.needed, 1)} {item.unit}, have {formatNumber(item.onHand, 1)}
+                            </p>
+                            <p className="font-semibold text-red-600">
+                              Short {formatNumber(item.short, 1)} {item.unit}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleQuickAddFromBlocking(item.product.id, item.short, item.unit)}
+                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
+                          >
+                            Add {formatNumber(item.short, 1)}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {hasPlannedUsage && readinessData.blocking.length === 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
-          <div className="flex items-center gap-3">
-            <Check className="w-5 h-5 text-emerald-600" />
+            {/* Planned Usage Overview (inside collapsible) */}
             <div>
-              <h3 className="font-semibold text-emerald-800">Ready to Execute</h3>
-              <p className="text-emerald-700 text-sm">
-                You have enough inventory to cover all planned applications.
-              </p>
+              <h3 className="text-sm font-semibold text-stone-600 uppercase tracking-wider mb-3">
+                Planned Usage Overview
+              </h3>
+              <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-stone-50">
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
+                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
+                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Planned</th>
+                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Remaining</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-200">
+                    {readinessData.planned.map(item => (
+                      <tr key={item.product.id} className="hover:bg-stone-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                            }`}>
+                              {item.product.form === 'liquid' 
+                                ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                                : <Weight className="w-5 h-5 text-amber-600" />}
+                            </div>
+                            <div>
+                              <span className="font-medium text-stone-800">{item.product.name}</span>
+                              <p className="text-xs text-stone-400">
+                                {item.usages.map(u => `${u.cropName} → ${u.timingName}`).join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-stone-700">{formatNumber(item.onHand, 1)} {item.unit}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right text-stone-600">
+                          {formatNumber(item.needed, 1)} {item.unit}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`font-semibold ${item.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {item.remaining >= 0 ? '+' : ''}{formatNumber(item.remaining, 1)} {item.unit}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
