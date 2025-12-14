@@ -224,7 +224,7 @@ export const PassCard: React.FC<PassCardProps> = ({
                           onUpdate={onUpdateTiming}
                         >
                           <button
-                            className="p-0.5 opacity-0 group-hover/name:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                            className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
                             title="Edit timing"
                           >
                             <Clock className="w-3 h-3" />
