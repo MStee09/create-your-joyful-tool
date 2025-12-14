@@ -119,12 +119,16 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       className="group relative pl-5 pr-4 py-3 bg-secondary/30 hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer"
       onClick={onEdit}
     >
-      {/* Visual weight bar - height represents tier commitment */}
+      {/* Visual weight bar - height and opacity represent tier commitment */}
       <div className="absolute left-0 top-0 bottom-0 w-2 rounded-l-lg overflow-hidden bg-muted flex items-end">
         <div 
           className={cn(
             'w-full bg-primary transition-all',
-            getBarHeightClass()
+            getBarHeightClass(),
+            acresPercentage >= 90 ? 'opacity-100' :
+            acresPercentage >= 60 ? 'opacity-80' :
+            acresPercentage >= 40 ? 'opacity-60' :
+            'opacity-40'
           )}
         />
       </div>
