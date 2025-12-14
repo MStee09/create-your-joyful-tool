@@ -5,8 +5,6 @@ import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
-import { FunctionCoverageBar } from './FunctionCoverageBar';
-import { SeasonStrip } from './SeasonStrip';
 import { calculateSeasonSummary } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 
@@ -33,6 +31,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [newTimingName, setNewTimingName] = useState('');
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [showTierManager, setShowTierManager] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   // Get product intelligence for function summaries
   const { purposes } = useProductIntelligence();
@@ -131,24 +130,19 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Season Overview Bar - Sticky at top */}
+      {/* Season Overview Bar - Compact with collapsible insights */}
       <SeasonOverviewBar
         cropName={crop.name}
         totalAcres={crop.totalAcres}
         summary={summary}
+        crop={crop}
+        products={products}
+        purposes={purposes}
+        showInsights={showInsights}
+        onToggleInsights={() => setShowInsights(!showInsights)}
       />
 
-      {/* Season Strip - Visual orientation */}
-      <div className="px-6 pt-4">
-        <SeasonStrip crop={crop} products={products} purposes={purposes} />
-      </div>
-
-      {/* Function Coverage Bar */}
-      <div className="px-6 pt-2">
-        <FunctionCoverageBar crop={crop} products={products} purposes={purposes} />
-      </div>
-
-      {/* Main Content - Scrollable vertical timeline */}
+      {/* Main Content - Scrollable vertical timeline, immediately below header */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* Acres Editor & Settings Row */}
         <div className="flex items-center justify-between mb-4">
