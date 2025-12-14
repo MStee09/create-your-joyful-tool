@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, Edit2, Check, X } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import type { SeasonSummary } from '@/lib/cropCalculations';
@@ -105,6 +105,19 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(cropName);
+  
+  // Track cost changes for animation feedback
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const prevCostRef = useRef(summary.totalCost);
+  
+  useEffect(() => {
+    if (summary.totalCost !== prevCostRef.current) {
+      setIsHighlighted(true);
+      prevCostRef.current = summary.totalCost;
+      const timer = setTimeout(() => setIsHighlighted(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [summary.totalCost]);
 
   const handleSaveName = () => {
     if (nameValue.trim() && onUpdateCropName) {
@@ -113,95 +126,115 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
     setIsEditingName(false);
   };
 
+  // Format total cost as whole dollars for cleaner hero display
+  const formattedTotalCost = formatCurrency(summary.totalCost, 0);
+
   return (
     <div className="bg-card border-b border-border sticky top-0 z-10">
-      {/* Compact Header Row */}
-      <div className="px-6 py-3 flex items-center justify-between">
-        {/* Left: Crop name + status */}
-        <div className="flex items-center gap-3">
-          {isEditingName ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveName();
-                  if (e.key === 'Escape') { setIsEditingName(false); setNameValue(cropName); }
-                }}
-                className="px-2 py-1 border border-input rounded text-xl font-bold focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                autoFocus
-              />
-              <button
-                onClick={handleSaveName}
-                className="p-1 text-primary hover:bg-primary/10 rounded"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => { setIsEditingName(false); setNameValue(cropName); }}
-                className="p-1 text-muted-foreground hover:bg-muted rounded"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 group">
-              <h2 className="text-xl font-bold text-foreground">{cropName}</h2>
-              {onUpdateCropName && (
+      {/* Main Header - Restructured for visual hierarchy */}
+      <div className="px-6 py-4 flex justify-between items-start">
+        
+        {/* Left Column: Crop identity + Hero cost + Supporting metrics */}
+        <div className="space-y-2">
+          {/* Row 1: Crop name + status + type selector */}
+          <div className="flex items-center gap-3">
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') { setIsEditingName(false); setNameValue(cropName); }
+                  }}
+                  className="px-2 py-1 border border-input rounded text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                  autoFocus
+                />
                 <button
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
-                  title="Rename crop"
+                  onClick={handleSaveName}
+                  className="p-1 text-primary hover:bg-primary/10 rounded"
                 >
-                  <Edit2 className="w-3 h-3" />
+                  <Check className="w-4 h-4" />
                 </button>
-              )}
-            </div>
-          )}
-          <StatusBadge status={summary.status} />
-          
-          {/* Crop Type Selector */}
-          {onUpdateCropType && (
-            <CropTypeSelector
-              value={crop.cropType}
-              onChange={onUpdateCropType}
-              className="w-32 h-8 text-sm"
-            />
-          )}
-        </div>
-
-        {/* Center: Key metrics inline */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-primary">{formatCurrency(summary.totalCost)}</span>
-            <span className="text-muted-foreground text-sm">·</span>
-            <span className="text-sm text-muted-foreground">{formatCurrency(summary.costPerAcre)}/ac</span>
+                <button
+                  onClick={() => { setIsEditingName(false); setNameValue(cropName); }}
+                  className="p-1 text-muted-foreground hover:bg-muted rounded"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 group">
+                <h2 className="text-lg font-semibold text-foreground">{cropName}</h2>
+                {onUpdateCropName && (
+                  <button
+                    onClick={() => setIsEditingName(true)}
+                    className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                    title="Rename crop"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+            <StatusBadge status={summary.status} />
+            
+            {/* Crop Type Selector */}
+            {onUpdateCropType && (
+              <CropTypeSelector
+                value={crop.cropType}
+                onChange={onUpdateCropType}
+                className="w-32 h-7 text-sm"
+              />
+            )}
           </div>
-          <span className="text-muted-foreground text-sm">·</span>
-          <span className="text-sm text-foreground">{formatNumber(totalAcres, 0)} ac</span>
-          <span className="text-muted-foreground text-sm">·</span>
-          <IntensityDots intensity={summary.programIntensity} />
+
+          {/* Row 2: HERO - Total Crop Cost */}
+          <div>
+            <p 
+              className={`text-3xl font-bold text-primary transition-all duration-300 ${
+                isHighlighted ? 'scale-[1.02] brightness-110' : ''
+              }`}
+            >
+              {formattedTotalCost}
+            </p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">
+              Total Crop Cost
+            </p>
+          </div>
+
+          {/* Row 3: Supporting metrics */}
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span>{formatCurrency(summary.costPerAcre)}/ac</span>
+            <span className="text-muted-foreground/50">·</span>
+            <span>{formatNumber(totalAcres, 0)} ac</span>
+            <span className="text-muted-foreground/50">·</span>
+            <div className="flex items-center gap-1.5">
+              <IntensityDots intensity={summary.programIntensity} />
+              <span className="text-xs">Intensity</span>
+            </div>
+          </div>
         </div>
 
-        {/* Right: Inline nutrients + toggle */}
-        <div className="flex items-center gap-4">
-          {/* Compact nutrient totals */}
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-muted-foreground">
-              N <span className="font-medium text-foreground">{formatNumber(summary.nutrients.n, 1)}</span>
+        {/* Right Column: Nutrients (quieter) + Insights toggle */}
+        <div className="flex flex-col items-end gap-3">
+          {/* Compact nutrient totals - quieter styling */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              N <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.n, 1)}</span>
             </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              P <span className="font-medium text-foreground">{formatNumber(summary.nutrients.p, 1)}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>
+              P <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.p, 1)}</span>
             </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              K <span className="font-medium text-foreground">{formatNumber(summary.nutrients.k, 1)}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>
+              K <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.k, 1)}</span>
             </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              S <span className="font-medium text-foreground">{formatNumber(summary.nutrients.s, 1)}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>
+              S <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.s, 1)}</span>
             </span>
           </div>
 
