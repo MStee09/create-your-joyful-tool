@@ -5,7 +5,7 @@ import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
-import { calculateSeasonSummary } from '@/lib/cropCalculations';
+import { calculateSeasonSummary, calculatePassSummary } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
 
@@ -127,7 +127,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     return grouped;
   }, [sortedTimings]);
 
-  // Calculate cost per phase using existing calculation logic
+  // Calculate cost per phase using the proper calculation logic from cropCalculations
   const phaseCosts = useMemo(() => {
     const costs: Record<TimingBucket, number> = {
       'PRE_PLANT': 0,
@@ -138,29 +138,13 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     
     sortedTimings.forEach(timing => {
       const bucket = timing.timingBucket || 'IN_SEASON';
-      const timingApps = crop.applications.filter(a => a.timingId === timing.id);
-      
-      timingApps.forEach(app => {
-        const product = products.find(p => p.id === app.productId);
-        if (product) {
-          const coverage = app.acresPercentage || 100;
-          let costPerAcre = 0;
-          
-          if (product.form === 'liquid') {
-            const gallons = app.rateUnit === 'gal' ? app.rate : app.rate / 128;
-            costPerAcre = gallons * product.price;
-          } else {
-            const tons = app.rate / 2000;
-            costPerAcre = tons * product.price;
-          }
-          
-          costs[bucket] += costPerAcre * (coverage / 100);
-        }
-      });
+      const summary = calculatePassSummary(timing, crop, products);
+      // Use costPerFieldAcre - the field-weighted cost that rolls up to budget
+      costs[bucket] += summary.costPerFieldAcre;
     });
     
     return costs;
-  }, [sortedTimings, crop.applications, products]);
+  }, [sortedTimings, crop, products]);
 
   // Handlers
   const handleSaveAcres = () => {
