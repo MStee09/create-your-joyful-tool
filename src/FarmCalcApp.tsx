@@ -508,7 +508,7 @@ const VendorsView: React.FC<{
 import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 import { ProductSelectorModal, type ProductWithContext } from './components/farm/ProductSelectorModal';
 import { InventoryAddModal } from './components/farm/InventoryAddModal';
-import { formatInventoryDisplay } from './lib/packagingUtils';
+import { formatInventoryDisplay, getDefaultPackagingOptions } from './lib/packagingUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/ui/collapsible';
 
 const InventoryView: React.FC<{
@@ -524,6 +524,7 @@ const InventoryView: React.FC<{
   const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState(0);
+  const [editPackaging, setEditPackaging] = useState<string>('');
   
   // Persist Plan Readiness collapsed state
   const [planReadinessOpen, setPlanReadinessOpen] = useState(() => {
@@ -707,17 +708,39 @@ const InventoryView: React.FC<{
     setShowAddModal(true);
   };
 
-  const handleSaveEdit = (id: string) => {
+  const handleSaveEdit = (id: string, product: Product) => {
     if (editQuantity <= 0) {
       onUpdateInventory(inventory.filter(i => i.id !== id));
     } else {
       const item = inventory.find(i => i.id === id);
-      if (item && item.packagingSize && item.containerCount) {
-        // Update container count based on new quantity
-        const newContainerCount = Math.round(editQuantity / item.packagingSize);
-        onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity, containerCount: newContainerCount } : i));
-      } else {
-        onUpdateInventory(inventory.map(i => i.id === id ? { ...i, quantity: editQuantity } : i));
+      if (item) {
+        // Parse the selected packaging
+        const packagingOptions = getDefaultPackagingOptions(product.form);
+        const [name, sizeStr] = editPackaging.split('|');
+        const size = parseFloat(sizeStr);
+        const selectedPkg = packagingOptions.find(p => p.name === name && p.unitSize === size);
+        
+        if (selectedPkg) {
+          // Calculate container count from new quantity and packaging
+          const newContainerCount = Math.round(editQuantity / selectedPkg.unitSize);
+          onUpdateInventory(inventory.map(i => i.id === id ? { 
+            ...i, 
+            quantity: editQuantity,
+            packagingName: selectedPkg.name,
+            packagingSize: selectedPkg.unitSize,
+            unit: selectedPkg.unitType,
+            containerCount: newContainerCount > 0 ? newContainerCount : 1
+          } : i));
+        } else {
+          // Bulk mode - no packaging
+          onUpdateInventory(inventory.map(i => i.id === id ? { 
+            ...i, 
+            quantity: editQuantity,
+            packagingName: undefined,
+            packagingSize: undefined,
+            containerCount: undefined
+          } : i));
+        }
       }
     }
     setEditingId(null);
@@ -839,15 +862,30 @@ const InventoryView: React.FC<{
                     </td>
                     <td className="px-6 py-4 text-right">
                       {editingId === item.id ? (
-                        <input
-                          type="number"
-                          value={editQuantity}
-                          onChange={(e) => setEditQuantity(Number(e.target.value))}
-                          className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
-                          autoFocus
-                          onBlur={() => handleSaveEdit(item.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
-                        />
+                        <div className="space-y-2">
+                          <select
+                            value={editPackaging}
+                            onChange={(e) => setEditPackaging(e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-stone-300 rounded bg-white"
+                          >
+                            <option value="">Bulk (no packaging)</option>
+                            {getDefaultPackagingOptions(product.form).map((opt) => (
+                              <option key={`${opt.name}|${opt.unitSize}`} value={`${opt.name}|${opt.unitSize}`}>
+                                {opt.name} – {opt.unitSize} {opt.unitType}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(Number(e.target.value))}
+                            className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
+                            autoFocus
+                            onBlur={() => handleSaveEdit(item.id, product)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id, product)}
+                          />
+                          <span className="text-xs text-stone-500 ml-1">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                        </div>
                       ) : (
                         <div className="text-right">
                           <span className="text-stone-700">{display.primary}</span>
@@ -867,6 +905,12 @@ const InventoryView: React.FC<{
                             onClick={() => {
                               setEditingId(item.id);
                               setEditQuantity(item.quantity);
+                              // Set current packaging if exists
+                              if (item.packagingName && item.packagingSize) {
+                                setEditPackaging(`${item.packagingName}|${item.packagingSize}`);
+                              } else {
+                                setEditPackaging('');
+                              }
                             }}
                             className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
                           >
