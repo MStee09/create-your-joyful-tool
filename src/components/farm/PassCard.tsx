@@ -221,17 +221,30 @@ export const PassCard: React.FC<PassCardProps> = ({
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Split cost display */}
+          {/* Cost display - field average as primary for Selective, treated for Uniform */}
           <div className="text-right">
-            <div className="flex items-baseline gap-1.5">
-              <p className="text-lg font-semibold text-primary">
-                {formatCurrency(summary.costPerTreatedAcre)}/ac
-              </p>
-              <span className="text-xs text-muted-foreground">treated</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {formatCurrency(summary.costPerFieldAcre)}/ac field • {formatCurrency(summary.totalCost)} total
-            </p>
+            {summary.passPattern === 'selective' ? (
+              <>
+                {/* Selective: show field avg as primary, no treated at pass level */}
+                <p className="text-lg font-semibold text-primary">
+                  {formatCurrency(summary.costPerFieldAcre)}/ac
+                  <span className="text-sm font-normal text-muted-foreground ml-1">field</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(summary.totalCost)} total
+                </p>
+              </>
+            ) : (
+              <>
+                {/* Uniform/Trial: treated = field for 100% passes */}
+                <p className="text-lg font-semibold text-primary">
+                  {formatCurrency(summary.costPerTreatedAcre)}/ac
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(summary.totalCost)} total
+                </p>
+              </>
+            )}
           </div>
           
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -265,21 +278,29 @@ export const PassCard: React.FC<PassCardProps> = ({
               <div key={group.acresPercentage} className="space-y-2">
                 {/* Group Header - only show if multiple groups */}
                 {summary.coverageGroups.length > 1 && (
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/30 rounded-lg">
-                    <span className={cn(
-                      'px-2 py-0.5 rounded text-xs font-semibold',
-                      group.tierLabel === 'Core' ? 'bg-emerald-500/15 text-emerald-600' :
-                      group.tierLabel === 'Selective' ? 'bg-amber-500/15 text-amber-600' :
-                      'bg-violet-500/15 text-violet-600'
-                    )}>
-                      {group.tierLabel}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatNumber(group.acresPercentage, 0)}% · {formatNumber(group.acresTreated, 0)} ac
-                    </span>
-                    <span className="text-sm text-primary font-medium ml-auto">
-                      {formatCurrency(group.costPerTreatedAcre)}/ac
-                    </span>
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        'px-2 py-0.5 rounded text-xs font-semibold',
+                        group.tierLabel === 'Core' ? 'bg-emerald-500/15 text-emerald-600' :
+                        group.tierLabel === 'Selective' ? 'bg-amber-500/15 text-amber-600' :
+                        'bg-violet-500/15 text-violet-600'
+                      )}>
+                        {group.tierLabel}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatNumber(group.acresPercentage, 0)}% · {formatNumber(group.acresTreated, 0)} ac
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-primary font-semibold">
+                        {formatCurrency(group.costPerTreatedAcre)}/ac
+                        <span className="font-normal text-muted-foreground ml-1">treated</span>
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(group.costPerFieldAcre)}/ac field
+                      </p>
+                    </div>
                   </div>
                 )}
                 
