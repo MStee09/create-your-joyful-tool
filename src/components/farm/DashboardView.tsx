@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Leaf, DollarSign, BarChart3, Package } from 'lucide-react';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 import type { Season, Product } from '@/types/farm';
 import type { ProductPurpose } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
@@ -105,63 +105,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return products.filter(p => productIds.has(p.id));
   }, [season, products]);
 
+  // Get comparative indicator for crop cost/acre vs farm average
+  const getComparativeIndicator = (cropCostPerAcre: number) => {
+    if (stats.costPerAcre === 0) return null;
+    const deviation = (cropCostPerAcre - stats.costPerAcre) / stats.costPerAcre;
+    
+    if (deviation > 0.10) {
+      return <ArrowUp className="w-4 h-4 text-amber-500" />;
+    } else if (deviation < -0.10) {
+      return <ArrowDown className="w-4 h-4 text-emerald-500" />;
+    }
+    return null;
+  };
+
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
-        <p className="text-muted-foreground mt-1">
-          {season ? `${season.year} - ${season.name}` : 'No season selected'}
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Acres</p>
-              <p className="text-2xl font-bold text-foreground">{formatNumber(stats.totalAcres, 0)}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-blue" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Plan Cost</p>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.totalCost)}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-amber" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Avg Cost/Acre</p>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.costPerAcre)}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-purple" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Crops Planned</p>
-              <p className="text-2xl font-bold text-foreground">{stats.cropCount}</p>
-            </div>
-          </div>
+      {/* Hero Section - Total Plan Cost */}
+      <div className="bg-card rounded-xl p-8 shadow-sm border border-border mb-8">
+        <div className="text-center">
+          <p className="text-4xl font-bold text-primary mb-1">
+            {formatCurrency(stats.totalCost, 0)}
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Total Plan Cost ({season?.year || new Date().getFullYear()})
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {formatNumber(stats.totalAcres, 0)} acres&nbsp;&nbsp;•&nbsp;&nbsp;
+            {formatCurrency(stats.costPerAcre)}/ac avg&nbsp;&nbsp;•&nbsp;&nbsp;
+            {stats.cropCount} crop{stats.cropCount !== 1 ? 's' : ''}
+          </p>
         </div>
       </div>
 
@@ -189,20 +161,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <thead>
                 <tr className="bg-muted/50">
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applications</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
                   <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Passes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {cropSummaries.map((crop, idx) => (
                   <tr key={idx} className="hover:bg-muted/30">
                     <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
+                        {getComparativeIndicator(crop.costPerAcre)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost, 0)}</td>
                     <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
                     <td className="px-6 py-4 text-right text-muted-foreground">{crop.applicationCount}</td>
-                    <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
-                    <td className="px-6 py-4 text-right font-semibold text-primary">{formatCurrency(crop.costPerAcre)}</td>
                   </tr>
                 ))}
                 {cropSummaries.length === 0 && (
