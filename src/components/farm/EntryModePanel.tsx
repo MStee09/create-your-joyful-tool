@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Trash2, Droplet, Weight, ChevronDown } from 'lucide-react';
+import { X, Trash2, Droplet, Weight } from 'lucide-react';
 import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { ACRES_PRESETS, getApplicationAcresPercentage } from '@/lib/cropCalculations';
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 interface EntryModePanelProps {
   application: Application | null;
   crop: Crop;
@@ -143,35 +143,33 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
                 )}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent className="bg-popover border border-border shadow-lg z-[100]">
-              <ScrollArea className="max-h-[300px]">
-                {products.map(p => {
-                  const vendor = vendors.find(v => v.id === p.vendorId);
-                  return (
-                    <SelectItem 
-                      key={p.id} 
-                      value={p.id}
-                      className="cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 py-0.5">
-                        {p.form === 'liquid' ? (
-                          <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                        ) : (
-                          <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+            <SelectContent className="bg-popover border border-border shadow-lg z-[100] max-h-[400px]">
+              {products.map(p => {
+                const vendor = vendors.find(v => v.id === p.vendorId);
+                return (
+                  <SelectItem 
+                    key={p.id} 
+                    value={p.id}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 py-0.5">
+                      {p.form === 'liquid' ? (
+                        <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      ) : (
+                        <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                      )}
+                      <div className="flex flex-col">
+                        {vendor && (
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                            {vendor.name}
+                          </span>
                         )}
-                        <div className="flex flex-col">
-                          {vendor && (
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                              {vendor.name}
-                            </span>
-                          )}
-                          <span className="font-medium">{p.name}</span>
-                        </div>
+                        <span className="font-medium">{p.name}</span>
                       </div>
-                    </SelectItem>
-                  );
-                })}
-              </ScrollArea>
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
