@@ -16,3 +16,5 @@ export { ProductHoverCard } from './ProductHoverCard';
 export { AnalysisReviewModal } from './AnalysisReviewModal';
 export { ProductPurposeEditor } from './ProductPurposeEditor';
 export { FunctionCoverageBar } from './FunctionCoverageBar';
+export { TimingEditorPopover } from './TimingEditorPopover';
+export { CropTypeSelector } from './CropTypeSelector';

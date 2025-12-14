@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
 import { calculatePassSummary, getApplicationAcresPercentage, type CoverageGroup, type PassPattern } from '@/lib/cropCalculations';
 import { FUNCTION_CATEGORIES, getRoleFunctionCategory } from '@/lib/functionCategories';
+import { getTimingDisplayText } from '@/lib/growthStages';
+import { TimingEditorPopover } from './TimingEditorPopover';
 import { cn } from '@/lib/utils';
 
 interface PassCardProps {
@@ -190,22 +192,49 @@ export const PassCard: React.FC<PassCardProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 group/name">
-                  <h3 className="font-semibold text-foreground uppercase tracking-wide">
-                    {timing.name}
-                  </h3>
-                  {onUpdateTiming && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setIsEditingName(true); }}
-                      className="p-1 opacity-0 group-hover/name:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
-                      title="Rename timing"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </button>
-                  )}
+              <div className="flex items-center gap-1 group/name">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-semibold text-foreground uppercase tracking-wide">
+                        {timing.name}
+                      </h3>
+                      {onUpdateTiming && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setIsEditingName(true); }}
+                          className="p-1 opacity-0 group-hover/name:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                          title="Rename timing"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    {/* Timing line - always visible */}
+                    <div className="flex items-center gap-1.5 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-muted-foreground">
+                        {getTimingDisplayText(
+                          timing.timingBucket || 'IN_SEASON',
+                          timing.growthStageStart,
+                          timing.growthStageEnd
+                        )}
+                      </span>
+                      {onUpdateTiming && (
+                        <TimingEditorPopover
+                          timing={timing}
+                          cropType={crop.cropType}
+                          onUpdate={onUpdateTiming}
+                        >
+                          <button
+                            className="p-0.5 opacity-0 group-hover/name:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                            title="Edit timing"
+                          >
+                            <Clock className="w-3 h-3" />
+                          </button>
+                        </TimingEditorPopover>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
-              
               {/* Pass Pattern Badge */}
               <span
                 className={cn(

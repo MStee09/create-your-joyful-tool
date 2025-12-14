@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit2, Check, X } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import type { SeasonSummary } from '@/lib/cropCalculations';
-import type { Crop, Product } from '@/types/farm';
+import type { Crop, Product, CropType } from '@/types/farm';
 import type { ProductPurpose } from '@/types/productIntelligence';
 import { SeasonStrip } from './SeasonStrip';
 import { FunctionCoverageBar } from './FunctionCoverageBar';
+import { CropTypeSelector } from './CropTypeSelector';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface SeasonOverviewBarProps {
@@ -18,6 +19,7 @@ interface SeasonOverviewBarProps {
   showInsights: boolean;
   onToggleInsights: () => void;
   onUpdateCropName?: (name: string) => void;
+  onUpdateCropType?: (cropType: CropType) => void;
 }
 
 const StatusBadge: React.FC<{ status: SeasonSummary['status'] }> = ({ status }) => {
@@ -99,6 +101,7 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
   showInsights,
   onToggleInsights,
   onUpdateCropName,
+  onUpdateCropType,
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(cropName);
@@ -157,6 +160,15 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
             </div>
           )}
           <StatusBadge status={summary.status} />
+          
+          {/* Crop Type Selector */}
+          {onUpdateCropType && (
+            <CropTypeSelector
+              value={crop.cropType}
+              onChange={onUpdateCropType}
+              className="w-32 h-8 text-sm"
+            />
+          )}
         </div>
 
         {/* Center: Key metrics inline */}
