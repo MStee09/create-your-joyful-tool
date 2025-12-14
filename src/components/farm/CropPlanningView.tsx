@@ -96,6 +96,15 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     });
   };
 
+  const handleUpdateTiming = (updatedTiming: ApplicationTiming) => {
+    onUpdate({
+      ...crop,
+      applicationTimings: crop.applicationTimings.map(t => 
+        t.id === updatedTiming.id ? updatedTiming : t
+      ),
+    });
+  };
+
   const handleAddApplication = (timingId: string) => {
     const newApp: Application = {
       id: generateId(),
@@ -245,6 +254,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                 onAddApplication={handleAddApplication}
                 onDuplicateTiming={handleDuplicateTiming}
                 onDeleteTiming={handleDeleteTiming}
+                onUpdateTiming={handleUpdateTiming}
                 defaultExpanded={idx === 0}
               />
             ))

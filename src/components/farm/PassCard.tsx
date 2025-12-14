@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
@@ -19,6 +19,7 @@ interface PassCardProps {
   onAddApplication: (timingId: string) => void;
   onDuplicateTiming: (timingId: string) => void;
   onDeleteTiming: (timingId: string) => void;
+  onUpdateTiming?: (timing: ApplicationTiming) => void;
   onUpdateApplicationOverride?: (override: ApplicationOverride) => void;
   defaultExpanded?: boolean;
 }
@@ -82,10 +83,20 @@ export const PassCard: React.FC<PassCardProps> = ({
   onAddApplication,
   onDuplicateTiming,
   onDeleteTiming,
+  onUpdateTiming,
   onUpdateApplicationOverride,
   defaultExpanded = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(timing.name);
+
+  const handleSaveName = () => {
+    if (nameValue.trim() && onUpdateTiming) {
+      onUpdateTiming({ ...timing, name: nameValue.trim() });
+    }
+    setIsEditingName(false);
+  };
   
   const summary = calculatePassSummary(timing, crop, products);
   
@@ -152,9 +163,48 @@ export const PassCard: React.FC<PassCardProps> = ({
           
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-foreground uppercase tracking-wide">
-                {timing.name}
-              </h3>
+              {isEditingName ? (
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="text"
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName();
+                      if (e.key === 'Escape') { setIsEditingName(false); setNameValue(timing.name); }
+                    }}
+                    className="px-2 py-1 border border-input rounded text-sm font-semibold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveName}
+                    className="p-1 text-primary hover:bg-primary/10 rounded"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => { setIsEditingName(false); setNameValue(timing.name); }}
+                    className="p-1 text-muted-foreground hover:bg-muted rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 group/name">
+                  <h3 className="font-semibold text-foreground uppercase tracking-wide">
+                    {timing.name}
+                  </h3>
+                  {onUpdateTiming && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsEditingName(true); }}
+                      className="p-1 opacity-0 group-hover/name:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                      title="Rename timing"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
               
               {/* Pass Pattern Badge */}
               <span
