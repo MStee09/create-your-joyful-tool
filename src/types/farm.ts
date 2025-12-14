@@ -36,10 +36,17 @@ export interface Tier {
   percentage: number;
 }
 
+export type TimingBucket = 'PRE_PLANT' | 'AT_PLANTING' | 'IN_SEASON' | 'POST_HARVEST';
+export type CropType = 'corn' | 'soybeans' | 'wheat' | 'small_grains' | 'edible_beans' | 'other';
+
 export interface ApplicationTiming {
   id: string;
   name: string;
   order: number;
+  // Timing metadata
+  timingBucket?: TimingBucket;
+  growthStageStart?: string;
+  growthStageEnd?: string;
 }
 
 export interface Application {
@@ -65,6 +72,7 @@ export interface SeedTreatment {
 export interface Crop {
   id: string;
   name: string;
+  cropType?: CropType;
   totalAcres: number;
   tiers: Tier[];
   applicationTimings: ApplicationTiming[];

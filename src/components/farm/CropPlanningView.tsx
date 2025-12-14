@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Check, X, Trash2, Settings } from 'lucide-react';
-import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming } from '@/types/farm';
+import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
 import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
 import { calculateSeasonSummary } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
+import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
 
 interface CropPlanningViewProps {
   crop: Crop;
@@ -50,10 +51,18 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
   const handleAddTiming = () => {
     if (!newTimingName.trim()) return;
+    
+    // Infer timing bucket and growth stage from name
+    const inferredBucket = inferTimingBucket(newTimingName);
+    const inferredStages = inferGrowthStage(newTimingName, crop.cropType);
+    
     const newTiming: ApplicationTiming = {
       id: generateId(),
       name: newTimingName.trim(),
       order: crop.applicationTimings.length,
+      timingBucket: inferredBucket,
+      growthStageStart: inferredBucket === 'IN_SEASON' ? inferredStages.start : undefined,
+      growthStageEnd: inferredBucket === 'IN_SEASON' ? inferredStages.end : undefined,
     };
     onUpdate({
       ...crop,
@@ -69,8 +78,11 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
     const newTiming: ApplicationTiming = {
       id: generateId(),
-      name: `${original.name} (copy)`,
-      order: crop.applicationTimings.length,
+      name: `${original.name} (Copy)`,
+      order: original.order + 0.5, // Insert right after original, will be normalized
+      timingBucket: original.timingBucket,
+      growthStageStart: original.growthStageStart,
+      growthStageEnd: original.growthStageEnd,
     };
 
     // Duplicate all applications from the original timing
@@ -81,9 +93,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
       timingId: newTiming.id,
     }));
 
+    // Normalize order values
+    const updatedTimings = [...crop.applicationTimings, newTiming]
+      .sort((a, b) => a.order - b.order)
+      .map((t, idx) => ({ ...t, order: idx }));
+
     onUpdate({
       ...crop,
-      applicationTimings: [...crop.applicationTimings, newTiming],
+      applicationTimings: updatedTimings,
       applications: [...crop.applications, ...newApps],
     });
   };
@@ -150,6 +167,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         showInsights={showInsights}
         onToggleInsights={() => setShowInsights(!showInsights)}
         onUpdateCropName={(name) => onUpdate({ ...crop, name })}
+        onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
       />
 
       {/* Main Content - Scrollable vertical timeline, immediately below header */}
@@ -242,7 +260,23 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
           </div>
         ) : (
           crop.applicationTimings
-            .sort((a, b) => a.order - b.order)
+            .slice() // create copy to avoid mutating
+            .sort((a, b) => {
+              // Primary: bucket order
+              const bucketOrderA = TIMING_BUCKET_INFO[a.timingBucket || 'IN_SEASON'].order;
+              const bucketOrderB = TIMING_BUCKET_INFO[b.timingBucket || 'IN_SEASON'].order;
+              if (bucketOrderA !== bucketOrderB) return bucketOrderA - bucketOrderB;
+              
+              // Secondary (IN_SEASON only): growth stage order
+              if ((a.timingBucket || 'IN_SEASON') === 'IN_SEASON') {
+                const stageOrderA = getStageOrder(crop.cropType, a.growthStageStart);
+                const stageOrderB = getStageOrder(crop.cropType, b.growthStageStart);
+                if (stageOrderA !== stageOrderB) return stageOrderA - stageOrderB;
+              }
+              
+              // Tertiary: original order (tie-breaker)
+              return a.order - b.order;
+            })
             .map((timing, idx) => (
               <PassCard
                 key={timing.id}
