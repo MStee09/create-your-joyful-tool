@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp, Edit2, Check, X } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import type { SeasonSummary } from '@/lib/cropCalculations';
 import type { Crop, Product } from '@/types/farm';
@@ -17,6 +17,7 @@ interface SeasonOverviewBarProps {
   purposes: Record<string, ProductPurpose>;
   showInsights: boolean;
   onToggleInsights: () => void;
+  onUpdateCropName?: (name: string) => void;
 }
 
 const StatusBadge: React.FC<{ status: SeasonSummary['status'] }> = ({ status }) => {
@@ -97,14 +98,64 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
   purposes,
   showInsights,
   onToggleInsights,
+  onUpdateCropName,
 }) => {
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(cropName);
+
+  const handleSaveName = () => {
+    if (nameValue.trim() && onUpdateCropName) {
+      onUpdateCropName(nameValue.trim());
+    }
+    setIsEditingName(false);
+  };
+
   return (
     <div className="bg-card border-b border-border sticky top-0 z-10">
       {/* Compact Header Row */}
       <div className="px-6 py-3 flex items-center justify-between">
         {/* Left: Crop name + status */}
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-foreground">{cropName}</h2>
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') { setIsEditingName(false); setNameValue(cropName); }
+                }}
+                className="px-2 py-1 border border-input rounded text-xl font-bold focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                autoFocus
+              />
+              <button
+                onClick={handleSaveName}
+                className="p-1 text-primary hover:bg-primary/10 rounded"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => { setIsEditingName(false); setNameValue(cropName); }}
+                className="p-1 text-muted-foreground hover:bg-muted rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 group">
+              <h2 className="text-xl font-bold text-foreground">{cropName}</h2>
+              {onUpdateCropName && (
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground rounded transition-opacity"
+                  title="Rename crop"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
           <StatusBadge status={summary.status} />
         </div>
 

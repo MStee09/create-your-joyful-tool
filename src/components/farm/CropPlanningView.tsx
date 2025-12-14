@@ -149,6 +149,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         purposes={purposes}
         showInsights={showInsights}
         onToggleInsights={() => setShowInsights(!showInsights)}
+        onUpdateCropName={(name) => onUpdate({ ...crop, name })}
       />
 
       {/* Main Content - Scrollable vertical timeline, immediately below header */}
