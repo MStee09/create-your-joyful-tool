@@ -300,30 +300,18 @@ export const PassCard: React.FC<PassCardProps> = ({
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Cost display - field average as primary for Selective, treated for Uniform */}
+          {/* Cost display - ALWAYS show field avg at pass level (budget truth) */}
           <div className="text-right">
-            {summary.passPattern === 'selective' ? (
-              <>
-                {/* Selective: show field avg as primary, no treated at pass level */}
-                <p className="text-lg font-semibold text-primary">
-                  {formatCurrency(summary.costPerFieldAcre)}/ac
-                  <span className="text-sm font-normal text-muted-foreground ml-1">field</span>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {formatCurrency(summary.totalCost)} total
-                </p>
-              </>
-            ) : (
-              <>
-                {/* Uniform/Trial: treated = field for 100% passes */}
-                <p className="text-lg font-semibold text-primary">
-                  {formatCurrency(summary.costPerTreatedAcre)}/ac
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {formatCurrency(summary.totalCost)} total
-                </p>
-              </>
-            )}
+            <p className="text-lg font-semibold text-primary">
+              {formatCurrency(summary.costPerFieldAcre)}/ac
+              {/* Only show "field" label when not uniform (treated ≠ field) */}
+              {summary.passPattern !== 'uniform' && (
+                <span className="text-sm font-normal text-muted-foreground ml-1">field</span>
+              )}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {formatCurrency(summary.totalCost)} total
+            </p>
           </div>
           
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
