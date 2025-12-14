@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Trash2, Droplet, Weight } from 'lucide-react';
 import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
@@ -6,7 +6,9 @@ import { ACRES_PRESETS, getApplicationAcresPercentage } from '@/lib/cropCalculat
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -40,6 +42,35 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
   const [showCustomAcres, setShowCustomAcres] = useState(false);
 
   const product = products.find(p => p.id === productId);
+
+  // Group products by vendor, sorted alphabetically by vendor name
+  const productsByVendor = useMemo(() => {
+    // Create a map of vendorId -> { vendor, products }
+    const vendorMap = new Map<string, { vendor: Vendor | undefined; products: Product[] }>();
+    
+    products.forEach(p => {
+      const vendor = vendors.find(v => v.id === p.vendorId);
+      const vendorId = p.vendorId || 'unknown';
+      
+      if (!vendorMap.has(vendorId)) {
+        vendorMap.set(vendorId, { vendor, products: [] });
+      }
+      vendorMap.get(vendorId)!.products.push(p);
+    });
+    
+    // Convert to array and sort by vendor name alphabetically
+    return Array.from(vendorMap.values())
+      .sort((a, b) => {
+        const nameA = a.vendor?.name || 'ZZZ'; // Unknown vendors go last
+        const nameB = b.vendor?.name || 'ZZZ';
+        return nameA.localeCompare(nameB);
+      })
+      .map(group => ({
+        ...group,
+        // Sort products within each vendor alphabetically
+        products: group.products.slice().sort((a, b) => a.name.localeCompare(b.name))
+      }));
+  }, [products, vendors]);
   
   // Calculate live cost preview
   let costPerAcre = 0;
@@ -125,7 +156,7 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
 
       {/* Form */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Product Select */}
+        {/* Product Select - Grouped by Vendor */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Product</label>
           <Select value={productId} onValueChange={setProductId}>
@@ -144,32 +175,29 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
               </SelectValue>
             </SelectTrigger>
             <SelectContent className="bg-popover border border-border shadow-lg z-[100] max-h-[400px]">
-              {products.map(p => {
-                const vendor = vendors.find(v => v.id === p.vendorId);
-                return (
-                  <SelectItem 
-                    key={p.id} 
-                    value={p.id}
-                    className="cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 py-0.5">
-                      {p.form === 'liquid' ? (
-                        <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                      ) : (
-                        <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                      )}
-                      <div className="flex flex-col">
-                        {vendor && (
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                            {vendor.name}
-                          </span>
+              {productsByVendor.map(({ vendor, products: vendorProducts }) => (
+                <SelectGroup key={vendor?.id || 'unknown'}>
+                  <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-1.5 -mx-1 sticky top-0">
+                    {vendor?.name || 'Unknown Vendor'}
+                  </SelectLabel>
+                  {vendorProducts.map(p => (
+                    <SelectItem 
+                      key={p.id} 
+                      value={p.id}
+                      className="cursor-pointer pl-4"
+                    >
+                      <div className="flex items-center gap-2 py-0.5">
+                        {p.form === 'liquid' ? (
+                          <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                        ) : (
+                          <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
                         )}
                         <span className="font-medium">{p.name}</span>
                       </div>
-                    </div>
-                  </SelectItem>
-                );
-              })}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
             </SelectContent>
           </Select>
         </div>
