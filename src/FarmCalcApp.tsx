@@ -875,16 +875,28 @@ const InventoryView: React.FC<{
                               </option>
                             ))}
                           </select>
-                          <input
-                            type="number"
-                            value={editQuantity}
-                            onChange={(e) => setEditQuantity(Number(e.target.value))}
-                            className="w-24 px-2 py-1 text-right border border-stone-300 rounded"
-                            autoFocus
-                            onBlur={() => handleSaveEdit(item.id, product)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id, product)}
-                          />
-                          <span className="text-xs text-stone-500 ml-1">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              value={editQuantity}
+                              onChange={(e) => setEditQuantity(Number(e.target.value))}
+                              className="w-20 px-2 py-1 text-right border border-stone-300 rounded"
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id, product)}
+                            />
+                            <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                            <button
+                              onClick={() => handleSaveEdit(item.id, product)}
+                              className="ml-2 px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="px-2 py-1 text-xs text-stone-500 hover:text-stone-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="text-right">
