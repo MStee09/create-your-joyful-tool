@@ -231,7 +231,7 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
     
     season.crops.forEach(crop => {
       const costs = calculateCropCosts(crop, products);
-      csv += `"${crop.name}",${crop.totalAcres},${crop.applications.length},${crop.seedTreatments.length},${costs.totalCost.toFixed(2)},${costs.costPerAcre.toFixed(2)}\n`;
+      csv += `"${crop.name}",${crop.totalAcres},${crop.applicationTimings.length},${crop.seedTreatments.length},${costs.totalCost.toFixed(2)},${costs.costPerAcre.toFixed(2)}\n`;
     });
     
     downloadCSV(csv, `${season.year}_Crop_Summary.csv`);
@@ -397,7 +397,7 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
             <div>
               <p className="text-sm text-stone-500">Total Applications</p>
               <p className="text-2xl font-bold text-stone-800">
-                {season.crops.reduce((sum, c) => sum + c.applications.length, 0)}
+                {season.crops.reduce((sum, c) => sum + c.applicationTimings.length, 0)}
               </p>
             </div>
             <div>

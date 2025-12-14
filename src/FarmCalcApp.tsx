@@ -270,7 +270,7 @@ const DashboardView: React.FC<{
         acres: crop.totalAcres,
         totalCost: costs.totalCost,
         costPerAcre: costs.costPerAcre,
-        applicationCount: crop.applications.length,
+        applicationCount: crop.applicationTimings.length,
         seedTreatmentCount: crop.seedTreatments.length,
         nutrients,
       };
