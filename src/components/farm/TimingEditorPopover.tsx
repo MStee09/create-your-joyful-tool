@@ -114,15 +114,15 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
                 
                 <div className="flex-1">
                   <Select 
-                    value={stageEnd} 
-                    onValueChange={setStageEnd}
+                    value={stageEnd || '__none__'} 
+                    onValueChange={(v) => setStageEnd(v === '__none__' ? '' : v)}
                     disabled={!stageStart}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="End (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None (single stage)</SelectItem>
+                      <SelectItem value="__none__">None (single stage)</SelectItem>
                       {stages
                         .filter(({ stage }) => {
                           if (!stageStart) return true;
