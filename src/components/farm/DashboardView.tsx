@@ -88,7 +88,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         acres: crop.totalAcres,
         totalCost: cropCost,
         costPerAcre: crop.totalAcres > 0 ? cropCost / crop.totalAcres : 0,
-        applicationCount: crop.applications.length,
+        applicationCount: crop.applicationTimings.length,
       };
     });
   }, [season, products]);
