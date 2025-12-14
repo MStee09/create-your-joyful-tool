@@ -6,6 +6,7 @@ import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
 import { FunctionCoverageBar } from './FunctionCoverageBar';
+import { SeasonStrip } from './SeasonStrip';
 import { calculateSeasonSummary } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 
@@ -137,8 +138,13 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         summary={summary}
       />
 
-      {/* Function Coverage Bar */}
+      {/* Season Strip - Visual orientation */}
       <div className="px-6 pt-4">
+        <SeasonStrip crop={crop} products={products} purposes={purposes} />
+      </div>
+
+      {/* Function Coverage Bar */}
+      <div className="px-6 pt-2">
         <FunctionCoverageBar crop={crop} products={products} purposes={purposes} />
       </div>
 
