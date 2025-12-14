@@ -68,19 +68,22 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
     );
   }
 
-  // Calculate cost
-  let costPerAcre = 0;
+  // Calculate costs - treated (intensity) and field (budget)
+  let treatedCostPerAcre = 0;
   if (product.form === 'liquid') {
     const gallonsPerAcre = convertToGallons(application.rate, application.rateUnit as LiquidUnit);
-    costPerAcre = gallonsPerAcre * product.price;
+    treatedCostPerAcre = gallonsPerAcre * product.price;
   } else {
     const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
     const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-    costPerAcre = poundsPerAcre * pricePerPound;
+    treatedCostPerAcre = poundsPerAcre * pricePerPound;
   }
 
+  // Field average cost = treated cost × coverage fraction (budget truth)
+  const fieldAvgCostPerAcre = treatedCostPerAcre * (acresPercentage / 100);
   const acresTreated = totalAcres * (acresPercentage / 100);
-  const totalCost = costPerAcre * acresTreated;
+  // Total cost is always field-weighted (what you actually spend)
+  const totalCost = fieldAvgCostPerAcre * totalAcres;
 
   // Get roles from purpose or override
   const roles = override?.customRoles || purpose?.roles || [];
@@ -170,7 +173,7 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             )}
           </div>
           
-          {/* Sentence-style details */}
+          {/* Sentence-style details with coverage-weighted costs */}
           <p className="text-sm text-muted-foreground mt-1">
             <span className="text-foreground">{formatNumber(application.rate, 1)} {application.rateUnit}</span>
             <span className="mx-2">•</span>
@@ -179,7 +182,18 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             </span>
             <span className="text-muted-foreground/70"> ({formatNumber(acresTreated, 0)} ac)</span>
             <span className="mx-2">•</span>
-            <span className="text-primary font-medium">{formatCurrency(costPerAcre)}/ac</span>
+            {/* Show both costs when partial coverage, single cost when 100% */}
+            {acresPercentage >= 100 ? (
+              <span className="text-primary font-medium">{formatCurrency(treatedCostPerAcre)}/ac</span>
+            ) : (
+              <>
+                <span className="text-foreground">{formatCurrency(treatedCostPerAcre)}/ac</span>
+                <span className="text-xs text-muted-foreground ml-0.5">treated</span>
+                <span className="mx-1 text-muted-foreground">→</span>
+                <span className="text-primary font-medium">{formatCurrency(fieldAvgCostPerAcre)}/ac</span>
+                <span className="text-xs text-muted-foreground ml-0.5">field</span>
+              </>
+            )}
             <span className="mx-2">•</span>
             <span className="font-medium">{formatCurrency(totalCost)}</span>
           </p>
