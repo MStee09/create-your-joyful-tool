@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Check, X, Trash2, Settings, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
+import type { ProductMaster, PriceBookEntry } from '@/types';
 import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
-import { calculateSeasonSummary, calculatePassSummary } from '@/lib/cropCalculations';
+import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
 
@@ -59,6 +60,9 @@ interface CropPlanningViewProps {
   products: Product[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  productMasters: ProductMaster[];
+  priceBook: PriceBookEntry[];
+  seasonYear: number;
   onUpdate: (crop: Crop) => void;
   onDelete: () => void;
 }
@@ -68,6 +72,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   products,
   vendors,
   inventory,
+  productMasters,
+  priceBook,
+  seasonYear,
   onUpdate,
   onDelete,
 }) => {
@@ -86,9 +93,16 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
   const { purposes } = useProductIntelligence();
 
+  // Build price book context for cost calculations
+  const priceBookContext: PriceBookContext = useMemo(() => ({
+    productMasters,
+    priceBook,
+    seasonYear,
+  }), [productMasters, priceBook, seasonYear]);
+
   const summary = useMemo(() => 
-    calculateSeasonSummary(crop, products),
-    [crop, products]
+    calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext),
+    [crop, products, priceBookContext]
   );
 
   // Sort timings by bucket then growth stage
@@ -127,7 +141,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     return grouped;
   }, [sortedTimings]);
 
-  // Calculate cost per phase using the proper calculation logic from cropCalculations
+  // Calculate cost per phase using price book-aware calculations
   const phaseCosts = useMemo(() => {
     const costs: Record<TimingBucket, number> = {
       'PRE_PLANT': 0,
@@ -138,13 +152,13 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     
     sortedTimings.forEach(timing => {
       const bucket = timing.timingBucket || 'IN_SEASON';
-      const summary = calculatePassSummary(timing, crop, products);
+      const passSummary = calculatePassSummaryWithPriceBook(timing, crop, products, priceBookContext);
       // Use costPerFieldAcre - the field-weighted cost that rolls up to budget
-      costs[bucket] += summary.costPerFieldAcre;
+      costs[bucket] += passSummary.costPerFieldAcre;
     });
     
     return costs;
-  }, [sortedTimings, crop, products]);
+  }, [sortedTimings, crop, products, priceBookContext]);
 
   // Handlers
   const handleSaveAcres = () => {
