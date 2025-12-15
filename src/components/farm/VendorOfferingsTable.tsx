@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Star, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Plus, Star, Trash2, Edit2, Check, X, Calendar } from 'lucide-react';
 import type { VendorOffering, Vendor, ProductMaster } from '@/types';
 import { formatCurrency, generateId, calculateCostPerPound } from '@/lib/calculations';
 
@@ -41,7 +41,9 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       priceUnit: formData.priceUnit || 'gal',
       packaging: formData.packaging,
       sku: formData.sku,
-      lastQuotedDate: new Date().toISOString().split('T')[0],
+      minOrder: formData.minOrder,
+      freightTerms: formData.freightTerms,
+      lastQuotedDate: formData.lastQuotedDate || new Date().toISOString().split('T')[0],
       isPreferred: productOfferings.length === 0, // First one is preferred
     };
     
@@ -116,8 +118,11 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Vendor</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground">Price</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Packaging</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">SKU</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground">$/lb</th>
-                <th className="text-center px-3 py-2 font-medium text-muted-foreground w-24">Preferred</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Min Order</th>
+                <th className="text-center px-3 py-2 font-medium text-muted-foreground">Quoted</th>
+                <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">Pref</th>
                 <th className="px-3 py-2 w-20"></th>
               </tr>
             </thead>
@@ -188,8 +193,48 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                         <span className="text-muted-foreground">{offering.packaging || '-'}</span>
                       )}
                     </td>
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={formData.sku ?? offering.sku ?? ''}
+                          onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                          placeholder="SKU"
+                          className="w-20 px-2 py-1 border border-input rounded text-sm bg-background"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">{offering.sku || '-'}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
                       {costPerLb ? formatCurrency(costPerLb) : '-'}
+                    </td>
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={formData.minOrder ?? offering.minOrder ?? ''}
+                          onChange={(e) => setFormData({ ...formData, minOrder: e.target.value })}
+                          placeholder="e.g., 1 pallet"
+                          className="w-24 px-2 py-1 border border-input rounded text-sm bg-background"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">{offering.minOrder || '-'}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={formData.lastQuotedDate ?? offering.lastQuotedDate ?? ''}
+                          onChange={(e) => setFormData({ ...formData, lastQuotedDate: e.target.value })}
+                          className="px-2 py-1 border border-input rounded text-sm bg-background"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          {offering.lastQuotedDate ? new Date(offering.lastQuotedDate).toLocaleDateString() : '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button
@@ -306,6 +351,35 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                 value={formData.sku || ''}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                 placeholder="Optional"
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-muted-foreground">Min Order</label>
+              <input
+                type="text"
+                value={formData.minOrder || ''}
+                onChange={(e) => setFormData({ ...formData, minOrder: e.target.value })}
+                placeholder="e.g., 1 pallet, 10 cases"
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-muted-foreground">Last Quoted</label>
+              <input
+                type="date"
+                value={formData.lastQuotedDate || new Date().toISOString().split('T')[0]}
+                onChange={(e) => setFormData({ ...formData, lastQuotedDate: e.target.value })}
+                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1 text-muted-foreground">Freight Terms</label>
+              <input
+                type="text"
+                value={formData.freightTerms || ''}
+                onChange={(e) => setFormData({ ...formData, freightTerms: e.target.value })}
+                placeholder="e.g., Free freight on orders over $2,000"
                 className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
               />
             </div>

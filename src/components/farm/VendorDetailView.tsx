@@ -71,6 +71,10 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
   const [newContactPhone, setNewContactPhone] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
   
+  // Contact editing state
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editContact, setEditContact] = useState<VendorContact | null>(null);
+  
   const [editingNotes, setEditingNotes] = useState(false);
   const [generalNotes, setGeneralNotes] = useState(vendor.generalNotes || '');
   const [freightNotes, setFreightNotes] = useState(vendor.freightNotes || '');
@@ -159,6 +163,68 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
     onUpdateVendor({
       ...vendor,
       contacts: (vendor.contacts || []).filter(c => c.id !== contactId),
+    });
+  };
+
+  const handleStartEditContact = (contact: VendorContact) => {
+    setEditingContactId(contact.id);
+    setEditContact({ ...contact });
+  };
+
+  const handleSaveContact = () => {
+    if (!editContact) return;
+    onUpdateVendor({
+      ...vendor,
+      contacts: (vendor.contacts || []).map(c => 
+        c.id === editContact.id ? editContact : c
+      ),
+    });
+    setEditingContactId(null);
+    setEditContact(null);
+  };
+
+  const handleCancelEditContact = () => {
+    setEditingContactId(null);
+    setEditContact(null);
+  };
+
+  // Document handlers
+  const handleUploadDocument = (type: VendorDocument['type'], file: File) => {
+    if (file.type !== 'application/pdf') {
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      const doc: VendorDocument = {
+        id: generateId(),
+        name: file.name,
+        type,
+        data: base64,
+        fileName: file.name,
+      };
+      onUpdateVendor({
+        ...vendor,
+        documents: [...(vendor.documents || []), doc],
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleViewDocument = (data: string) => {
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`<iframe src="${data}" style="width:100%;height:100%;border:none;"></iframe>`);
+    }
+  };
+
+  const handleDeleteDocument = (docId: string) => {
+    onUpdateVendor({
+      ...vendor,
+      documents: (vendor.documents || []).filter(d => d.id !== docId),
     });
   };
 
@@ -496,37 +562,160 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
 
             <div className="space-y-3">
               {(vendor.contacts || []).map(contact => (
-                <div key={contact.id} className="flex items-start justify-between p-2 rounded-lg hover:bg-muted/50">
-                  <div className="flex items-start gap-2">
-                    <User className="w-4 h-4 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{contact.name}</p>
-                      {contact.role && (
-                        <p className="text-xs text-muted-foreground">{contact.role}</p>
-                      )}
-                      {contact.phone && (
-                        <a href={`tel:${contact.phone}`} className="text-xs text-primary hover:underline block">
-                          {contact.phone}
-                        </a>
-                      )}
-                      {contact.email && (
-                        <a href={`mailto:${contact.email}`} className="text-xs text-primary hover:underline block">
-                          {contact.email}
-                        </a>
-                      )}
+                <div key={contact.id} className="p-2 rounded-lg hover:bg-muted/50">
+                  {editingContactId === contact.id && editContact ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editContact.name}
+                        onChange={(e) => setEditContact({ ...editContact, name: e.target.value })}
+                        placeholder="Name"
+                        className="w-full px-2 py-1 text-sm border border-input rounded bg-background"
+                      />
+                      <input
+                        type="text"
+                        value={editContact.role || ''}
+                        onChange={(e) => setEditContact({ ...editContact, role: e.target.value || undefined })}
+                        placeholder="Role"
+                        className="w-full px-2 py-1 text-sm border border-input rounded bg-background"
+                      />
+                      <input
+                        type="tel"
+                        value={editContact.phone || ''}
+                        onChange={(e) => setEditContact({ ...editContact, phone: e.target.value || undefined })}
+                        placeholder="Phone"
+                        className="w-full px-2 py-1 text-sm border border-input rounded bg-background"
+                      />
+                      <input
+                        type="email"
+                        value={editContact.email || ''}
+                        onChange={(e) => setEditContact({ ...editContact, email: e.target.value || undefined })}
+                        placeholder="Email"
+                        className="w-full px-2 py-1 text-sm border border-input rounded bg-background"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={handleCancelEditContact}
+                          className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveContact}
+                          className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteContact(contact.id)}
-                    className="p-1 text-muted-foreground hover:text-destructive rounded"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  ) : (
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-2">
+                        <User className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{contact.name}</p>
+                          {contact.role && (
+                            <p className="text-xs text-muted-foreground">{contact.role}</p>
+                          )}
+                          {contact.phone && (
+                            <a href={`tel:${contact.phone}`} className="text-xs text-primary hover:underline block">
+                              {contact.phone}
+                            </a>
+                          )}
+                          {contact.email && (
+                            <a href={`mailto:${contact.email}`} className="text-xs text-primary hover:underline block">
+                              {contact.email}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStartEditContact(contact)}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteContact(contact.id)}
+                          className="p-1 text-muted-foreground hover:text-destructive rounded"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {(!vendor.contacts || vendor.contacts.length === 0) && !showAddContact && (
                 <p className="text-sm text-muted-foreground text-center py-2">No contacts added</p>
               )}
+            </div>
+          </div>
+
+          {/* Documents */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-foreground">Documents</h4>
+            </div>
+            
+            <div className="space-y-2 mb-3">
+              {(vendor.documents || []).map(doc => (
+                <div key={doc.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{doc.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{doc.type}</p>
+                  </div>
+                  {doc.data && (
+                    <button
+                      onClick={() => handleViewDocument(doc.data!)}
+                      className="px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded"
+                    >
+                      View
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteDocument(doc.id)}
+                    className="p-1 text-muted-foreground hover:text-destructive rounded"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {(!vendor.documents || vendor.documents.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-2">No documents added</p>
+              )}
+            </div>
+            
+            {/* Upload buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex items-center justify-center gap-1 p-2 border border-dashed border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors text-xs">
+                <Upload className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Catalog</span>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadDocument('catalog', file);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <label className="flex items-center justify-center gap-1 p-2 border border-dashed border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors text-xs">
+                <Upload className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Pricing</span>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadDocument('pricing', file);
+                  }}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
