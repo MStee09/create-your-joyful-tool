@@ -28,10 +28,11 @@ import type {
   DemandRollup,
   Award,
   Season,
+  PriceBookEntry,
 } from '@/types';
-import { generateId, formatCurrency, formatNumber } from '@/lib/calculations';
+import { generateId, formatCurrency, formatNumber, downloadCSV } from '@/lib/calculations';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
-import { downloadCSV } from '@/lib/calculations';
+import { updatePriceBookFromAwards } from '@/lib/priceBookUtils';
 import { Breadcrumb } from './Breadcrumb';
 import {
   Dialog,
@@ -49,10 +50,12 @@ interface BidEventDetailViewProps {
   productMasters: ProductMaster[];
   vendorQuotes: VendorQuote[];
   awards: Award[];
+  priceBook: PriceBookEntry[];
   season: Season | null;
   onUpdateEvent: (event: BidEvent) => void;
   onUpdateQuotes: (quotes: VendorQuote[]) => void;
   onUpdateAwards: (awards: Award[]) => void;
+  onUpdatePriceBook: (priceBook: PriceBookEntry[]) => void;
   onBack: () => void;
 }
 
@@ -71,10 +74,12 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   productMasters,
   vendorQuotes,
   awards,
+  priceBook,
   season,
   onUpdateEvent,
   onUpdateQuotes,
   onUpdateAwards,
+  onUpdatePriceBook,
   onBack,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'quotes' | 'awards'>('overview');
@@ -174,10 +179,11 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   const handleAward = (specId: string, vendorId: string, price: number) => {
     const existingAward = eventAwards.find(a => a.specId === specId);
     
+    let updatedAwards: Award[];
     if (existingAward) {
-      onUpdateAwards(awards.map(a => 
+      updatedAwards = awards.map(a => 
         a.id === existingAward.id ? { ...a, vendorId, awardedPrice: price } : a
-      ));
+      );
     } else {
       const newAward: Award = {
         id: generateId(),
@@ -187,11 +193,23 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
         awardedPrice: price,
         effectiveDate: new Date().toISOString(),
       };
-      onUpdateAwards([...awards, newAward]);
+      updatedAwards = [...awards, newAward];
     }
     
+    onUpdateAwards(updatedAwards);
+    
+    // Update price book with new award
+    const updatedPriceBook = updatePriceBookFromAwards(
+      updatedAwards.filter(a => a.bidEventId === event.id),
+      commoditySpecs,
+      productMasters,
+      season?.year || new Date().getFullYear(),
+      priceBook
+    );
+    onUpdatePriceBook(updatedPriceBook);
+    
     setShowAwardModal(null);
-    toast.success('Award saved');
+    toast.success('Award saved & price book updated');
   };
   
   const handleExportBidSheet = () => {

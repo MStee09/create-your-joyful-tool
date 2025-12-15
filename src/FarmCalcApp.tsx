@@ -1406,6 +1406,7 @@ const AppContent: React.FC = () => {
                 productMasters={state.productMasters || []}
                 vendorQuotes={state.vendorQuotes || []}
                 awards={state.awards || []}
+                priceBook={state.priceBook || []}
                 season={currentSeason}
                 onUpdateEvent={(updatedEvent) => {
                   setState(prev => ({
@@ -1417,6 +1418,7 @@ const AppContent: React.FC = () => {
                 }}
                 onUpdateQuotes={(quotes) => setState(prev => ({ ...prev, vendorQuotes: quotes }))}
                 onUpdateAwards={(awards) => setState(prev => ({ ...prev, awards: awards }))}
+                onUpdatePriceBook={(priceBook) => setState(prev => ({ ...prev, priceBook }))}
                 onBack={() => setActiveView('bid-events')}
               />
             );

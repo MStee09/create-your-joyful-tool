@@ -1,4 +1,5 @@
 import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType } from '@/types/farm';
+import type { ProductMaster, PriceBookEntry } from '@/types';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
 
 export interface CoverageGroup {
@@ -79,6 +80,53 @@ export const calculateApplicationCostPerAcre = (
     const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
     return poundsPerAcre * pricePerPound;
   }
+};
+
+// Calculate cost per acre using price book for bid-eligible products
+export const calculateApplicationCostPerAcreWithPriceBook = (
+  app: Application,
+  product: Product | undefined,
+  productMasters: ProductMaster[],
+  priceBook: PriceBookEntry[],
+  seasonYear: number
+): number => {
+  if (!product) return 0;
+  
+  // Check if this product has a price book entry (from awarded bids)
+  const productMaster = productMasters.find(pm => pm.id === product.id);
+  if (productMaster?.isBidEligible) {
+    // Look for price book entry
+    const priceEntry = priceBook.find(pb => 
+      pb.seasonYear === seasonYear && 
+      (
+        (productMaster.commoditySpecId && pb.specId === productMaster.commoditySpecId) ||
+        pb.productId === product.id
+      )
+    );
+    
+    if (priceEntry) {
+      // Use awarded price from price book
+      if (product.form === 'liquid') {
+        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+        // Convert price if units differ
+        if (priceEntry.priceUom === 'gal') {
+          return gallonsPerAcre * priceEntry.price;
+        }
+        // priceEntry is per lb or ton, convert using density
+        const density = product.densityLbsPerGal || 10;
+        const lbsPerAcre = gallonsPerAcre * density;
+        const pricePerLb = priceEntry.priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
+        return lbsPerAcre * pricePerLb;
+      } else {
+        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+        const pricePerPound = priceEntry.priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
+        return poundsPerAcre * pricePerPound;
+      }
+    }
+  }
+  
+  // Fall back to regular product price
+  return calculateApplicationCostPerAcre(app, product);
 };
 
 // Calculate nutrients from an application
@@ -237,6 +285,117 @@ export const calculatePassSummary = (
   };
 };
 
+// Price book context for calculations
+export interface PriceBookContext {
+  productMasters: ProductMaster[];
+  priceBook: PriceBookEntry[];
+  seasonYear: number;
+}
+
+// Calculate pass summary with price book integration
+export const calculatePassSummaryWithPriceBook = (
+  timing: ApplicationTiming,
+  crop: Crop,
+  products: Product[],
+  priceBookContext: PriceBookContext
+): PassSummary => {
+  const applications = crop.applications.filter(a => a.timingId === timing.id);
+  let totalCost = 0;
+  let totalAcresPercentage = 0;
+  const nutrients = { n: 0, p: 0, k: 0, s: 0 };
+
+  applications.forEach(app => {
+    const product = products.find(p => p.id === app.productId);
+    const acresPercentage = getApplicationAcresPercentage(app, crop);
+    const acresTreated = crop.totalAcres * (acresPercentage / 100);
+    
+    // Use price book-aware cost calculation
+    const costPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+      app, 
+      product,
+      priceBookContext.productMasters,
+      priceBookContext.priceBook,
+      priceBookContext.seasonYear
+    );
+    
+    totalCost += costPerAcre * acresTreated;
+    totalAcresPercentage += acresPercentage;
+
+    const appNutrients = calculateApplicationNutrients(app, product);
+    const weight = acresPercentage / 100;
+    nutrients.n += appNutrients.n * weight;
+    nutrients.p += appNutrients.p * weight;
+    nutrients.k += appNutrients.k * weight;
+    nutrients.s += appNutrients.s * weight;
+  });
+
+  // Calculate coverage groups with price book
+  const coverageGroups = calculateCoverageGroupsWithPriceBook(applications, crop, products, priceBookContext);
+  const passPattern = determinePassPattern(coverageGroups);
+  
+  const dominantGroup = coverageGroups.reduce((max, g) => 
+    g.applications.length > (max?.applications.length || 0) ? g : max, 
+    coverageGroups[0]
+  );
+  
+  const totalCostPerTreated = coverageGroups.reduce((sum, g) => sum + g.costPerTreatedAcre, 0);
+  const totalCostPerField = coverageGroups.reduce((sum, g) => sum + g.costPerFieldAcre, 0);
+
+  return {
+    timing,
+    applications,
+    totalCost,
+    avgAcresPercentage: applications.length > 0 ? totalAcresPercentage / applications.length : 0,
+    nutrients,
+    coverageGroups,
+    passPattern,
+    dominantAcres: dominantGroup?.acresPercentage || 100,
+    costPerTreatedAcre: totalCostPerTreated,
+    costPerFieldAcre: totalCostPerField,
+  };
+};
+
+// Calculate coverage groups with price book
+export const calculateCoverageGroupsWithPriceBook = (
+  applications: Application[],
+  crop: Crop,
+  products: Product[],
+  priceBookContext: PriceBookContext
+): CoverageGroup[] => {
+  const groupMap = new Map<number, { apps: Application[]; costSum: number }>();
+
+  applications.forEach(app => {
+    const product = products.find(p => p.id === app.productId);
+    const acresPercentage = getApplicationAcresPercentage(app, crop);
+    const bucket = bucketAcres(acresPercentage);
+    const costPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+      app, 
+      product,
+      priceBookContext.productMasters,
+      priceBookContext.priceBook,
+      priceBookContext.seasonYear
+    );
+
+    if (!groupMap.has(bucket)) {
+      groupMap.set(bucket, { apps: [], costSum: 0 });
+    }
+    const group = groupMap.get(bucket)!;
+    group.apps.push(app);
+    group.costSum += costPerAcre;
+  });
+
+  return Array.from(groupMap.entries())
+    .map(([acresPercentage, { apps, costSum }]) => ({
+      acresPercentage,
+      tierLabel: getTierLabel(acresPercentage),
+      applications: apps,
+      costPerTreatedAcre: costSum,
+      costPerFieldAcre: costSum * (acresPercentage / 100),
+      acresTreated: crop.totalAcres * (acresPercentage / 100),
+    }))
+    .sort((a, b) => b.acresPercentage - a.acresPercentage);
+};
+
 // Late-season stage thresholds by crop type
 const LATE_STAGE_THRESHOLDS: Record<CropType, string[]> = {
   corn: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'],
@@ -374,6 +533,77 @@ export const calculateSeasonSummary = (
   });
 
   // Determine status based on cost distribution
+  const earlyCost = passSummaries.slice(0, earlyEnd).reduce((sum, p) => sum + p.totalCost, 0);
+  const lateCost = passSummaries.slice(midEnd).reduce((sum, p) => sum + p.totalCost, 0);
+  const earlyRatio = totalCost > 0 ? earlyCost / totalCost : 0;
+  const lateRatio = totalCost > 0 ? lateCost / totalCost : 0;
+
+  let status: SeasonSummary['status'] = 'balanced';
+  if (earlyRatio > 0.6) status = 'heavy-early';
+  else if (lateRatio > 0.6) status = 'heavy-late';
+  else if (Math.abs(earlyRatio - lateRatio) > 0.4) status = 'skewed';
+
+  return {
+    totalCost,
+    costPerAcre,
+    programIntensity: intensity.dots,
+    intensityLabel: intensity.label,
+    intensityBreakdown: intensity.breakdown,
+    status,
+    nutrients,
+    nutrientTiming,
+  };
+};
+
+// Calculate full season summary with price book integration
+export const calculateSeasonSummaryWithPriceBook = (
+  crop: Crop,
+  products: Product[],
+  priceBookContext: PriceBookContext,
+  farmAvgCostPerAcre?: number
+): SeasonSummary => {
+  const passSummaries = crop.applicationTimings.map(timing => 
+    calculatePassSummaryWithPriceBook(timing, crop, products, priceBookContext)
+  );
+
+  let totalCost = 0;
+  const nutrients = { n: 0, p: 0, k: 0, s: 0 };
+
+  passSummaries.forEach(pass => {
+    totalCost += pass.totalCost;
+    nutrients.n += pass.nutrients.n;
+    nutrients.p += pass.nutrients.p;
+    nutrients.k += pass.nutrients.k;
+    nutrients.s += pass.nutrients.s;
+  });
+
+  const costPerAcre = crop.totalAcres > 0 ? totalCost / crop.totalAcres : 0;
+  
+  const intensity = calculateProgramIntensity(
+    crop, 
+    passSummaries, 
+    costPerAcre, 
+    farmAvgCostPerAcre
+  );
+
+  const numTimings = passSummaries.length;
+  const earlyEnd = Math.floor(numTimings / 3);
+  const midEnd = Math.floor((2 * numTimings) / 3);
+
+  const nutrientTiming = {
+    early: { n: 0, p: 0, k: 0, s: 0 },
+    mid: { n: 0, p: 0, k: 0, s: 0 },
+    late: { n: 0, p: 0, k: 0, s: 0 },
+  };
+
+  passSummaries.forEach((pass, idx) => {
+    const target = idx < earlyEnd ? 'early' : idx < midEnd ? 'mid' : 'late';
+    nutrientTiming[target].n += pass.nutrients.n;
+    nutrientTiming[target].p += pass.nutrients.p;
+    nutrientTiming[target].k += pass.nutrients.k;
+    nutrientTiming[target].s += pass.nutrients.s;
+  });
+
   const earlyCost = passSummaries.slice(0, earlyEnd).reduce((sum, p) => sum + p.totalCost, 0);
   const lateCost = passSummaries.slice(midEnd).reduce((sum, p) => sum + p.totalCost, 0);
   const earlyRatio = totalCost > 0 ? earlyCost / totalCost : 0;
