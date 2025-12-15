@@ -58,6 +58,8 @@ import { CropPlannerView } from './components/farm/CropPlannerView';
 import { DashboardView } from './components/farm/DashboardView';
 import { DemandRollupView } from './components/farm/DemandRollupView';
 import { CommoditySpecsView } from './components/farm/CommoditySpecsView';
+import { BidEventsView } from './components/farm/BidEventsView';
+import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -132,9 +134,10 @@ const Sidebar: React.FC<{
   const procurementItems = [
     { id: 'procurement', label: 'Demand Rollup' },
     { id: 'commodity-specs', label: 'Commodity Specs' },
+    { id: 'bid-events', label: 'Bid Events' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs';
+  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -1359,6 +1362,18 @@ const AppContent: React.FC = () => {
             onUpdateProducts={handleUpdateProductMasters}
           />
         );
+      case 'bid-events':
+        return (
+          <BidEventsView
+            bidEvents={state.bidEvents || []}
+            vendors={state.vendors}
+            commoditySpecs={state.commoditySpecs || []}
+            productMasters={state.productMasters || []}
+            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+            onUpdateEvents={(events) => setState(prev => ({ ...prev, bidEvents: events }))}
+            onSelectEvent={(eventId) => setActiveView(`bid-event-${eventId}`)}
+          />
+        );
       case 'exports':
         return (
           <EnhancedExportView
@@ -1378,6 +1393,35 @@ const AppContent: React.FC = () => {
           />
         );
       default:
+        // Check for bid event detail view
+        if (activeView.startsWith('bid-event-')) {
+          const eventId = activeView.replace('bid-event-', '');
+          const event = (state.bidEvents || []).find(e => e.id === eventId);
+          if (event) {
+            return (
+              <BidEventDetailView
+                event={event}
+                vendors={state.vendors}
+                commoditySpecs={state.commoditySpecs || []}
+                productMasters={state.productMasters || []}
+                vendorQuotes={state.vendorQuotes || []}
+                awards={state.awards || []}
+                season={currentSeason}
+                onUpdateEvent={(updatedEvent) => {
+                  setState(prev => ({
+                    ...prev,
+                    bidEvents: (prev.bidEvents || []).map(e => 
+                      e.id === updatedEvent.id ? updatedEvent : e
+                    ),
+                  }));
+                }}
+                onUpdateQuotes={(quotes) => setState(prev => ({ ...prev, vendorQuotes: quotes }))}
+                onUpdateAwards={(awards) => setState(prev => ({ ...prev, awards: awards }))}
+                onBack={() => setActiveView('bid-events')}
+              />
+            );
+          }
+        }
         return null;
     }
   };
