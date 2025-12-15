@@ -146,14 +146,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     reader.onload = async (e) => {
       const base64 = e.target?.result as string;
       
-      // Save the document first
-      if (type === 'label') {
-        onUpdateProduct({ ...product, labelData: base64, labelFileName: file.name });
-      } else {
-        onUpdateProduct({ ...product, sdsData: base64, sdsFileName: file.name });
-      }
-      
-      // Now extract data from it
+      // Start extraction
       setIsExtracting(true);
       toast.info('Extracting product data from document...');
       
@@ -167,8 +160,10 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
         
         if (error) throw error;
         
-        // Build updates from extracted data
-        const updates: Partial<ProductMaster> = {};
+        // Build updates from extracted data - include the document data to preserve it
+        const updates: Partial<ProductMaster> = type === 'label' 
+          ? { labelData: base64, labelFileName: file.name }
+          : { sdsData: base64, sdsFileName: file.name };
         
         // Product name (only if current is generic)
         if (data.productName && (product.name === 'New Product' || product.name.startsWith('Untitled'))) {
@@ -247,12 +242,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             rolesConfirmed: false, // User should confirm
           };
           savePurpose(product.id, newPurpose);
-          toast.info(`Suggested ${data.suggestedRoles.length} role(s) - review in Product Intelligence`);
+          toast.info(`Suggested ${data.suggestedRoles.length} role(s) - review in Purpose & Roles section`);
         }
         
       } catch (extractError) {
         console.error('Extraction failed:', extractError);
-        toast.error('Failed to extract data from document');
+        // Still save the document even if extraction fails
+        if (type === 'label') {
+          onUpdateProduct({ ...product, labelData: base64, labelFileName: file.name });
+        } else {
+          onUpdateProduct({ ...product, sdsData: base64, sdsFileName: file.name });
+        }
+        toast.error('Failed to extract data, but document was saved');
       } finally {
         setIsExtracting(false);
       }
