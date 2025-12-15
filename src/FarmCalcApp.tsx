@@ -57,6 +57,7 @@ import { VendorsViewNew } from './components/farm/VendorsViewNew';
 import { CropPlannerView } from './components/farm/CropPlannerView';
 import { DashboardView } from './components/farm/DashboardView';
 import { DemandRollupView } from './components/farm/DemandRollupView';
+import { CommoditySpecsView } from './components/farm/CommoditySpecsView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -124,10 +125,16 @@ const Sidebar: React.FC<{
     { id: 'products', icon: FlaskConical, label: 'Products' },
     { id: 'vendors', icon: Building2, label: 'Vendors' },
     { id: 'inventory', icon: Warehouse, label: 'Inventory' },
-    { id: 'procurement', icon: Package, label: 'Procurement' },
     { id: 'exports', icon: FileSpreadsheet, label: 'Export' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
+  
+  const procurementItems = [
+    { id: 'procurement', label: 'Demand Rollup' },
+    { id: 'commodity-specs', label: 'Commodity Specs' },
+  ];
+  
+  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs';
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -199,6 +206,31 @@ const Sidebar: React.FC<{
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
+        
+        {/* Procurement Section with Sub-items */}
+        <div className="pt-2">
+          <div className={`flex items-center gap-3 px-4 py-2 rounded-lg ${
+            isProcurementActive ? 'bg-stone-800' : ''
+          }`}>
+            <Package className="w-5 h-5 text-stone-400" />
+            <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Procurement</span>
+          </div>
+          <div className="ml-4 mt-1 space-y-1">
+            {procurementItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => onViewChange(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm ${
+                  activeView === item.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-stone-400 hover:bg-stone-800 hover:text-white'
+                }`}
+              >
+                <span className="font-medium">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
 
       {/* User */}
@@ -1315,6 +1347,16 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             productMasters={state.productMasters || []}
             commoditySpecs={state.commoditySpecs || []}
+            onNavigateToSpecs={() => setActiveView('commodity-specs')}
+          />
+        );
+      case 'commodity-specs':
+        return (
+          <CommoditySpecsView
+            commoditySpecs={state.commoditySpecs || []}
+            productMasters={state.productMasters || []}
+            onUpdateSpecs={(specs) => setState(prev => ({ ...prev, commoditySpecs: specs }))}
+            onUpdateProducts={handleUpdateProductMasters}
           />
         );
       case 'exports':

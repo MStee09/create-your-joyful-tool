@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, Package, Droplets, Weight, FileSpreadsheet } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Package, Droplets, Weight, FileSpreadsheet, Settings } from 'lucide-react';
 import type { Season, ProductMaster, CommoditySpec } from '@/types';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
 import { downloadCSV } from '@/lib/calculations';
@@ -9,12 +9,14 @@ interface DemandRollupViewProps {
   season: Season | null;
   productMasters: ProductMaster[];
   commoditySpecs: CommoditySpec[];
+  onNavigateToSpecs?: () => void;
 }
 
 export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
   season,
   productMasters,
   commoditySpecs,
+  onNavigateToSpecs,
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   
@@ -54,6 +56,15 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {onNavigateToSpecs && (
+            <button
+              onClick={onNavigateToSpecs}
+              className="flex items-center gap-2 px-4 py-2 border border-stone-300 text-stone-700 rounded-lg text-sm font-medium hover:bg-stone-50"
+            >
+              <Settings className="w-4 h-4" />
+              Manage Specs
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             disabled={demandRollup.length === 0}
