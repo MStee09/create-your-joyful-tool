@@ -26,19 +26,18 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
 
   const handleAdd = () => {
     console.log('AddOffering clicked', formData);
-    if (!formData.vendorId || formData.price === undefined || formData.price === null) {
-      console.log('AddOffering validation failed', {
-        hasVendor: !!formData.vendorId,
-        price: formData.price,
-      });
+    if (!formData.vendorId) {
+      console.log('AddOffering validation failed: missing vendor');
       return;
     }
+
+    const price = formData.price ?? 0;
     
     const newOffering: VendorOffering = {
       id: generateId(),
       productId: product.id,
       vendorId: formData.vendorId,
-      price: formData.price,
+      price,
       priceUnit: formData.priceUnit || 'gal',
       packaging: formData.packaging,
       sku: formData.sku,
@@ -320,7 +319,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
             </button>
             <button
               onClick={handleAdd}
-              disabled={!formData.vendorId || formData.price === undefined || formData.price === null}
+              disabled={!formData.vendorId}
               className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               Add Offering
