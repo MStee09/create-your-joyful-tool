@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { X, Check, ExternalLink, Sparkles, FileText } from 'lucide-react';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import type { ProductRole } from '@/types/productIntelligence';
 import { CATEGORY_LABELS } from '@/lib/calculations';
@@ -16,6 +16,8 @@ interface ScrapedData {
   activeIngredients?: string;
   generalNotes?: string;
   suggestedRoles?: ProductRole[];
+  labelPdfUrl?: string;
+  sdsPdfUrl?: string;
 }
 
 interface UrlScrapeReviewModalProps {
@@ -172,6 +174,45 @@ export const UrlScrapeReviewModal: React.FC<UrlScrapeReviewModalProps> = ({
               />
             )}
           </div>
+
+          {/* PDF Links Section */}
+          {(data.labelPdfUrl || data.sdsPdfUrl) && (
+            <div className="border-t border-border pt-4 mt-4">
+              <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Documents Found
+              </h4>
+              <div className="space-y-2">
+                {data.labelPdfUrl && (
+                  <a
+                    href={data.labelPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg hover:bg-muted transition-colors text-sm"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    <span className="flex-1">Product Label (PDF)</span>
+                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                  </a>
+                )}
+                {data.sdsPdfUrl && (
+                  <a
+                    href={data.sdsPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg hover:bg-muted transition-colors text-sm"
+                  >
+                    <FileText className="w-4 h-4 text-amber-500" />
+                    <span className="flex-1">Safety Data Sheet (SDS)</span>
+                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                  </a>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Download these PDFs and upload them to the Documents section for analysis.
+              </p>
+            </div>
+          )}
 
           {selectedFields.size === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">

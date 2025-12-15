@@ -49,7 +49,9 @@ Return a JSON object with the following structure:
   "activeIngredients": "<string - list of active ingredients if found>",
   "generalNotes": "<string - any important product notes or description>",
   "extractionConfidence": "<high | medium | low>",
-  "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"]
+  "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"],
+  "labelPdfUrl": "<string - URL to product label PDF if found, null otherwise>",
+  "sdsPdfUrl": "<string - URL to SDS/MSDS PDF if found, null otherwise>"
 }
 
 Rules:
@@ -61,6 +63,9 @@ Rules:
 - For density, look for "lbs/gal", "weight per gallon", or "density"
 - For category, infer from product type (fertilizer, biological, adjuvant, etc.)
 - For form, look for liquid/dry/granular mentions
+- For labelPdfUrl, look for links containing "label", "product label", "specimen label", etc.
+- For sdsPdfUrl, look for links containing "sds", "msds", "safety data sheet", "safety sheet", etc.
+- Make PDF URLs absolute (include full domain if relative)
 
 IMPORTANT: Return ONLY valid JSON, no markdown or explanation.`;
 
@@ -114,6 +119,25 @@ serve(async (req) => {
 
     const html = await pageResponse.text();
     
+    // Extract PDF links before stripping HTML
+    const pdfLinkRegex = /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*)<\/a>/gi;
+    const pdfLinks: { url: string; text: string }[] = [];
+    let match;
+    while ((match = pdfLinkRegex.exec(html)) !== null) {
+      let pdfUrl = match[1];
+      // Make relative URLs absolute
+      if (pdfUrl.startsWith('/')) {
+        const urlObj = new URL(url);
+        pdfUrl = `${urlObj.origin}${pdfUrl}`;
+      } else if (!pdfUrl.startsWith('http')) {
+        const urlObj = new URL(url);
+        pdfUrl = `${urlObj.origin}/${pdfUrl}`;
+      }
+      pdfLinks.push({ url: pdfUrl, text: match[2].toLowerCase() });
+    }
+    
+    console.log('Found PDF links:', pdfLinks.length);
+    
     // Simple HTML to text conversion - strip tags and clean up
     const textContent = html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -131,8 +155,14 @@ serve(async (req) => {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 15000); // Limit content to avoid token limits
+    
+    // Append PDF link info for AI extraction
+    let contentWithLinks = textContent;
+    if (pdfLinks.length > 0) {
+      contentWithLinks += '\n\nDETECTED PDF LINKS:\n' + pdfLinks.map(l => `- ${l.text}: ${l.url}`).join('\n');
+    }
 
-    console.log('Extracted text length:', textContent.length);
+    console.log('Extracted text length:', contentWithLinks.length);
 
     if (textContent.length < 100) {
       throw new Error('Could not extract meaningful content from the page. The page may require JavaScript to load content.');
@@ -143,7 +173,7 @@ serve(async (req) => {
       { role: 'system', content: EXTRACTION_PROMPT },
       { 
         role: 'user', 
-        content: `Extract product information from this webpage content. Source URL: ${url}\n\nPage content:\n${textContent}` 
+        content: `Extract product information from this webpage content. Source URL: ${url}\n\nPage content:\n${contentWithLinks}` 
       }
     ];
 
@@ -219,6 +249,8 @@ serve(async (req) => {
       activeIngredients: extracted.activeIngredients || null,
       generalNotes: extracted.generalNotes || null,
       suggestedRoles: extracted.suggestedRoles || [],
+      labelPdfUrl: extracted.labelPdfUrl || null,
+      sdsPdfUrl: extracted.sdsPdfUrl || null,
     };
 
     return new Response(JSON.stringify(result), {
