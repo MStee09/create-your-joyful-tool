@@ -18,10 +18,26 @@ export type ProductCategory =
   | 'other';
 
 export interface NutrientAnalysis {
+  // Macros
   n: number;
   p: number;
   k: number;
   s: number;
+  // Secondary
+  ca?: number;  // Calcium
+  mg?: number;  // Magnesium
+  // Micros
+  b?: number;   // Boron
+  zn?: number;  // Zinc
+  mn?: number;  // Manganese
+  fe?: number;  // Iron
+  cu?: number;  // Copper
+  mo?: number;  // Molybdenum
+  co?: number;  // Cobalt
+  ni?: number;  // Nickel
+  cl?: number;  // Chlorine
+  // Carbon
+  c?: number;   // Carbon/Organic matter
 }
 
 export interface VendorContact {

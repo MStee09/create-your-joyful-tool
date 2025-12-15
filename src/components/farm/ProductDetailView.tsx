@@ -78,13 +78,29 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(product.name);
   
-  // NPK-S Analysis editing
+  // Nutrient Analysis editing
   const [editingAnalysis, setEditingAnalysis] = useState(false);
   const [analysisValues, setAnalysisValues] = useState({
+    // Macros
     n: product.analysis?.n || 0,
     p: product.analysis?.p || 0,
     k: product.analysis?.k || 0,
     s: product.analysis?.s || 0,
+    // Secondary
+    ca: product.analysis?.ca || 0,
+    mg: product.analysis?.mg || 0,
+    // Micros
+    b: product.analysis?.b || 0,
+    zn: product.analysis?.zn || 0,
+    mn: product.analysis?.mn || 0,
+    fe: product.analysis?.fe || 0,
+    cu: product.analysis?.cu || 0,
+    mo: product.analysis?.mo || 0,
+    co: product.analysis?.co || 0,
+    ni: product.analysis?.ni || 0,
+    cl: product.analysis?.cl || 0,
+    // Carbon
+    c: product.analysis?.c || 0,
   });
   
   // Role suggestion review state
@@ -302,12 +318,32 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     onUpdateProduct({ ...product, category });
   };
 
-  // NPK-S Analysis handlers
+  // Nutrient Analysis handlers
   const handleSaveAnalysis = () => {
-    const hasValues = analysisValues.n > 0 || analysisValues.p > 0 || analysisValues.k > 0 || analysisValues.s > 0;
+    // Check if any values are set
+    const hasValues = Object.values(analysisValues).some(v => v > 0);
+    // Clean up zero values for optional fields
+    const cleanedAnalysis = hasValues ? {
+      n: analysisValues.n,
+      p: analysisValues.p,
+      k: analysisValues.k,
+      s: analysisValues.s,
+      ...(analysisValues.ca > 0 && { ca: analysisValues.ca }),
+      ...(analysisValues.mg > 0 && { mg: analysisValues.mg }),
+      ...(analysisValues.b > 0 && { b: analysisValues.b }),
+      ...(analysisValues.zn > 0 && { zn: analysisValues.zn }),
+      ...(analysisValues.mn > 0 && { mn: analysisValues.mn }),
+      ...(analysisValues.fe > 0 && { fe: analysisValues.fe }),
+      ...(analysisValues.cu > 0 && { cu: analysisValues.cu }),
+      ...(analysisValues.mo > 0 && { mo: analysisValues.mo }),
+      ...(analysisValues.co > 0 && { co: analysisValues.co }),
+      ...(analysisValues.ni > 0 && { ni: analysisValues.ni }),
+      ...(analysisValues.cl > 0 && { cl: analysisValues.cl }),
+      ...(analysisValues.c > 0 && { c: analysisValues.c }),
+    } : undefined;
     onUpdateProduct({ 
       ...product, 
-      analysis: hasValues ? analysisValues : undefined 
+      analysis: cleanedAnalysis 
     });
     setEditingAnalysis(false);
   };
@@ -318,6 +354,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
       p: product.analysis?.p || 0,
       k: product.analysis?.k || 0,
       s: product.analysis?.s || 0,
+      ca: product.analysis?.ca || 0,
+      mg: product.analysis?.mg || 0,
+      b: product.analysis?.b || 0,
+      zn: product.analysis?.zn || 0,
+      mn: product.analysis?.mn || 0,
+      fe: product.analysis?.fe || 0,
+      cu: product.analysis?.cu || 0,
+      mo: product.analysis?.mo || 0,
+      co: product.analysis?.co || 0,
+      ni: product.analysis?.ni || 0,
+      cl: product.analysis?.cl || 0,
+      c: product.analysis?.c || 0,
     });
     setEditingAnalysis(false);
   };
@@ -611,75 +659,123 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                     p: product.analysis?.p || 0,
                     k: product.analysis?.k || 0,
                     s: product.analysis?.s || 0,
+                    ca: product.analysis?.ca || 0,
+                    mg: product.analysis?.mg || 0,
+                    b: product.analysis?.b || 0,
+                    zn: product.analysis?.zn || 0,
+                    mn: product.analysis?.mn || 0,
+                    fe: product.analysis?.fe || 0,
+                    cu: product.analysis?.cu || 0,
+                    mo: product.analysis?.mo || 0,
+                    co: product.analysis?.co || 0,
+                    ni: product.analysis?.ni || 0,
+                    cl: product.analysis?.cl || 0,
+                    c: product.analysis?.c || 0,
                   });
                   setEditingAnalysis(true);
                 }}
                 className="px-2 py-0.5 bg-muted rounded text-xs hover:bg-muted/80 transition-colors"
-                title="Edit NPK-S Analysis"
+                title="Edit Nutrient Analysis"
               >
                 {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
                 {product.analysis.s > 0 && `-${product.analysis.s}S`}
+                {(product.analysis.ca || product.analysis.mg || product.analysis.b || product.analysis.zn) && ' +micros'}
               </button>
             )}
             {!product.analysis && (
               <button
                 onClick={() => {
-                  setAnalysisValues({ n: 0, p: 0, k: 0, s: 0 });
+                  setAnalysisValues({ n: 0, p: 0, k: 0, s: 0, ca: 0, mg: 0, b: 0, zn: 0, mn: 0, fe: 0, cu: 0, mo: 0, co: 0, ni: 0, cl: 0, c: 0 });
                   setEditingAnalysis(true);
                 }}
                 className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground hover:bg-muted/80 transition-colors"
               >
-                + Add NPK-S
+                + Add Analysis
               </button>
             )}
           </div>
           
-          {/* NPK-S Analysis Editor Modal */}
+          {/* Nutrient Analysis Editor Modal */}
           {editingAnalysis && (
-            <div className="absolute top-full left-11 mt-2 bg-card border border-border rounded-lg shadow-lg p-4 z-50">
-              <h4 className="text-sm font-medium mb-3">NPK-S Analysis</h4>
-              <div className="grid grid-cols-4 gap-2 mb-3">
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">N</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={analysisValues.n}
-                    onChange={(e) => setAnalysisValues({ ...analysisValues, n: Number(e.target.value) })}
-                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">P</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={analysisValues.p}
-                    onChange={(e) => setAnalysisValues({ ...analysisValues, p: Number(e.target.value) })}
-                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">K</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={analysisValues.k}
-                    onChange={(e) => setAnalysisValues({ ...analysisValues, k: Number(e.target.value) })}
-                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">S</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={analysisValues.s}
-                    onChange={(e) => setAnalysisValues({ ...analysisValues, s: Number(e.target.value) })}
-                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
-                  />
+            <div className="absolute top-full left-11 mt-2 bg-card border border-border rounded-lg shadow-lg p-4 z-50 w-[420px]">
+              <h4 className="text-sm font-medium mb-3">Nutrient Analysis</h4>
+              
+              {/* Macros: N-P-K-S */}
+              <div className="mb-3">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Primary (N-P-K-S)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['n', 'p', 'k', 's'] as const).map((key) => (
+                    <div key={key}>
+                      <label className="block text-xs text-muted-foreground mb-1">{key.toUpperCase()}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={analysisValues[key]}
+                        onChange={(e) => setAnalysisValues({ ...analysisValues, [key]: Number(e.target.value) })}
+                        className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
+              
+              {/* Secondary: Ca, Mg */}
+              <div className="mb-3">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Secondary</p>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Ca</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={analysisValues.ca}
+                      onChange={(e) => setAnalysisValues({ ...analysisValues, ca: Number(e.target.value) })}
+                      className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Mg</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={analysisValues.mg}
+                      onChange={(e) => setAnalysisValues({ ...analysisValues, mg: Number(e.target.value) })}
+                      className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">C</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={analysisValues.c}
+                      onChange={(e) => setAnalysisValues({ ...analysisValues, c: Number(e.target.value) })}
+                      className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                      title="Carbon / Organic Matter"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Micros */}
+              <div className="mb-3">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Micronutrients</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {(['b', 'zn', 'mn', 'fe', 'cu', 'mo', 'co', 'ni', 'cl'] as const).map((key) => (
+                    <div key={key}>
+                      <label className="block text-xs text-muted-foreground mb-1 capitalize">{key}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={analysisValues[key]}
+                        onChange={(e) => setAnalysisValues({ ...analysisValues, [key]: Number(e.target.value) })}
+                        className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
               <div className="flex justify-end gap-2">
                 <button
                   onClick={handleCancelAnalysis}
