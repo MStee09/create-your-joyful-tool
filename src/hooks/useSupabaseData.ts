@@ -206,58 +206,41 @@ export function useSupabaseData(user: User | null) {
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
 
-      // Sync: if a product is marked as a commodity, ensure it exists as a commodity spec
-      const commodityProducts = productMasters.filter(
-        (p) => p.productType === 'commodity' || p.isBidEligible
-      );
+      // Sync: any dry fertilizer products should exist as a commodity spec
+      // (Our DB doesn't store productType/isBidEligible flags yet, so we infer from category/form.)
+       const commodityProducts = productMasters.filter((p) => {
+         const cat = String(p.category || '');
+         return (
+           cat === 'fertilizer-dry' ||
+           (cat.startsWith('fertilizer') && (p.defaultUnit === 'ton' || p.defaultUnit === 'lbs'))
+         );
+       });
 
-      const existingByProductId = new Set(
-        commoditySpecs.flatMap((s) => (s.productId ? [s.productId] : []))
-      );
       const existingByName = new Set(
-        commoditySpecs.map((s) => (s.specName || s.name).trim().toLowerCase())
+        commoditySpecs.map((s) => (s.name || '').trim().toLowerCase()).filter(Boolean)
       );
 
       const specsToCreate = commodityProducts
-        .filter((p) => {
-          const nameKey = p.name.trim().toLowerCase();
-          return !existingByProductId.has(p.id) && !existingByName.has(nameKey);
-        })
+        .filter((p) => !existingByName.has(p.name.trim().toLowerCase()))
         .map((p) => {
-          const unit = (p.defaultUnit === 'gal' || p.defaultUnit === 'lbs' || p.defaultUnit === 'ton')
-            ? p.defaultUnit
-            : 'ton';
+          const unit: 'ton' | 'gal' | 'lbs' = 'ton';
+          const category: 'fertilizer' | 'chemical' = 'fertilizer';
 
-          const category = p.category.startsWith('fertilizer') ? 'fertilizer' : 'chemical';
-
-          const spec: CommoditySpec = {
+          return {
             id: crypto.randomUUID(),
-            productId: p.id,
+            user_id: user.id,
             name: p.name,
-            specName: p.name,
-            unit: unit as any,
-            uom: unit as any,
-            category,
-            analysis: p.analysis,
             description: undefined,
+            unit,
+            category,
+            analysis: (p.analysis ?? null) as any,
           };
-          return spec;
         });
 
       if (specsToCreate.length > 0) {
         const { data: inserted, error: insertError } = await supabase
           .from('commodity_specs')
-          .insert(
-            specsToCreate.map((s) => ({
-              id: s.id,
-              user_id: user.id,
-              name: s.name,
-              description: s.description,
-              unit: s.unit,
-              category: s.category,
-              analysis: s.analysis as any,
-            }))
-          )
+          .insert(specsToCreate)
           .select('*');
 
         if (insertError) {
