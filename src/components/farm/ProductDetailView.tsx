@@ -89,9 +89,12 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const stockInfo = getStockStatus(product, inventory);
   
   // Get preferred offering for calculations
-  const preferredOffering = vendorOfferings.find(o => o.productId === product.id && o.isPreferred)
-    || vendorOfferings.find(o => o.productId === product.id);
+  const productOfferings = vendorOfferings.filter(o => o.productId === product.id);
+  const preferredOffering = productOfferings.find(o => o.isPreferred) || productOfferings[0];
   const preferredVendor = preferredOffering ? vendors.find(v => v.id === preferredOffering.vendorId) : null;
+  
+  // Check if this is a "new" product (no offerings, no label, no SDS)
+  const isNewProduct = productOfferings.length === 0 && !product.labelData && !product.sdsData;
 
   // Calculations
   const costPerLb = preferredOffering ? calculateCostPerPound(preferredOffering, product) : null;
@@ -297,6 +300,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           { label: product.name },
         ]} 
       />
+
+      {/* New Product Helper Banner */}
+      {isNewProduct && (
+        <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-foreground">
+              Add vendor pricing, packaging, and roles to use this product in plans.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
