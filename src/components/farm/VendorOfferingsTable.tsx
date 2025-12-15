@@ -25,7 +25,14 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const productOfferings = offerings.filter(o => o.productId === product.id);
 
   const handleAdd = () => {
-    if (!formData.vendorId || formData.price === undefined || formData.price === null) return;
+    console.log('AddOffering clicked', formData);
+    if (!formData.vendorId || formData.price === undefined || formData.price === null) {
+      console.log('AddOffering validation failed', {
+        hasVendor: !!formData.vendorId,
+        price: formData.price,
+      });
+      return;
+    }
     
     const newOffering: VendorOffering = {
       id: generateId(),
@@ -39,6 +46,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       isPreferred: productOfferings.length === 0, // First one is preferred
     };
     
+    console.log('AddOffering creating new offering', newOffering);
     onUpdateOfferings([...offerings, newOffering]);
     setShowAddForm(false);
     setFormData({});
