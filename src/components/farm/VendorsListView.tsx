@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Building2, Search, Star, Package } from 'lucide-react';
-import type { Vendor, VendorTag, ProductMaster, VendorOffering } from '@/types';
+import { Plus, Search, Star, Check } from 'lucide-react';
+import type { Vendor, VendorTag, ProductMaster, VendorOffering, Season } from '@/types';
 import { generateId, CATEGORY_LABELS } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
 
@@ -8,6 +8,7 @@ interface VendorsListViewProps {
   vendors: Vendor[];
   productMasters: ProductMaster[];
   vendorOfferings: VendorOffering[];
+  currentSeason?: Season | null;
   onUpdateVendors: (vendors: Vendor[]) => void;
   onSelectVendor: (vendorId: string) => void;
 }
@@ -21,10 +22,24 @@ const TAG_LABELS: Record<VendorTag, string> = {
   'national': 'National',
 };
 
+// Simplified category labels for vendor list
+const SIMPLE_CATEGORY: Record<string, string> = {
+  'biological': 'Biological',
+  'micronutrient': 'Micronutrient',
+  'herbicide': 'Crop Protection',
+  'fungicide': 'Crop Protection',
+  'seed-treatment': 'Seed Treatment',
+  'adjuvant': 'Adjuvant',
+  'fertilizer-liquid': 'Fertility',
+  'fertilizer-dry': 'Fertility',
+  'other': 'Other',
+};
+
 export const VendorsListView: React.FC<VendorsListViewProps> = ({
   vendors,
   productMasters,
   vendorOfferings,
+  currentSeason,
   onUpdateVendors,
   onSelectVendor,
 }) => {
@@ -35,40 +50,133 @@ export const VendorsListView: React.FC<VendorsListViewProps> = ({
   const [newVendorWebsite, setNewVendorWebsite] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Get vendor stats
+  // Get vendor stats with season usage context
   const vendorStats = useMemo(() => {
-    const stats: Record<string, { productCount: number; preferredCount: number; categories: string[] }> = {};
+    // Build map of productId -> vendorId from offerings
+    const productToVendor: Record<string, string> = {};
+    vendorOfferings.forEach(o => {
+      productToVendor[o.productId] = o.vendorId;
+    });
+
+    // Find which products are used in current season and which crops
+    const usedProductIds = new Set<string>();
+    const productToCrops: Record<string, string[]> = {};
+    
+    currentSeason?.crops.forEach(crop => {
+      crop.applications.forEach(app => {
+        // Find the productMaster for this application's productId
+        const master = productMasters.find(p => p.id === app.productId);
+        if (master) {
+          usedProductIds.add(master.id);
+          if (!productToCrops[master.id]) productToCrops[master.id] = [];
+          if (!productToCrops[master.id].includes(crop.name)) {
+            productToCrops[master.id].push(crop.name);
+          }
+        }
+      });
+    });
+
+    const stats: Record<string, { 
+      productCount: number; 
+      preferredCount: number; 
+      hasPreferred: boolean;
+      categories: string[]; 
+      primaryCategory: string;
+      usedInCrops: string[];
+      isKeyVendor: boolean;
+    }> = {};
     
     vendors.forEach(vendor => {
       const offerings = vendorOfferings.filter(o => o.vendorId === vendor.id);
       const categories: string[] = [];
+      const categoryCounts: Record<string, number> = {};
+      const cropsSet = new Set<string>();
       
       offerings.forEach(offering => {
         const product = productMasters.find(p => p.id === offering.productId);
-        if (product && !categories.includes(product.category)) {
-          categories.push(product.category);
+        if (product) {
+          const simpleCategory = SIMPLE_CATEGORY[product.category] || 'Other';
+          if (!categories.includes(simpleCategory)) {
+            categories.push(simpleCategory);
+          }
+          categoryCounts[simpleCategory] = (categoryCounts[simpleCategory] || 0) + 1;
+          
+          // Check if this product is used in current season
+          if (productToCrops[product.id]) {
+            productToCrops[product.id].forEach(cropName => cropsSet.add(cropName));
+          }
         }
       });
       
+      // Find primary category (most common)
+      let primaryCategory = 'Mixed';
+      let maxCount = 0;
+      Object.entries(categoryCounts).forEach(([cat, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          primaryCategory = cat;
+        }
+      });
+      // If multiple categories are close, call it Mixed
+      const totalProducts = offerings.length;
+      if (totalProducts > 0 && maxCount < totalProducts * 0.6) {
+        primaryCategory = 'Mixed';
+      }
+      
+      const preferredCount = offerings.filter(o => o.isPreferred).length;
+      const usedInCrops = Array.from(cropsSet);
+      
       stats[vendor.id] = {
         productCount: offerings.length,
-        preferredCount: offerings.filter(o => o.isPreferred).length,
+        preferredCount,
+        hasPreferred: preferredCount > 0,
         categories,
+        primaryCategory,
+        usedInCrops,
+        isKeyVendor: preferredCount > 0 || usedInCrops.length > 0,
       };
     });
     
     return stats;
-  }, [vendors, vendorOfferings, productMasters]);
+  }, [vendors, vendorOfferings, productMasters, currentSeason]);
 
-  // Filter vendors
-  const filteredVendors = useMemo(() => {
-    if (!searchQuery.trim()) return vendors;
+  // Split vendors into key and all
+  const { keyVendors, allVendors } = useMemo(() => {
+    const key: Vendor[] = [];
+    const all: Vendor[] = [];
+    
+    vendors.forEach(v => {
+      const stats = vendorStats[v.id];
+      if (stats?.isKeyVendor) {
+        key.push(v);
+      }
+      all.push(v);
+    });
+    
+    // Sort key vendors by product count descending
+    key.sort((a, b) => (vendorStats[b.id]?.productCount || 0) - (vendorStats[a.id]?.productCount || 0));
+    
+    return { keyVendors: key, allVendors: all };
+  }, [vendors, vendorStats]);
+
+  // Filter vendors by search
+  const filteredKeyVendors = useMemo(() => {
+    if (!searchQuery.trim()) return keyVendors;
     const query = searchQuery.toLowerCase();
-    return vendors.filter(v => 
+    return keyVendors.filter(v => 
       v.name.toLowerCase().includes(query) ||
       (v.tags || []).some(t => TAG_LABELS[t].toLowerCase().includes(query))
     );
-  }, [vendors, searchQuery]);
+  }, [keyVendors, searchQuery]);
+
+  const filteredAllVendors = useMemo(() => {
+    if (!searchQuery.trim()) return allVendors;
+    const query = searchQuery.toLowerCase();
+    return allVendors.filter(v => 
+      v.name.toLowerCase().includes(query) ||
+      (v.tags || []).some(t => TAG_LABELS[t].toLowerCase().includes(query))
+    );
+  }, [allVendors, searchQuery]);
 
   const handleAddVendor = () => {
     if (!newVendorName.trim()) return;
@@ -88,6 +196,57 @@ export const VendorsListView: React.FC<VendorsListViewProps> = ({
     setNewVendorEmail('');
     setNewVendorPhone('');
     setNewVendorWebsite('');
+  };
+
+  const VendorRow: React.FC<{ vendor: Vendor }> = ({ vendor }) => {
+    const stats = vendorStats[vendor.id] || { 
+      productCount: 0, 
+      preferredCount: 0, 
+      hasPreferred: false,
+      categories: [], 
+      primaryCategory: 'Other',
+      usedInCrops: [],
+      isKeyVendor: false,
+    };
+    
+    return (
+      <div
+        onClick={() => onSelectVendor(vendor.id)}
+        className="px-4 py-3 flex items-center gap-4 hover:bg-muted/50 cursor-pointer transition-colors"
+      >
+        {/* Vendor name - primary */}
+        <span className="font-medium text-foreground flex-1 min-w-0 truncate">
+          {vendor.name}
+        </span>
+        
+        {/* Product count - muted */}
+        <span className="text-sm text-muted-foreground w-24 text-right shrink-0">
+          {stats.productCount} {stats.productCount === 1 ? 'product' : 'products'}
+        </span>
+        
+        {/* Primary category badge */}
+        <Badge variant="secondary" className="text-xs w-28 justify-center shrink-0">
+          {stats.primaryCategory}
+        </Badge>
+        
+        {/* Preferred star */}
+        <div className="w-6 shrink-0 flex justify-center">
+          {stats.hasPreferred && (
+            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+          )}
+        </div>
+        
+        {/* Used this season */}
+        <div className="w-44 text-right shrink-0">
+          {stats.usedInCrops.length > 0 && (
+            <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+              <Check className="w-3.5 h-3.5 text-primary" />
+              {stats.usedInCrops.join(', ')}
+            </span>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -183,75 +342,37 @@ export const VendorsListView: React.FC<VendorsListViewProps> = ({
         </div>
       )}
 
-      {/* Vendor Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVendors.map(vendor => {
-          const stats = vendorStats[vendor.id] || { productCount: 0, preferredCount: 0, categories: [] };
-          const primaryTag = (vendor.tags || []).find(t => t.startsWith('primary-'));
-          
-          return (
-            <div
-              key={vendor.id}
-              onClick={() => onSelectVendor(vendor.id)}
-              className="bg-card rounded-xl border border-border p-5 hover:border-primary/50 hover:shadow-md cursor-pointer transition-all group"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Building2 className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground truncate">{vendor.name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Package className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">{stats.productCount} products</span>
-                    {stats.preferredCount > 0 && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm text-muted-foreground">{stats.preferredCount} preferred</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Tags */}
-              {((vendor.tags || []).length > 0 || stats.categories.length > 0) && (
-                <div className="flex flex-wrap gap-1.5 mt-4">
-                  {primaryTag && (
-                    <Badge variant="default" className="text-xs">
-                      {TAG_LABELS[primaryTag]}
-                    </Badge>
-                  )}
-                  {stats.categories.slice(0, 2).map(cat => (
-                    <Badge key={cat} variant="secondary" className="text-xs">
-                      {CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] || cat}
-                    </Badge>
-                  ))}
-                  {stats.categories.length > 2 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{stats.categories.length - 2} more
-                    </Badge>
-                  )}
-                </div>
-              )}
-
-              {/* Contact preview */}
-              {(vendor.contactEmail || vendor.contactPhone) && (
-                <div className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border truncate">
-                  {vendor.contactEmail || vendor.contactPhone}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredVendors.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          {searchQuery ? 'No vendors match your search' : 'No vendors yet. Add your first vendor to get started.'}
+      {/* KEY VENDORS SECTION */}
+      {filteredKeyVendors.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+            Key Vendors
+          </h3>
+          <div className="bg-card rounded-lg border border-border divide-y divide-border">
+            {filteredKeyVendors.map(vendor => (
+              <VendorRow key={vendor.id} vendor={vendor} />
+            ))}
+          </div>
         </div>
       )}
+
+      {/* ALL VENDORS SECTION */}
+      <div>
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+          All Vendors ({filteredAllVendors.length})
+        </h3>
+        {filteredAllVendors.length > 0 ? (
+          <div className="bg-card rounded-lg border border-border divide-y divide-border">
+            {filteredAllVendors.map(vendor => (
+              <VendorRow key={vendor.id} vendor={vendor} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchQuery ? 'No vendors match your search' : 'No vendors yet. Add your first vendor to get started.'}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
