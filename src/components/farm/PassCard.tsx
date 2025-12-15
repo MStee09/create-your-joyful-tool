@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
+import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
-import { calculatePassSummary, getApplicationAcresPercentage, type CoverageGroup, type PassPattern } from '@/lib/cropCalculations';
+import { calculatePassSummary, calculatePassSummaryWithPriceBook, getApplicationAcresPercentage, type CoverageGroup, type PassPattern, type PriceBookContext } from '@/lib/cropCalculations';
 import { FUNCTION_CATEGORIES, getRoleFunctionCategory } from '@/lib/functionCategories';
 import { getTimingDisplayText } from '@/lib/growthStages';
 import { TimingEditorPopover } from './TimingEditorPopover';
+import { hasAwardedPrice } from '@/lib/priceBookUtils';
 import { cn } from '@/lib/utils';
 
 interface PassCardProps {
@@ -17,6 +19,9 @@ interface PassCardProps {
   vendors?: Vendor[];
   purposes?: Record<string, ProductPurpose>;
   applicationOverrides?: Record<string, ApplicationOverride>;
+  productMasters?: ProductMaster[];
+  priceBook?: PriceBookEntry[];
+  seasonYear?: number;
   onEditApplication: (app: Application) => void;
   onAddApplication: (timingId: string) => void;
   onDuplicateTiming: (timingId: string) => void;
@@ -81,6 +86,9 @@ export const PassCard: React.FC<PassCardProps> = ({
   vendors = [],
   purposes = {},
   applicationOverrides = {},
+  productMasters = [],
+  priceBook = [],
+  seasonYear = new Date().getFullYear(),
   onEditApplication,
   onAddApplication,
   onDuplicateTiming,
@@ -100,7 +108,24 @@ export const PassCard: React.FC<PassCardProps> = ({
     setIsEditingName(false);
   };
   
-  const summary = calculatePassSummary(timing, crop, products);
+  // Build price book context if available
+  const priceBookContext: PriceBookContext | undefined = productMasters.length > 0 && priceBook.length > 0 
+    ? { productMasters, priceBook, seasonYear }
+    : undefined;
+  
+  const summary = priceBookContext 
+    ? calculatePassSummaryWithPriceBook(timing, crop, products, priceBookContext)
+    : calculatePassSummary(timing, crop, products);
+  
+  // Count products with awarded bid prices in this pass
+  const awardedProductsCount = React.useMemo(() => {
+    return summary.applications.reduce((count, app) => {
+      if (hasAwardedPrice(app.productId, seasonYear, productMasters, priceBook)) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+  }, [summary.applications, seasonYear, productMasters, priceBook]);
   
   const hasNutrients = summary.nutrients.n > 0 || summary.nutrients.p > 0 || 
                        summary.nutrients.k > 0 || summary.nutrients.s > 0;
@@ -300,6 +325,14 @@ export const PassCard: React.FC<PassCardProps> = ({
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Awarded bid indicator at pass level */}
+          {awardedProductsCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-full text-xs font-medium">
+              <Award className="w-3.5 h-3.5" />
+              {awardedProductsCount} bid{awardedProductsCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          
           {/* Cost display - ALWAYS show field avg at pass level (budget truth) */}
           <div className="text-right">
             <p className="text-lg font-semibold text-primary">
@@ -390,6 +423,9 @@ export const PassCard: React.FC<PassCardProps> = ({
                         acresPercentage={acresPercentage}
                         purpose={purpose}
                         override={override}
+                        productMasters={productMasters}
+                        priceBook={priceBook}
+                        seasonYear={seasonYear}
                         onEdit={() => onEditApplication(app)}
                         onUpdateOverride={onUpdateApplicationOverride}
                       />
