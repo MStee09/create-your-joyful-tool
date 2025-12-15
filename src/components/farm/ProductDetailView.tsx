@@ -53,6 +53,7 @@ interface ProductDetailViewProps {
   onUpdateProduct: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
+  onDeleteProduct: (productId: string) => void;
   onBack: () => void;
   onNavigateToVendor?: (vendorId: string) => void;
 }
@@ -65,6 +66,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onUpdateProduct,
   onUpdateOfferings,
   onUpdateInventory,
+  onDeleteProduct,
   onBack,
   onNavigateToVendor,
 }) => {
@@ -694,6 +696,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   title="Edit product name"
                 >
                   <Edit2 className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Delete "${product.name}"? This cannot be undone.`)) {
+                      onDeleteProduct(product.id);
+                      toast.success('Product deleted');
+                    }
+                  }}
+                  className="p-1 opacity-50 hover:opacity-100 transition-opacity text-destructive"
+                  title="Delete product"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             )}
