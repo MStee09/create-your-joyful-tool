@@ -75,6 +75,15 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(product.name);
   
+  // NPK-S Analysis editing
+  const [editingAnalysis, setEditingAnalysis] = useState(false);
+  const [analysisValues, setAnalysisValues] = useState({
+    n: product.analysis?.n || 0,
+    p: product.analysis?.p || 0,
+    k: product.analysis?.k || 0,
+    s: product.analysis?.s || 0,
+  });
+  
   // Role suggestion review state
   const [pendingSuggestions, setPendingSuggestions] = useState<RoleSuggestion[] | null>(null);
   const [suggestionSourceInfo, setSuggestionSourceInfo] = useState<string>('');
@@ -173,6 +182,26 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const handleUpdateCategory = (category: ProductCategory) => {
     onUpdateProduct({ ...product, category });
+  };
+
+  // NPK-S Analysis handlers
+  const handleSaveAnalysis = () => {
+    const hasValues = analysisValues.n > 0 || analysisValues.p > 0 || analysisValues.k > 0 || analysisValues.s > 0;
+    onUpdateProduct({ 
+      ...product, 
+      analysis: hasValues ? analysisValues : undefined 
+    });
+    setEditingAnalysis(false);
+  };
+
+  const handleCancelAnalysis = () => {
+    setAnalysisValues({
+      n: product.analysis?.n || 0,
+      p: product.analysis?.p || 0,
+      k: product.analysis?.k || 0,
+      s: product.analysis?.s || 0,
+    });
+    setEditingAnalysis(false);
   };
 
   // Inline name editing handlers
@@ -314,7 +343,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-8 relative">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <button onClick={onBack} className="p-2 hover:bg-muted rounded-lg">
@@ -376,12 +405,98 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               ))}
             </select>
             {product.analysis && (
-              <span className="px-2 py-0.5 bg-muted rounded text-xs">
+              <button 
+                onClick={() => {
+                  setAnalysisValues({
+                    n: product.analysis?.n || 0,
+                    p: product.analysis?.p || 0,
+                    k: product.analysis?.k || 0,
+                    s: product.analysis?.s || 0,
+                  });
+                  setEditingAnalysis(true);
+                }}
+                className="px-2 py-0.5 bg-muted rounded text-xs hover:bg-muted/80 transition-colors"
+                title="Edit NPK-S Analysis"
+              >
                 {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
                 {product.analysis.s > 0 && `-${product.analysis.s}S`}
-              </span>
+              </button>
+            )}
+            {!product.analysis && (
+              <button
+                onClick={() => {
+                  setAnalysisValues({ n: 0, p: 0, k: 0, s: 0 });
+                  setEditingAnalysis(true);
+                }}
+                className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground hover:bg-muted/80 transition-colors"
+              >
+                + Add NPK-S
+              </button>
             )}
           </div>
+          
+          {/* NPK-S Analysis Editor Modal */}
+          {editingAnalysis && (
+            <div className="absolute top-full left-11 mt-2 bg-card border border-border rounded-lg shadow-lg p-4 z-50">
+              <h4 className="text-sm font-medium mb-3">NPK-S Analysis</h4>
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">N</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={analysisValues.n}
+                    onChange={(e) => setAnalysisValues({ ...analysisValues, n: Number(e.target.value) })}
+                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">P</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={analysisValues.p}
+                    onChange={(e) => setAnalysisValues({ ...analysisValues, p: Number(e.target.value) })}
+                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">K</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={analysisValues.k}
+                    onChange={(e) => setAnalysisValues({ ...analysisValues, k: Number(e.target.value) })}
+                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">S</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={analysisValues.s}
+                    onChange={(e) => setAnalysisValues({ ...analysisValues, s: Number(e.target.value) })}
+                    className="w-full px-2 py-1 border border-input rounded text-sm bg-background"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleCancelAnalysis}
+                  className="px-3 py-1 text-sm text-muted-foreground hover:bg-muted rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAnalysis}
+                  className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-right space-y-2">
