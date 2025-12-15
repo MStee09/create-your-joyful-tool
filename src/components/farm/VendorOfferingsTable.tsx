@@ -25,7 +25,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const productOfferings = offerings.filter(o => o.productId === product.id);
 
   const handleAdd = () => {
-    if (!formData.vendorId || !formData.price) return;
+    if (!formData.vendorId || formData.price === undefined || formData.price === null) return;
     
     const newOffering: VendorOffering = {
       id: generateId(),
@@ -312,7 +312,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
             </button>
             <button
               onClick={handleAdd}
-              disabled={!formData.vendorId || !formData.price}
+              disabled={!formData.vendorId || formData.price === undefined || formData.price === null}
               className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               Add Offering
