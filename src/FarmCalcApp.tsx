@@ -240,6 +240,7 @@ const ProductsViewNew: React.FC<{
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  currentSeason: Season | null;
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
@@ -249,6 +250,7 @@ const ProductsViewNew: React.FC<{
   vendorOfferings, 
   vendors, 
   inventory,
+  currentSeason,
   onUpdateProductMasters, 
   onUpdateOfferings,
   onUpdateInventory,
@@ -299,6 +301,7 @@ const ProductsViewNew: React.FC<{
       vendorOfferings={vendorOfferings}
       vendors={vendors}
       inventory={inventory}
+      currentSeason={currentSeason}
       onSelectProduct={setSelectedProductId}
       onAddProduct={handleAddProduct}
     />
@@ -1275,6 +1278,7 @@ const AppContent: React.FC = () => {
             vendorOfferings={state.vendorOfferings || []}
             vendors={state.vendors}
             inventory={state.inventory}
+            currentSeason={currentSeason}
             onUpdateProductMasters={handleUpdateProductMasters}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onUpdateInventory={handleUpdateInventory}

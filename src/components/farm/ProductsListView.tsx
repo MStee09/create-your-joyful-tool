@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Plus, 
   Search, 
@@ -7,10 +7,11 @@ import {
   FileText, 
   StickyNote,
   AlertTriangle,
-  Star,
   Filter,
+  LayoutList,
+  List,
 } from 'lucide-react';
-import type { ProductMaster, VendorOffering, Vendor, InventoryItem, ProductCategory } from '@/types';
+import type { ProductMaster, VendorOffering, Vendor, InventoryItem, ProductCategory, Season } from '@/types';
 import { 
   formatCurrency, 
   generateId, 
@@ -18,24 +19,34 @@ import {
   CATEGORY_LABELS,
   inferProductCategory,
 } from '@/lib/calculations';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface ProductsListViewProps {
   productMasters: ProductMaster[];
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  currentSeason?: Season | null;
   onSelectProduct: (productId: string) => void;
   onAddProduct: (product: ProductMaster) => void;
 }
+
+type ViewDensity = 'compact' | 'detailed';
 
 export const ProductsListView: React.FC<ProductsListViewProps> = ({
   productMasters,
   vendorOfferings,
   vendors,
   inventory,
+  currentSeason,
   onSelectProduct,
   onAddProduct,
 }) => {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<ProductCategory | ''>('');
   const [filterForm, setFilterForm] = useState<'liquid' | 'dry' | ''>('');
@@ -48,6 +59,30 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     category: 'other',
     defaultUnit: 'gal',
   });
+  const [viewDensity, setViewDensity] = useState<ViewDensity>(() => {
+    return (localStorage.getItem('productsViewDensity') as ViewDensity) || 'compact';
+  });
+
+  // Auto-focus search on mount
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
+  // Persist view density
+  useEffect(() => {
+    localStorage.setItem('productsViewDensity', viewDensity);
+  }, [viewDensity]);
+
+  // Get products used in current season
+  const usedThisSeasonIds = useMemo(() => {
+    if (!currentSeason) return new Set<string>();
+    const ids = new Set<string>();
+    currentSeason.crops.forEach(crop => {
+      crop.applications.forEach(app => ids.add(app.productId));
+      crop.seedTreatments.forEach(st => ids.add(st.productId));
+    });
+    return ids;
+  }, [currentSeason]);
 
   // Filter and enrich products
   const filteredProducts = useMemo(() => {
@@ -64,6 +99,7 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
           vendor,
           stockStatus: stockInfo.status,
           totalOnHand: stockInfo.totalOnHand,
+          usedThisSeason: usedThisSeasonIds.has(product.id),
         };
       })
       .filter(product => {
@@ -89,9 +125,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         }
         return true;
       });
-  }, [productMasters, vendorOfferings, vendors, inventory, searchTerm, filterCategory, filterForm, filterVendor, filterStock]);
+  }, [productMasters, vendorOfferings, vendors, inventory, usedThisSeasonIds, searchTerm, filterCategory, filterForm, filterVendor, filterStock]);
 
-  // Group by category for display
+  // Group by category for detailed view
   const groupedProducts = useMemo(() => {
     const groups: Record<string, typeof filteredProducts> = {};
     filteredProducts.forEach(product => {
@@ -100,6 +136,13 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
       groups[categoryLabel].push(product);
     });
     return groups;
+  }, [filteredProducts]);
+
+  // Separate used this season vs other products for compact view
+  const { usedThisSeasonProducts, otherProducts } = useMemo(() => {
+    const used = filteredProducts.filter(p => p.usedThisSeason);
+    const other = filteredProducts.filter(p => !p.usedThisSeason);
+    return { usedThisSeasonProducts: used, otherProducts: other };
   }, [filteredProducts]);
 
   const handleAddProduct = () => {
@@ -116,12 +159,197 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     onAddProduct(product);
     setShowAddModal(false);
     setNewProduct({ form: 'liquid', category: 'other', defaultUnit: 'gal' });
-    
-    // Navigate to the new product's detail page
     onSelectProduct(product.id);
   };
 
   const activeFiltersCount = [filterCategory, filterForm, filterVendor, filterStock].filter(Boolean).length;
+  const hasActiveFiltersOrSearch = searchTerm.length > 0 || activeFiltersCount > 0;
+
+  // Compact row component with hover card
+  const CompactProductRow: React.FC<{ product: typeof filteredProducts[0] }> = ({ product }) => (
+    <HoverCard openDelay={300} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          onClick={() => onSelectProduct(product.id)}
+          className="w-full px-4 py-2 flex items-center gap-3 hover:bg-muted/50 text-left transition-colors border-b border-border last:border-b-0"
+        >
+          {/* Form icon - small inline */}
+          {product.form === 'liquid' ? (
+            <Droplets className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          ) : (
+            <Weight className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          )}
+          
+          {/* Product name */}
+          <span className="font-medium text-foreground truncate min-w-0">
+            {product.name}
+          </span>
+          
+          {/* Vendor - muted */}
+          {product.vendor && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-sm text-muted-foreground truncate">
+                {product.vendor.name}
+              </span>
+            </>
+          )}
+          
+          {/* Price */}
+          {product.preferredOffering && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {formatCurrency(product.preferredOffering.price)}/{product.preferredOffering.priceUnit}
+              </span>
+            </>
+          )}
+          
+          {/* Spacer */}
+          <div className="flex-1" />
+          
+          {/* Stock status - only show if problematic */}
+          {product.stockStatus === 'low' && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs whitespace-nowrap">
+              <AlertTriangle className="w-3 h-3" />
+              Low
+            </span>
+          )}
+          {product.stockStatus === 'out' && (
+            <span className="px-1.5 py-0.5 bg-destructive/10 text-destructive rounded text-xs whitespace-nowrap">
+              Out
+            </span>
+          )}
+          {product.stockStatus === 'ok' && product.totalOnHand > 0 && (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {product.totalOnHand} {product.form === 'liquid' ? 'gal' : 'lbs'}
+            </span>
+          )}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent side="right" align="start" className="w-64">
+        <div className="space-y-2">
+          <div>
+            <p className="font-medium text-foreground">{product.name}</p>
+            {product.vendor && (
+              <p className="text-xs text-muted-foreground">{product.vendor.name}</p>
+            )}
+          </div>
+          
+          <div className="flex flex-wrap gap-1">
+            <span className="px-1.5 py-0.5 bg-muted rounded text-xs">
+              {CATEGORY_LABELS[product.category] || 'Other'}
+            </span>
+            <span className="px-1.5 py-0.5 bg-muted rounded text-xs capitalize">
+              {product.form}
+            </span>
+          </div>
+          
+          {product.analysis && (
+            <div className="text-xs">
+              <span className="text-muted-foreground">Analysis: </span>
+              <span className="font-medium">
+                {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
+                {product.analysis.s > 0 && `-${product.analysis.s}S`}
+              </span>
+            </div>
+          )}
+          
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {product.labelFileName && (
+              <span className="flex items-center gap-1">
+                <FileText className="w-3 h-3 text-blue-500" />
+                Label
+              </span>
+            )}
+            {product.sdsFileName && (
+              <span className="flex items-center gap-1">
+                <FileText className="w-3 h-3 text-orange-500" />
+                SDS
+              </span>
+            )}
+            {product.generalNotes && (
+              <span className="flex items-center gap-1">
+                <StickyNote className="w-3 h-3 text-amber-500" />
+                Notes
+              </span>
+            )}
+          </div>
+          
+          {product.usedThisSeason && currentSeason && (
+            <div className="text-xs text-emerald-600 font-medium pt-1 border-t border-border">
+              Used in {currentSeason.name} {currentSeason.year}
+            </div>
+          )}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+
+  // Detailed row component (existing style)
+  const DetailedProductRow: React.FC<{ product: typeof filteredProducts[0] }> = ({ product }) => (
+    <button
+      onClick={() => onSelectProduct(product.id)}
+      className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted/50 text-left transition-colors"
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+          product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+        }`}>
+          {product.form === 'liquid' 
+            ? <Droplets className="w-5 h-5 text-blue-600" /> 
+            : <Weight className="w-5 h-5 text-amber-600" />
+          }
+        </div>
+        <div>
+          {product.vendor && (
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+              {product.vendor.name}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{product.name}</span>
+            {product.generalNotes && <StickyNote className="w-4 h-4 text-amber-500" />}
+            {product.labelFileName && <FileText className="w-4 h-4 text-blue-500" />}
+            {product.stockStatus === 'low' && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                <AlertTriangle className="w-3 h-3" />
+                Low
+              </span>
+            )}
+            {product.stockStatus === 'out' && (
+              <span className="px-1.5 py-0.5 bg-destructive/10 text-destructive rounded text-xs">
+                Out
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {product.preferredOffering && (
+              <span>
+                {formatCurrency(product.preferredOffering.price)}/{product.preferredOffering.priceUnit}
+              </span>
+            )}
+            {product.analysis && (
+              <>
+                {product.preferredOffering && <span>•</span>}
+                <span className="px-1.5 py-0.5 bg-muted rounded text-xs">
+                  {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
+                  {product.analysis.s > 0 && `-${product.analysis.s}S`}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="text-right">
+        {product.totalOnHand > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {product.totalOnHand} {product.form === 'liquid' ? 'gal' : 'lbs'} on hand
+          </p>
+        )}
+      </div>
+    </button>
+  );
 
   return (
     <div className="p-8">
@@ -140,11 +368,12 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         </button>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search, Filters, and View Toggle */}
       <div className="flex gap-4 mb-6">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search products..."
             value={searchTerm}
@@ -152,6 +381,33 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
             className="w-full pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
+        
+        {/* View Density Toggle */}
+        <div className="flex items-center gap-0.5 border border-input rounded-lg p-0.5 bg-background">
+          <button
+            onClick={() => setViewDensity('compact')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              viewDensity === 'compact' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <List className="w-4 h-4" />
+            Compact
+          </button>
+          <button
+            onClick={() => setViewDensity('detailed')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              viewDensity === 'detailed' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <LayoutList className="w-4 h-4" />
+            Detailed
+          </button>
+        </div>
+        
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
@@ -222,93 +478,81 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         </div>
       )}
 
-      {/* Products List */}
-      <div className="space-y-6">
-        {Object.entries(groupedProducts).map(([category, products]) => (
-          <div key={category} className="bg-card rounded-xl shadow-sm border border-border">
-            <div className="px-6 py-4 border-b border-border bg-muted/50 rounded-t-xl">
-              <h3 className="font-semibold text-foreground">{category}</h3>
-              <p className="text-sm text-muted-foreground">{products.length} products</p>
+      {/* Products List - Compact Mode */}
+      {viewDensity === 'compact' && (
+        <div className="space-y-4">
+          {/* Used This Season - Pinned at top when no filters/search */}
+          {!hasActiveFiltersOrSearch && usedThisSeasonProducts.length > 0 && (
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="px-4 py-2 border-b border-border bg-emerald-50 dark:bg-emerald-950/20">
+                <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  Used This Season
+                </h3>
+              </div>
+              <div>
+                {usedThisSeasonProducts.map(product => (
+                  <CompactProductRow key={product.id} product={product} />
+                ))}
+              </div>
             </div>
-            <div className="divide-y divide-border">
-              {products.map(product => (
-                <button
-                  key={product.id}
-                  onClick={() => onSelectProduct(product.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted/50 text-left transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                    }`}>
-                      {product.form === 'liquid' 
-                        ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                        : <Weight className="w-5 h-5 text-amber-600" />
-                      }
-                    </div>
-                    <div>
-                      {/* Vendor name above product name */}
-                      {product.vendor && (
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
-                          {product.vendor.name}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{product.name}</span>
-                        {product.generalNotes && <StickyNote className="w-4 h-4 text-amber-500" />}
-                        {product.labelFileName && <FileText className="w-4 h-4 text-blue-500" />}
-                        {product.stockStatus === 'low' && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                            <AlertTriangle className="w-3 h-3" />
-                            Low
-                          </span>
-                        )}
-                        {product.stockStatus === 'out' && (
-                          <span className="px-1.5 py-0.5 bg-destructive/10 text-destructive rounded text-xs">
-                            Out
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                         {product.preferredOffering && (
-                          <span>
-                            {formatCurrency(product.preferredOffering.price)}/{product.preferredOffering.priceUnit}
-                          </span>
-                        )}
-                        {product.analysis && (
-                          <>
-                            {product.preferredOffering && <span>•</span>}
-                            <span className="px-1.5 py-0.5 bg-muted rounded text-xs">
-                              {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
-                              {product.analysis.s > 0 && `-${product.analysis.s}S`}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {product.totalOnHand > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        {product.totalOnHand} {product.form === 'liquid' ? 'gal' : 'lbs'} on hand
-                      </p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+          )}
 
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            {searchTerm || activeFiltersCount > 0 
-              ? 'No products match your filters.' 
-              : 'No products yet. Click "Add Product" to get started.'
-            }
-          </div>
-        )}
-      </div>
+          {/* Other Products / All Products */}
+          {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).length > 0 && (
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              {!hasActiveFiltersOrSearch && usedThisSeasonProducts.length > 0 && (
+                <div className="px-4 py-2 border-b border-border bg-muted/50">
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Other Products
+                  </h3>
+                </div>
+              )}
+              <div>
+                {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).map(product => (
+                  <CompactProductRow key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              {searchTerm || activeFiltersCount > 0 
+                ? 'No products match your filters.' 
+                : 'No products yet. Click "Add Product" to get started.'
+              }
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Products List - Detailed Mode (existing grouped view) */}
+      {viewDensity === 'detailed' && (
+        <div className="space-y-6">
+          {Object.entries(groupedProducts).map(([category, products]) => (
+            <div key={category} className="bg-card rounded-xl shadow-sm border border-border">
+              <div className="px-6 py-4 border-b border-border bg-muted/50 rounded-t-xl">
+                <h3 className="font-semibold text-foreground">{category}</h3>
+                <p className="text-sm text-muted-foreground">{products.length} products</p>
+              </div>
+              <div className="divide-y divide-border">
+                {products.map(product => (
+                  <DetailedProductRow key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              {searchTerm || activeFiltersCount > 0 
+                ? 'No products match your filters.' 
+                : 'No products yet. Click "Add Product" to get started.'
+              }
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Product Modal */}
       {showAddModal && (
