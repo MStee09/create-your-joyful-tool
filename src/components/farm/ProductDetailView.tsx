@@ -18,14 +18,18 @@ import {
   BadgeCheck,
   Link,
   ExternalLink,
+  Package,
+  Tag,
 } from 'lucide-react';
 import type { 
   ProductMaster, 
   VendorOffering, 
   Vendor, 
   InventoryItem, 
-  ProductCategory 
+  ProductCategory,
+  ProductType,
 } from '@/types';
+import { Switch } from '@/components/ui/switch';
 import { 
   formatCurrency, 
   formatNumber, 
@@ -1006,6 +1010,85 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Procurement Classification */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="w-5 h-5 text-muted-foreground" />
+              <h3 className="font-semibold text-foreground">Procurement</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              {/* Product Type */}
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2">Product Type</label>
+                <div className="flex rounded-lg overflow-hidden border border-border">
+                  <button
+                    onClick={() => onUpdateProduct({ ...product, productType: 'commodity' })}
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      product.productType === 'commodity'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    Commodity
+                  </button>
+                  <button
+                    onClick={() => onUpdateProduct({ ...product, productType: 'specialty' })}
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      product.productType === 'specialty'
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    Specialty
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {product.productType === 'commodity' 
+                    ? 'Commodities can be bid competitively across vendors'
+                    : 'Specialty products are typically single-source'}
+                </p>
+              </div>
+              
+              {/* Bid Eligible Toggle */}
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2">Bid Eligibility</label>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={product.isBidEligible || false}
+                    onCheckedChange={(checked) => onUpdateProduct({ 
+                      ...product, 
+                      isBidEligible: checked,
+                      // Auto-set to commodity if enabling bid eligibility
+                      productType: checked && !product.productType ? 'commodity' : product.productType,
+                    })}
+                  />
+                  <div>
+                    <span className={`text-sm font-medium ${product.isBidEligible ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {product.isBidEligible ? 'Bid-Eligible' : 'Not Bid-Eligible'}
+                    </span>
+                    {product.isBidEligible && (
+                      <p className="text-xs text-muted-foreground">
+                        Will appear in Demand Rollup for bidding
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Quick Stats when Bid Eligible */}
+            {product.isBidEligible && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-2 text-sm">
+                  <Tag className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    This product will be included in seasonal bid events
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Vendor Offerings */}
