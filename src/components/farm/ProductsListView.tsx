@@ -256,7 +256,7 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{product.name}</span>
                         {product.generalNotes && <StickyNote className="w-4 h-4 text-amber-500" />}
-                        {product.labelData && <FileText className="w-4 h-4 text-blue-500" />}
+                        {product.labelFileName && <FileText className="w-4 h-4 text-blue-500" />}
                         {product.stockStatus === 'low' && (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
                             <AlertTriangle className="w-3 h-3" />

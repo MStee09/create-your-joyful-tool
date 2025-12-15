@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Droplets, 
@@ -34,6 +34,7 @@ import {
   getStockStatus,
   CATEGORY_LABELS,
 } from '@/lib/calculations';
+import { saveDocument, getDocument, deleteDocument } from '@/lib/documentStorage';
 import { Breadcrumb } from './Breadcrumb';
 import { VendorOfferingsTable } from './VendorOfferingsTable';
 import { ProductPurposeEditor } from './ProductPurposeEditor';
@@ -116,6 +117,23 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [productUrl, setProductUrl] = useState(product.productUrl || '');
   const [showUrlScrapeReview, setShowUrlScrapeReview] = useState(false);
   const [scrapedData, setScrapedData] = useState<any>(null);
+  
+  // Document data loaded from IndexedDB
+  const [labelDoc, setLabelDoc] = useState<{ data: string; fileName?: string } | null>(null);
+  const [sdsDoc, setSdsDoc] = useState<{ data: string; fileName?: string } | null>(null);
+  
+  // Load documents from IndexedDB on mount
+  useEffect(() => {
+    const loadDocs = async () => {
+      const [label, sds] = await Promise.all([
+        getDocument(product.id, 'label'),
+        getDocument(product.id, 'sds'),
+      ]);
+      setLabelDoc(label);
+      setSdsDoc(sds);
+    };
+    loadDocs();
+  }, [product.id]);
 
   // Get stock info
   const productInventory = inventory.filter(i => i.productId === product.id);
@@ -127,7 +145,9 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const preferredVendor = preferredOffering ? vendors.find(v => v.id === preferredOffering.vendorId) : null;
   
   // Check if this is a "new" product (no offerings, no label, no SDS)
-  const isNewProduct = productOfferings.length === 0 && !product.labelData && !product.sdsData;
+  const hasLabel = !!labelDoc || !!product.labelFileName;
+  const hasSds = !!sdsDoc || !!product.sdsFileName;
+  const isNewProduct = productOfferings.length === 0 && !hasLabel && !hasSds;
 
   // Calculations
   const costPerLb = preferredOffering ? calculateCostPerPound(preferredOffering, product) : null;
@@ -176,10 +196,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
         
         if (error) throw error;
         
-        // Build updates from extracted data - include the document data to preserve it
+        // Save document to IndexedDB (not localStorage to avoid quota issues)
+        await saveDocument(product.id, type, base64, file.name);
+        if (type === 'label') {
+          setLabelDoc({ data: base64, fileName: file.name });
+        } else {
+          setSdsDoc({ data: base64, fileName: file.name });
+        }
+        
+        // Build updates - only save filename to product (data is in IndexedDB)
         const updates: Partial<ProductMaster> = type === 'label' 
-          ? { labelData: base64, labelFileName: file.name }
-          : { sdsData: base64, sdsFileName: file.name };
+          ? { labelFileName: file.name }
+          : { sdsFileName: file.name };
         
         // Product name (only if current is generic)
         if (data.productName && (product.name === 'New Product' || product.name.startsWith('Untitled'))) {
@@ -288,11 +316,11 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
         
       } catch (extractError) {
         console.error('Extraction failed:', extractError);
-        // Still save the document even if extraction fails
+        // Document was already saved to IndexedDB above, just update product metadata
         if (type === 'label') {
-          onUpdateProduct({ ...product, labelData: base64, labelFileName: file.name });
+          onUpdateProduct({ ...product, labelFileName: file.name });
         } else {
-          onUpdateProduct({ ...product, sdsData: base64, sdsFileName: file.name });
+          onUpdateProduct({ ...product, sdsFileName: file.name });
         }
         toast.error('Failed to extract data, but document was saved');
       } finally {
@@ -309,11 +337,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     }
   };
 
-  const handleRemoveDocument = (type: 'label' | 'sds') => {
+  const handleRemoveDocument = async (type: 'label' | 'sds') => {
+    await deleteDocument(product.id, type);
     if (type === 'label') {
-      onUpdateProduct({ ...product, labelData: undefined, labelFileName: undefined });
+      setLabelDoc(null);
+      onUpdateProduct({ ...product, labelFileName: undefined });
     } else {
-      onUpdateProduct({ ...product, sdsData: undefined, sdsFileName: undefined });
+      setSdsDoc(null);
+      onUpdateProduct({ ...product, sdsFileName: undefined });
     }
   };
 
@@ -1172,14 +1203,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               {/* Product Label */}
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Product Label</label>
-                {product.labelData ? (
+                {labelDoc ? (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
                     <FileText className="w-8 h-8 text-red-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{product.labelFileName || 'Label.pdf'}</p>
+                      <p className="text-sm font-medium truncate">{labelDoc.fileName || product.labelFileName || 'Label.pdf'}</p>
                     </div>
                     <button
-                      onClick={() => handleViewDocument(product.labelData!)}
+                      onClick={() => handleViewDocument(labelDoc.data)}
                       className="px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded"
                     >
                       View
@@ -1211,14 +1242,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               {/* SDS */}
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Safety Data Sheet (SDS)</label>
-                {product.sdsData ? (
+                {sdsDoc ? (
                   <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
                     <FileText className="w-8 h-8 text-amber-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{product.sdsFileName || 'SDS.pdf'}</p>
+                      <p className="text-sm font-medium truncate">{sdsDoc.fileName || product.sdsFileName || 'SDS.pdf'}</p>
                     </div>
                     <button
-                      onClick={() => handleViewDocument(product.sdsData!)}
+                      onClick={() => handleViewDocument(sdsDoc.data)}
                       className="px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded"
                     >
                       View

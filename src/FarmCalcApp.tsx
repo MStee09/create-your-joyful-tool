@@ -1133,9 +1133,32 @@ const AppContent: React.FC = () => {
     [state.productMasters, state.vendorOfferings]
   );
 
-  // Save to localStorage
+  // Save to localStorage - strip large binary data (PDFs) to avoid quota issues
   useEffect(() => {
-    localStorage.setItem('farmcalc-state-v2', JSON.stringify(state));
+    // Create a copy without labelData and sdsData (they're too large for localStorage)
+    const stateToSave = {
+      ...state,
+      productMasters: state.productMasters?.map(p => ({
+        ...p,
+        labelData: undefined,  // Strip PDF data
+        sdsData: undefined,    // Strip PDF data
+        // Keep the filenames so we know files existed
+      })) || [],
+    };
+    
+    try {
+      localStorage.setItem('farmcalc-state-v2', JSON.stringify(stateToSave));
+    } catch (e) {
+      if (e instanceof Error && e.name === 'QuotaExceededError') {
+        console.warn('localStorage quota exceeded, attempting to clear old data...');
+        // Try to save without any extra data
+        try {
+          localStorage.setItem('farmcalc-state-v2', JSON.stringify(stateToSave));
+        } catch {
+          console.error('Still cannot save to localStorage after cleanup');
+        }
+      }
+    }
   }, [state]);
 
   const currentSeason = state.seasons.find(s => s.id === state.currentSeasonId) || null;
