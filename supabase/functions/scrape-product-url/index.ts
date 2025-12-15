@@ -118,11 +118,31 @@ serve(async (req) => {
     });
 
     if (!pageResponse.ok) {
-      // Provide helpful error for blocked requests
+      // Provide helpful error for blocked or failing requests
       if (pageResponse.status === 403) {
-        throw new Error('This website blocks automated requests. Try pasting the product page content manually, or use a URL from a different manufacturer.');
+        console.warn('Blocked by website (403) when fetching URL');
+        return new Response(
+          JSON.stringify({
+            error:
+              'This website blocks automated requests. Try pasting the product page content manually, or use a URL from a different manufacturer.',
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
       }
-      throw new Error(`Failed to fetch URL: ${pageResponse.status} ${pageResponse.statusText}`);
+
+      console.error('Failed to fetch URL:', pageResponse.status, pageResponse.statusText);
+      return new Response(
+        JSON.stringify({
+          error: `Failed to fetch URL: ${pageResponse.status} ${pageResponse.statusText}`,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     const html = await pageResponse.text();
@@ -152,7 +172,7 @@ serve(async (req) => {
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
       .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+      .replace(/<header[^>]*>[\s\S]*?<header>/gi, '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -167,22 +187,33 @@ serve(async (req) => {
     // Append PDF link info for AI extraction
     let contentWithLinks = textContent;
     if (pdfLinks.length > 0) {
-      contentWithLinks += '\n\nDETECTED PDF LINKS:\n' + pdfLinks.map(l => `- ${l.text}: ${l.url}`).join('\n');
+      contentWithLinks +=
+        '\n\nDETECTED PDF LINKS:\n' + pdfLinks.map((l) => `- ${l.text}: ${l.url}`).join('\n');
     }
 
     console.log('Extracted text length:', contentWithLinks.length);
 
     if (textContent.length < 100) {
-      throw new Error('Could not extract meaningful content from the page. The page may require JavaScript to load content.');
+      console.warn('Insufficient text content extracted for URL:', url);
+      return new Response(
+        JSON.stringify({
+          error:
+            'Could not extract meaningful content from the page. The page may require JavaScript to load content.',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     // Call Lovable AI to extract structured data
     const messages = [
       { role: 'system', content: EXTRACTION_PROMPT },
-      { 
-        role: 'user', 
-        content: `Extract product information from this webpage content. Source URL: ${url}\n\nPage content:\n${contentWithLinks}` 
-      }
+      {
+        role: 'user',
+        content: `Extract product information from this webpage content. Source URL: ${url}\n\nPage content:\n${contentWithLinks}`,
+      },
     ];
 
     console.log('Calling Lovable AI for URL extraction...');
@@ -190,7 +221,7 @@ serve(async (req) => {
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -216,7 +247,14 @@ serve(async (req) => {
         });
       }
       
-      throw new Error(`AI gateway error: ${aiResponse.status}`);
+      // For other AI errors, return a graceful error payload
+      return new Response(
+        JSON.stringify({ error: `AI gateway error: ${aiResponse.status}` }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     const data = await aiResponse.json();
