@@ -115,6 +115,7 @@ export interface ProductMaster {
   labelFileName?: string;
   sdsData?: string;    // SDS PDF
   sdsFileName?: string;
+  productUrl?: string; // Manufacturer product page URL
   
   // Inventory tracking
   reorderPoint?: number;

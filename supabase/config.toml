@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.research-notes]
 verify_jwt = false
+
+[functions.suggest-roles]
+verify_jwt = false
+
+[functions.scrape-product-url]
+verify_jwt = false
