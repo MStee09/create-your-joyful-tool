@@ -100,8 +100,10 @@ const dbCommoditySpecToCommoditySpec = (row: any): CommoditySpec => ({
   id: row.id,
   productId: row.product_id || undefined,
   name: row.name,
+  specName: row.name, // legacy alias used across UI
   description: row.description,
   unit: row.unit || 'ton',
+  uom: row.unit || 'ton', // legacy alias used across UI
   analysis: row.analysis,
   category: row.category,
 });

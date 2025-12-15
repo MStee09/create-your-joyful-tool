@@ -216,7 +216,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
                         }
                       </div>
                       <div>
-                        <h3 className="font-semibold text-stone-800">{spec.specName}</h3>
+                        <h3 className="font-semibold text-stone-800">{spec.specName || spec.name}</h3>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             spec.category === 'fertilizer' 
@@ -238,7 +238,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
                       </button>
                       <button
                         onClick={() => {
-                          if (window.confirm(`Delete "${spec.specName}"? Products will be unlinked.`)) {
+                           if (window.confirm(`Delete "${spec.specName || spec.name}"? Products will be unlinked.`)) {
                             handleDeleteSpec(spec.id);
                           }
                         }}
