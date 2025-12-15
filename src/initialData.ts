@@ -382,6 +382,54 @@ const season2026: Season = {
 };
 
 // ============================================================================
+// INITIAL COMMODITY SPECS
+// ============================================================================
+import type { CommoditySpec } from './types';
+
+const initialCommoditySpecs: CommoditySpec[] = [
+  {
+    id: 'spec-ams',
+    productId: 'p44',
+    name: 'AMS 21-0-0-24S',
+    specName: 'AMS 21-0-0-24S',
+    description: 'Ammonium Sulfate - 21% N, 24% S',
+    unit: 'ton',
+    uom: 'ton',
+    category: 'fertilizer',
+  },
+  {
+    id: 'spec-urea',
+    productId: 'p45',
+    name: 'Urea 46-0-0',
+    specName: 'Urea 46-0-0',
+    description: 'Urea - 46% N',
+    unit: 'ton',
+    uom: 'ton',
+    category: 'fertilizer',
+  },
+  {
+    id: 'spec-kcl',
+    productId: 'p46',
+    name: 'KCL 0-0-60',
+    specName: 'KCL 0-0-60',
+    description: 'Potassium Chloride (Muriate of Potash) - 60% K',
+    unit: 'ton',
+    uom: 'ton',
+    category: 'fertilizer',
+  },
+  {
+    id: 'spec-sop',
+    productId: 'p47',
+    name: 'SOP 0-0-50-18S',
+    specName: 'SOP 0-0-50-18S',
+    description: 'Sulfate of Potash - 50% K, 18% S',
+    unit: 'ton',
+    uom: 'ton',
+    category: 'fertilizer',
+  },
+];
+
+// ============================================================================
 // EXPORT INITIAL STATE
 // ============================================================================
 export const initialState: AppState = {
@@ -394,7 +442,7 @@ export const initialState: AppState = {
   currentSeasonId: 'season-2026',
   currentCropId: null as string | null,
   // Procurement system
-  commoditySpecs: [],
+  commoditySpecs: initialCommoditySpecs,
   bidEvents: [],
   vendorQuotes: [],
   awards: [],
