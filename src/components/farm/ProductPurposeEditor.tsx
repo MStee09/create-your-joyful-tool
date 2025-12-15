@@ -98,8 +98,15 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
 
       if (error) throw error;
 
-      updateField('researchNotes', data.researchNotes);
-      updateField('researchGeneratedAt', data.generatedAt);
+      // Update both fields at once to avoid overwrites
+      onUpdate({
+        ...purpose,
+        id: purpose?.id || crypto.randomUUID(),
+        productId: purpose?.productId || '',
+        roles: purpose?.roles || [],
+        researchNotes: data.researchNotes,
+        researchGeneratedAt: new Date().toISOString(),
+      } as ProductPurpose);
       toast.success('Research notes generated');
     } catch (error) {
       console.error('Failed to generate research notes:', error);
