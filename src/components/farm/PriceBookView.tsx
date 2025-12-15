@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List, Plus, Edit2, Trash2, X } from 'lucide-react';
+import React, { useMemo, useState, useRef } from 'react';
+import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List, Plus, Edit2, Trash2, X, Download, Upload } from 'lucide-react';
 import type { PriceBookEntry, ProductMaster, Vendor, BidEvent, CommoditySpec } from '@/types';
+import { toast } from 'sonner';
 import { formatCurrency, generateId } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
 import {
@@ -440,6 +441,139 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
     onUpdatePriceBook(priceBook.filter(e => e.id !== entryId));
   };
 
+  // CSV Export
+  const handleExportCSV = () => {
+    const headers = ['Product Name', 'Season Year', 'Price', 'Unit', 'Vendor', 'Source'];
+    const rows = enrichedEntries.map(entry => [
+      entry.productName,
+      entry.seasonYear.toString(),
+      entry.price.toString(),
+      entry.priceUom,
+      entry.vendorName || '',
+      entry.source,
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `price-book-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Price book exported successfully');
+  };
+
+  // CSV Import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onUpdatePriceBook) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast.error('CSV file is empty or has no data rows');
+          return;
+        }
+        
+        // Skip header row
+        const dataRows = lines.slice(1);
+        const newEntries: PriceBookEntry[] = [];
+        let importedCount = 0;
+        let skippedCount = 0;
+        
+        dataRows.forEach((line, index) => {
+          // Parse CSV line (handle quoted values)
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+              } else {
+                inQuotes = !inQuotes;
+              }
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          values.push(current.trim());
+          
+          const [productName, seasonYearStr, priceStr, priceUom, vendorName, source] = values;
+          
+          if (!productName || !seasonYearStr || !priceStr) {
+            skippedCount++;
+            return;
+          }
+          
+          const seasonYear = parseInt(seasonYearStr);
+          const price = parseFloat(priceStr);
+          
+          if (isNaN(seasonYear) || isNaN(price)) {
+            skippedCount++;
+            return;
+          }
+          
+          // Find product by name
+          const product = allProducts.find(p => p.name.toLowerCase() === productName.toLowerCase());
+          if (!product) {
+            skippedCount++;
+            return;
+          }
+          
+          // Find vendor by name (optional)
+          const vendor = vendorName ? vendors.find(v => v.name.toLowerCase() === vendorName.toLowerCase()) : null;
+          
+          const validUom = ['ton', 'gal', 'lbs'].includes(priceUom) ? priceUom as 'ton' | 'gal' | 'lbs' : 'ton';
+          
+          newEntries.push({
+            id: `pb-import-${generateId()}`,
+            productId: product.type === 'product' ? product.id : '',
+            specId: product.type === 'spec' ? product.id : product.id,
+            seasonYear,
+            price,
+            priceUom: validUom,
+            vendorId: vendor?.id,
+            source: 'manual_override',
+          });
+          importedCount++;
+        });
+        
+        if (newEntries.length > 0) {
+          onUpdatePriceBook([...priceBook, ...newEntries]);
+          toast.success(`Imported ${importedCount} entries${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}`);
+        } else {
+          toast.error('No valid entries found in CSV');
+        }
+      } catch (error) {
+        toast.error('Failed to parse CSV file');
+      }
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -453,12 +587,31 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
             Historical awarded prices and cost references by season
           </p>
         </div>
-        {onUpdatePriceBook && (
-          <Button onClick={handleOpenAddModal} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Entry
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportCSV} className="flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            Export CSV
           </Button>
-        )}
+          {onUpdatePriceBook && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportCSV}
+                className="hidden"
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Import CSV
+              </Button>
+              <Button onClick={handleOpenAddModal} className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                Add Entry
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
