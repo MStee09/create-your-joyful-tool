@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm';
+import type { ProductMaster, PriceBookEntry } from '@/types';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
 import { CropPlanningView } from './CropPlanningView';
@@ -10,6 +11,8 @@ interface CropPlannerViewProps {
   products: Product[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  productMasters: ProductMaster[];
+  priceBook: PriceBookEntry[];
   onUpdateSeason: (season: Season) => void;
 }
 
@@ -18,6 +21,8 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
   products,
   vendors,
   inventory,
+  productMasters,
+  priceBook,
   onUpdateSeason,
 }) => {
   const [activeCropId, setActiveCropId] = useState<string | null>(null);
@@ -154,6 +159,9 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
             products={products}
             vendors={vendors}
             inventory={inventory}
+            productMasters={productMasters}
+            priceBook={priceBook}
+            seasonYear={season?.year || new Date().getFullYear()}
             onUpdate={handleUpdateCrop}
             onDelete={() => handleDeleteCrop(activeCrop.id)}
           />

@@ -1305,6 +1305,8 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             vendors={state.vendors}
             inventory={state.inventory}
+            productMasters={state.productMasters || []}
+            priceBook={state.priceBook || []}
             onUpdateSeason={handleUpdateSeason}
           />
         );
