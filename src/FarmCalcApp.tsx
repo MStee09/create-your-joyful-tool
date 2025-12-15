@@ -60,6 +60,7 @@ import { DemandRollupView } from './components/farm/DemandRollupView';
 import { CommoditySpecsView } from './components/farm/CommoditySpecsView';
 import { BidEventsView } from './components/farm/BidEventsView';
 import { BidEventDetailView } from './components/farm/BidEventDetailView';
+import { PriceBookView } from './components/farm/PriceBookView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -135,9 +136,10 @@ const Sidebar: React.FC<{
     { id: 'procurement', label: 'Demand Rollup' },
     { id: 'commodity-specs', label: 'Commodity Specs' },
     { id: 'bid-events', label: 'Bid Events' },
+    { id: 'price-book', label: 'Price Book' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView.startsWith('bid-event-');
+  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -1374,6 +1376,17 @@ const AppContent: React.FC = () => {
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onUpdateEvents={(events) => setState(prev => ({ ...prev, bidEvents: events }))}
             onSelectEvent={(eventId) => setActiveView(`bid-event-${eventId}`)}
+          />
+        );
+      case 'price-book':
+        return (
+          <PriceBookView
+            priceBook={state.priceBook || []}
+            productMasters={state.productMasters || []}
+            vendors={state.vendors}
+            bidEvents={state.bidEvents || []}
+            commoditySpecs={state.commoditySpecs || []}
+            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
           />
         );
       case 'exports':
