@@ -211,10 +211,16 @@ export function useSupabaseData(user: User | null) {
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
 
-      // Sync: any product marked Commodity or Bid-Eligible should exist as a commodity spec
-      const commodityProducts = productMasters.filter(
-        (p) => p.productType === 'commodity' || p.isBidEligible
-      );
+      // Sync: commodity/bid-eligible products should exist as commodity specs.
+      // Some older products may not have productType/isBidEligible persisted yet, so we also infer
+      // from category/form/unit (e.g. Fertilizer (Dry) commodities like AMS/Urea/KCL/SOP).
+      const commodityProducts = productMasters.filter((p) => {
+        const cat = String(p.category || '');
+        const inferredCommodity =
+          (p.form === 'dry' && cat === 'fertilizer-dry') ||
+          (cat.startsWith('fertilizer') && (p.defaultUnit === 'ton' || p.defaultUnit === 'lbs'));
+        return p.productType === 'commodity' || p.isBidEligible || inferredCommodity;
+      });
 
       const existingByProductId = new Set(
         commoditySpecs.flatMap((s) => (s.productId ? [s.productId] : []))
@@ -228,16 +234,25 @@ export function useSupabaseData(user: User | null) {
           const nameKey = p.name.trim().toLowerCase();
           return !existingByProductId.has(p.id) && !existingByName.has(nameKey);
         })
-        .map((p) => ({
-          id: crypto.randomUUID(),
-          user_id: user.id,
-          product_id: p.id,
-          name: p.name,
-          description: undefined,
-          unit: 'ton' as const,
-          category: 'fertilizer' as const,
-          analysis: (p.analysis ?? null) as any,
-        }));
+        .map((p) => {
+          const cat = String(p.category || '');
+          const unit: 'ton' | 'gal' | 'lbs' =
+            p.defaultUnit === 'gal' || p.defaultUnit === 'lbs' || p.defaultUnit === 'ton'
+              ? (p.defaultUnit as any)
+              : 'ton';
+          const category: 'fertilizer' | 'chemical' = cat.startsWith('fertilizer') ? 'fertilizer' : 'chemical';
+
+          return {
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            product_id: p.id,
+            name: p.name,
+            description: undefined,
+            unit,
+            category,
+            analysis: (p.analysis ?? null) as any,
+          };
+        });
 
       if (specsToCreate.length > 0) {
         const { data: inserted, error: insertError } = await supabase
