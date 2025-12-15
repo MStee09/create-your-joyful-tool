@@ -393,6 +393,12 @@ export const initialState: AppState = {
   inventory: [] as InventoryItem[],
   currentSeasonId: 'season-2026',
   currentCropId: null as string | null,
+  // Procurement system
+  commoditySpecs: [],
+  bidEvents: [],
+  vendorQuotes: [],
+  awards: [],
+  priceBook: [],
 };
 
 export default initialState;

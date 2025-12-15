@@ -81,6 +81,12 @@ export const migrateAppState = (state: AppState): AppState => {
     ...migratedState,
     productMasters: migratedState.productMasters || [],
     vendorOfferings: migratedState.vendorOfferings || [],
+    // Procurement system defaults
+    commoditySpecs: migratedState.commoditySpecs || [],
+    bidEvents: migratedState.bidEvents || [],
+    vendorQuotes: migratedState.vendorQuotes || [],
+    awards: migratedState.awards || [],
+    priceBook: migratedState.priceBook || [],
     dataVersion: CURRENT_DATA_VERSION,
   };
 };

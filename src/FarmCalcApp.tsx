@@ -56,6 +56,7 @@ import { ProductDetailView } from './components/farm/ProductDetailView';
 import { VendorsViewNew } from './components/farm/VendorsViewNew';
 import { CropPlannerView } from './components/farm/CropPlannerView';
 import { DashboardView } from './components/farm/DashboardView';
+import { DemandRollupView } from './components/farm/DemandRollupView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -123,6 +124,7 @@ const Sidebar: React.FC<{
     { id: 'products', icon: FlaskConical, label: 'Products' },
     { id: 'vendors', icon: Building2, label: 'Vendors' },
     { id: 'inventory', icon: Warehouse, label: 'Inventory' },
+    { id: 'procurement', icon: Package, label: 'Procurement' },
     { id: 'exports', icon: FileSpreadsheet, label: 'Export' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
@@ -1305,6 +1307,14 @@ const AppContent: React.FC = () => {
             vendors={state.vendors}
             season={currentSeason}
             onUpdateInventory={handleUpdateInventory}
+          />
+        );
+      case 'procurement':
+        return (
+          <DemandRollupView
+            season={currentSeason}
+            productMasters={state.productMasters || []}
+            commoditySpecs={state.commoditySpecs || []}
           />
         );
       case 'exports':
