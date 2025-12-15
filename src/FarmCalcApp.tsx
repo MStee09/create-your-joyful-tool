@@ -48,6 +48,7 @@ import type {
   LiquidUnit,
   DryUnit,
   RateUnit,
+  CommoditySpec,
 } from './types';
 
 // Import new components
@@ -279,20 +280,24 @@ const ProductsViewNew: React.FC<{
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  commoditySpecs: CommoditySpec[];
   currentSeason: Season | null;
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
+  onUpdateSpecs: (specs: CommoditySpec[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
 }> = ({ 
   productMasters, 
   vendorOfferings, 
   vendors, 
   inventory,
+  commoditySpecs,
   currentSeason,
   onUpdateProductMasters, 
   onUpdateOfferings,
   onUpdateInventory,
+  onUpdateSpecs,
   onNavigateToVendor,
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -324,9 +329,11 @@ const ProductsViewNew: React.FC<{
         vendorOfferings={vendorOfferings}
         vendors={vendors}
         inventory={inventory}
+        commoditySpecs={commoditySpecs}
         onUpdateProduct={handleUpdateProduct}
         onUpdateOfferings={onUpdateOfferings}
         onUpdateInventory={onUpdateInventory}
+        onUpdateSpecs={onUpdateSpecs}
         onDeleteProduct={handleDeleteProduct}
         onBack={() => setSelectedProductId(null)}
         onNavigateToVendor={onNavigateToVendor}
@@ -1319,10 +1326,12 @@ const AppContent: React.FC = () => {
             vendorOfferings={state.vendorOfferings || []}
             vendors={state.vendors}
             inventory={state.inventory}
+            commoditySpecs={state.commoditySpecs || []}
             currentSeason={currentSeason}
             onUpdateProductMasters={handleUpdateProductMasters}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onUpdateInventory={handleUpdateInventory}
+            onUpdateSpecs={(specs) => setState(prev => ({ ...prev, commoditySpecs: specs }))}
             onNavigateToVendor={() => setActiveView('vendors')}
           />
         );

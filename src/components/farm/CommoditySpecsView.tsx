@@ -74,9 +74,25 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
     setSpecCategory('fertilizer');
   };
   
+  // Check for duplicate/similar spec names
+  const checkDuplicateSpec = (name: string, excludeId?: string): CommoditySpec | null => {
+    const normalizedName = name.trim().toLowerCase();
+    return commoditySpecs.find(s => 
+      s.id !== excludeId && 
+      (s.name || s.specName || '').trim().toLowerCase() === normalizedName
+    ) || null;
+  };
+
   const handleCreateSpec = () => {
     if (!specName.trim()) {
       toast.error('Spec name is required');
+      return;
+    }
+    
+    // Check for duplicates
+    const duplicate = checkDuplicateSpec(specName);
+    if (duplicate) {
+      toast.error(`A spec named "${duplicate.specName || duplicate.name}" already exists`);
       return;
     }
     
@@ -99,6 +115,13 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
   
   const handleUpdateSpec = () => {
     if (!editingSpec || !specName.trim()) return;
+    
+    // Check for duplicates (excluding current spec)
+    const duplicate = checkDuplicateSpec(specName, editingSpec.id);
+    if (duplicate) {
+      toast.error(`A spec named "${duplicate.specName || duplicate.name}" already exists`);
+      return;
+    }
     
     const updated: CommoditySpec = {
       ...editingSpec,
@@ -162,7 +185,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
         <div>
           <h2 className="text-3xl font-bold text-stone-800">Commodity Specs</h2>
           <p className="text-stone-500 mt-1">
-            Define canonical specifications for competitive bidding
+            Define what is being purchased for bidding, independent of vendor or crop plan usage
           </p>
         </div>
         <button
@@ -310,7 +333,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
           <DialogHeader>
             <DialogTitle>{editingSpec ? 'Edit' : 'Create'} Commodity Spec</DialogTitle>
             <DialogDescription>
-              Define a canonical specification for competitive bidding
+              This defines what is being purchased for bidding, independent of vendor or crop plan usage.
             </DialogDescription>
           </DialogHeader>
           
@@ -323,9 +346,12 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
                 type="text"
                 value={specName}
                 onChange={(e) => setSpecName(e.target.value)}
-                placeholder="e.g., AMS 21-0-0-24S"
+                placeholder="e.g., AMS 21-0-0-24S or Glyphosate 4lb ae"
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="text-xs text-stone-400 mt-1">
+                Use explicit names including analysis — this is what vendors will quote
+              </p>
             </div>
             
             <div>

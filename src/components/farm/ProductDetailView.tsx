@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Package,
   Tag,
+  ChevronDown,
 } from 'lucide-react';
 import type { 
   ProductMaster, 
@@ -28,6 +29,7 @@ import type {
   InventoryItem, 
   ProductCategory,
   ProductType,
+  CommoditySpec,
 } from '@/types';
 import { Switch } from '@/components/ui/switch';
 import { 
@@ -54,9 +56,11 @@ interface ProductDetailViewProps {
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  commoditySpecs?: CommoditySpec[];
   onUpdateProduct: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
+  onUpdateSpecs?: (specs: CommoditySpec[]) => void;
   onDeleteProduct: (productId: string) => void;
   onBack: () => void;
   onNavigateToVendor?: (vendorId: string) => void;
@@ -67,9 +71,11 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   vendorOfferings,
   vendors,
   inventory,
+  commoditySpecs = [],
   onUpdateProduct,
   onUpdateOfferings,
   onUpdateInventory,
+  onUpdateSpecs,
   onDeleteProduct,
   onBack,
   onNavigateToVendor,
@@ -123,6 +129,13 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [productUrl, setProductUrl] = useState(product.productUrl || '');
   const [showUrlScrapeReview, setShowUrlScrapeReview] = useState(false);
   const [scrapedData, setScrapedData] = useState<any>(null);
+  
+  // Commodity Spec state
+  const [showSpecDropdown, setShowSpecDropdown] = useState(false);
+  const [showCreateSpecModal, setShowCreateSpecModal] = useState(false);
+  const [newSpecName, setNewSpecName] = useState('');
+  const [newSpecCategory, setNewSpecCategory] = useState<'fertilizer' | 'chemical'>('fertilizer');
+  const [newSpecUnit, setNewSpecUnit] = useState<'ton' | 'gal' | 'lbs'>('ton');
   
   // Document data loaded from IndexedDB
   const [labelDoc, setLabelDoc] = useState<{ data: string; fileName?: string } | null>(null);
@@ -1078,8 +1091,109 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               </div>
             </div>
             
-            {/* Quick Stats when Bid Eligible */}
-            {product.isBidEligible && (
+            {/* Commodity Spec Selector - only show when bid-eligible or commodity */}
+            {(product.isBidEligible || product.productType === 'commodity') && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <label className="block text-sm text-muted-foreground mb-2">Commodity Spec</label>
+                {(() => {
+                  const linkedSpec = commoditySpecs.find(s => s.id === product.commoditySpecId);
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowSpecDropdown(!showSpecDropdown)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors text-left ${
+                          linkedSpec 
+                            ? 'bg-primary/5 border-primary/30 text-foreground' 
+                            : 'bg-muted border-border text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {linkedSpec ? (
+                            <>
+                              <BadgeCheck className="w-4 h-4 text-primary" />
+                              <span className="font-medium">{linkedSpec.specName || linkedSpec.name}</span>
+                              <span className="text-xs text-muted-foreground">({linkedSpec.uom || linkedSpec.unit})</span>
+                            </>
+                          ) : (
+                            <span>Select a commodity spec...</span>
+                          )}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${showSpecDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {showSpecDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {/* None option */}
+                          <button
+                            onClick={() => {
+                              onUpdateProduct({ ...product, commoditySpecId: undefined });
+                              setShowSpecDropdown(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors text-muted-foreground"
+                          >
+                            (None)
+                          </button>
+                          
+                          {/* Existing specs */}
+                          {commoditySpecs.map(spec => (
+                            <button
+                              key={spec.id}
+                              onClick={() => {
+                                onUpdateProduct({ ...product, commoditySpecId: spec.id });
+                                setShowSpecDropdown(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center justify-between ${
+                                product.commoditySpecId === spec.id ? 'bg-primary/10' : ''
+                              }`}
+                            >
+                              <span className="font-medium">{spec.specName || spec.name}</span>
+                              <span className="text-xs text-muted-foreground">{spec.uom || spec.unit}</span>
+                            </button>
+                          ))}
+                          
+                          {/* Divider */}
+                          <div className="border-t border-border my-1" />
+                          
+                          {/* Create new option */}
+                          <button
+                            onClick={() => {
+                              setShowSpecDropdown(false);
+                              // Pre-fill with product info
+                              setNewSpecName(product.name);
+                              setNewSpecCategory(product.category?.startsWith('fertilizer') ? 'fertilizer' : 'chemical');
+                              setNewSpecUnit(product.form === 'liquid' ? 'gal' : 'ton');
+                              setShowCreateSpecModal(true);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-primary font-medium hover:bg-muted transition-colors flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create new spec...
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Link this product to a commodity spec for bidding. Multiple products can share one spec.
+                </p>
+              </div>
+            )}
+            
+            {/* Quick Stats when Bid Eligible but no spec linked */}
+            {product.isBidEligible && !product.commoditySpecId && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-2 text-sm text-amber-600">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>
+                    Link to a commodity spec to enable demand rollup and bidding
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Linked spec confirmation */}
+            {product.commoditySpecId && (
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 text-sm">
                   <Tag className="w-4 h-4 text-primary" />
@@ -1090,6 +1204,117 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               </div>
             )}
           </div>
+
+          {/* Create Spec Modal */}
+          {showCreateSpecModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreateSpecModal(false)}>
+              <div className="bg-card rounded-xl shadow-xl w-full max-w-md m-4 p-6" onClick={(e) => e.stopPropagation()}>
+                <h3 className="font-semibold text-lg mb-2">Create Commodity Spec</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  This defines what is being purchased for bidding, independent of vendor or crop plan usage.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Spec Name <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newSpecName}
+                      onChange={(e) => setNewSpecName(e.target.value)}
+                      placeholder="e.g., AMS 21-0-0-24S or Glyphosate 4lb ae"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Use explicit names including analysis — this is what vendors will quote
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">Category</label>
+                      <select
+                        value={newSpecCategory}
+                        onChange={(e) => setNewSpecCategory(e.target.value as 'fertilizer' | 'chemical')}
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                      >
+                        <option value="fertilizer">Fertilizer</option>
+                        <option value="chemical">Chemical</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">Unit</label>
+                      <select
+                        value={newSpecUnit}
+                        onChange={(e) => setNewSpecUnit(e.target.value as 'ton' | 'gal' | 'lbs')}
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                      >
+                        <option value="ton">Ton</option>
+                        <option value="lbs">Pounds</option>
+                        <option value="gal">Gallon</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setShowCreateSpecModal(false)}
+                    className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!newSpecName.trim()) {
+                        toast.error('Spec name is required');
+                        return;
+                      }
+                      
+                      // Check for duplicate
+                      const normalizedName = newSpecName.trim().toLowerCase();
+                      const duplicate = commoditySpecs.find(s => 
+                        (s.name || s.specName || '').trim().toLowerCase() === normalizedName
+                      );
+                      if (duplicate) {
+                        toast.error(`A spec named "${duplicate.specName || duplicate.name}" already exists`);
+                        return;
+                      }
+                      
+                      // Create the new spec
+                      const newSpecId = crypto.randomUUID();
+                      const newSpec: CommoditySpec = {
+                        id: newSpecId,
+                        productId: product.id,
+                        name: newSpecName.trim(),
+                        specName: newSpecName.trim(),
+                        category: newSpecCategory,
+                        unit: newSpecUnit,
+                        uom: newSpecUnit,
+                        analysis: product.analysis ? JSON.stringify(product.analysis) : undefined,
+                      };
+                      
+                      // Update specs if handler provided
+                      if (onUpdateSpecs) {
+                        onUpdateSpecs([...commoditySpecs, newSpec]);
+                      }
+                      
+                      // Link product to new spec
+                      onUpdateProduct({ ...product, commoditySpecId: newSpecId });
+                      
+                      setShowCreateSpecModal(false);
+                      setNewSpecName('');
+                      toast.success('Commodity spec created and linked');
+                    }}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
+                  >
+                    Create & Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Vendor Offerings */}
           <div className="bg-card rounded-xl border border-border p-6">
