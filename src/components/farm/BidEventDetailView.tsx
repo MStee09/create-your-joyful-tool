@@ -17,6 +17,10 @@ import {
   Check,
   X,
   AlertCircle,
+  MessageSquare,
+  Phone,
+  Mail,
+  MoreHorizontal,
 } from 'lucide-react';
 import type { 
   BidEvent, 
@@ -29,6 +33,8 @@ import type {
   Award,
   Season,
   PriceBookEntry,
+  VendorInvitation,
+  VendorInvitationStatus,
 } from '@/types';
 import { generateId, formatCurrency, formatNumber, downloadCSV } from '@/lib/calculations';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
@@ -87,6 +93,8 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   const [editingQuote, setEditingQuote] = useState<{ vendorId: string; specId: string } | null>(null);
   const [quotePrice, setQuotePrice] = useState('');
   const [showAwardModal, setShowAwardModal] = useState<string | null>(null); // specId
+  const [editingInvitation, setEditingInvitation] = useState<string | null>(null); // vendorId
+  const [invitationNotes, setInvitationNotes] = useState('');
   
   // Get invited vendors
   const invitedVendors = vendors.filter(v => event.invitedVendorIds.includes(v.id));
@@ -126,18 +134,88 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   
   const handleInviteVendor = (vendorId: string) => {
     if (!event.invitedVendorIds.includes(vendorId)) {
+      const newInvitation: VendorInvitation = {
+        vendorId,
+        status: 'pending',
+      };
       onUpdateEvent({
         ...event,
         invitedVendorIds: [...event.invitedVendorIds, vendorId],
+        vendorInvitations: [...(event.vendorInvitations || []), newInvitation],
       });
       toast.success('Vendor invited');
     }
+  };
+
+  const getVendorInvitation = (vendorId: string): VendorInvitation | undefined => {
+    return event.vendorInvitations?.find(inv => inv.vendorId === vendorId);
+  };
+
+  const handleUpdateInvitationStatus = (vendorId: string, status: VendorInvitationStatus) => {
+    const existingInvitations = event.vendorInvitations || [];
+    const existingInv = existingInvitations.find(inv => inv.vendorId === vendorId);
+    
+    let updatedInvitations: VendorInvitation[];
+    if (existingInv) {
+      updatedInvitations = existingInvitations.map(inv => 
+        inv.vendorId === vendorId 
+          ? { 
+              ...inv, 
+              status,
+              sentDate: status === 'sent' && !inv.sentDate ? new Date().toISOString() : inv.sentDate,
+              responseDate: ['responded', 'declined'].includes(status) && !inv.responseDate 
+                ? new Date().toISOString() 
+                : inv.responseDate,
+            }
+          : inv
+      );
+    } else {
+      updatedInvitations = [...existingInvitations, {
+        vendorId,
+        status,
+        sentDate: status === 'sent' ? new Date().toISOString() : undefined,
+        responseDate: ['responded', 'declined'].includes(status) ? new Date().toISOString() : undefined,
+      }];
+    }
+    
+    onUpdateEvent({
+      ...event,
+      vendorInvitations: updatedInvitations,
+    });
+    toast.success('Invitation status updated');
+  };
+
+  const handleUpdateInvitationNotes = (vendorId: string, notes: string) => {
+    const existingInvitations = event.vendorInvitations || [];
+    const existingInv = existingInvitations.find(inv => inv.vendorId === vendorId);
+    
+    let updatedInvitations: VendorInvitation[];
+    if (existingInv) {
+      updatedInvitations = existingInvitations.map(inv => 
+        inv.vendorId === vendorId ? { ...inv, notes } : inv
+      );
+    } else {
+      updatedInvitations = [...existingInvitations, {
+        vendorId,
+        status: 'pending' as VendorInvitationStatus,
+        notes,
+      }];
+    }
+    
+    onUpdateEvent({
+      ...event,
+      vendorInvitations: updatedInvitations,
+    });
+    setEditingInvitation(null);
+    setInvitationNotes('');
+    toast.success('Notes saved');
   };
   
   const handleRemoveVendor = (vendorId: string) => {
     onUpdateEvent({
       ...event,
       invitedVendorIds: event.invitedVendorIds.filter(id => id !== vendorId),
+      vendorInvitations: (event.vendorInvitations || []).filter(inv => inv.vendorId !== vendorId),
     });
     // Also remove their quotes
     onUpdateQuotes(vendorQuotes.filter(q => !(q.bidEventId === event.id && q.vendorId === vendorId)));
@@ -294,42 +372,177 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-3 gap-6">
-          {/* Invited Vendors */}
-          <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+          {/* Vendor Invitation Tracker */}
+          <div className="col-span-2 bg-white rounded-xl shadow-sm border border-stone-200 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-stone-800">Invited Vendors</h3>
+              <h3 className="font-semibold text-stone-800">Vendor Invitations</h3>
               <button
                 onClick={() => setShowInviteModal(true)}
                 className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
               >
-                + Add
+                + Add Vendor
               </button>
             </div>
             
             {invitedVendors.length === 0 ? (
-              <p className="text-sm text-stone-400 italic">No vendors invited yet</p>
+              <div className="text-center py-8">
+                <Users className="w-10 h-10 text-stone-300 mx-auto mb-3" />
+                <p className="text-sm text-stone-500">No vendors invited yet</p>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                >
+                  Invite your first vendor
+                </button>
+              </div>
             ) : (
-              <div className="space-y-2">
-                {invitedVendors.map(vendor => (
-                  <div 
-                    key={vendor.id}
-                    className="flex items-center justify-between py-2 px-3 bg-stone-50 rounded-lg"
-                  >
-                    <span className="text-sm font-medium text-stone-700">{vendor.name}</span>
-                    <button
-                      onClick={() => handleRemoveVendor(vendor.id)}
-                      className="p-1 text-stone-400 hover:text-red-500 rounded"
+              <div className="space-y-3">
+                {invitedVendors.map(vendor => {
+                  const invitation = getVendorInvitation(vendor.id);
+                  const status = invitation?.status || 'pending';
+                  const isEditingNotes = editingInvitation === vendor.id;
+                  
+                  const statusColors: Record<VendorInvitationStatus, string> = {
+                    pending: 'bg-stone-100 text-stone-600',
+                    sent: 'bg-blue-100 text-blue-700',
+                    responded: 'bg-emerald-100 text-emerald-700',
+                    declined: 'bg-red-100 text-red-700',
+                    no_response: 'bg-amber-100 text-amber-700',
+                  };
+                  
+                  const statusLabels: Record<VendorInvitationStatus, string> = {
+                    pending: 'Pending',
+                    sent: 'Sent',
+                    responded: 'Responded',
+                    declined: 'Declined',
+                    no_response: 'No Response',
+                  };
+                  
+                  return (
+                    <div 
+                      key={vendor.id}
+                      className="p-4 bg-stone-50 rounded-lg border border-stone-200"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium text-stone-800">{vendor.name}</span>
+                            <select
+                              value={status}
+                              onChange={(e) => handleUpdateInvitationStatus(vendor.id, e.target.value as VendorInvitationStatus)}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer border-0 ${statusColors[status]}`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="sent">Sent</option>
+                              <option value="responded">Responded</option>
+                              <option value="declined">Declined</option>
+                              <option value="no_response">No Response</option>
+                            </select>
+                          </div>
+                          
+                          {/* Contact info */}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-stone-500">
+                            {vendor.contactEmail && (
+                              <a href={`mailto:${vendor.contactEmail}`} className="flex items-center gap-1 hover:text-emerald-600">
+                                <Mail className="w-3 h-3" />
+                                {vendor.contactEmail}
+                              </a>
+                            )}
+                            {vendor.contactPhone && (
+                              <a href={`tel:${vendor.contactPhone}`} className="flex items-center gap-1 hover:text-emerald-600">
+                                <Phone className="w-3 h-3" />
+                                {vendor.contactPhone}
+                              </a>
+                            )}
+                          </div>
+                          
+                          {/* Dates */}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-stone-400">
+                            {invitation?.sentDate && (
+                              <span>Sent: {new Date(invitation.sentDate).toLocaleDateString()}</span>
+                            )}
+                            {invitation?.responseDate && (
+                              <span>Response: {new Date(invitation.responseDate).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                          
+                          {/* Notes */}
+                          {isEditingNotes ? (
+                            <div className="mt-3 flex gap-2">
+                              <input
+                                type="text"
+                                value={invitationNotes}
+                                onChange={(e) => setInvitationNotes(e.target.value)}
+                                placeholder="Add notes about this vendor..."
+                                className="flex-1 px-2 py-1 text-sm border border-stone-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleUpdateInvitationNotes(vendor.id, invitationNotes)}
+                                className="px-2 py-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => { setEditingInvitation(null); setInvitationNotes(''); }}
+                                className="px-2 py-1 text-stone-400 hover:bg-stone-100 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : invitation?.notes ? (
+                            <button
+                              onClick={() => { setEditingInvitation(vendor.id); setInvitationNotes(invitation.notes || ''); }}
+                              className="mt-2 text-xs text-stone-500 italic hover:text-stone-700 text-left"
+                            >
+                              <MessageSquare className="w-3 h-3 inline mr-1" />
+                              {invitation.notes}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingInvitation(vendor.id); setInvitationNotes(''); }}
+                              className="mt-2 text-xs text-stone-400 hover:text-stone-600"
+                            >
+                              + Add notes
+                            </button>
+                          )}
+                        </div>
+                        
+                        <button
+                          onClick={() => handleRemoveVendor(vendor.id)}
+                          className="p-1 text-stone-400 hover:text-red-500 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* Summary stats */}
+            {invitedVendors.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-stone-200 flex items-center gap-6 text-xs">
+                <span className="text-stone-500">
+                  <span className="font-medium text-stone-700">{invitedVendors.length}</span> invited
+                </span>
+                <span className="text-stone-500">
+                  <span className="font-medium text-blue-600">
+                    {(event.vendorInvitations || []).filter(inv => inv.status === 'sent').length}
+                  </span> sent
+                </span>
+                <span className="text-stone-500">
+                  <span className="font-medium text-emerald-600">
+                    {(event.vendorInvitations || []).filter(inv => inv.status === 'responded').length}
+                  </span> responded
+                </span>
               </div>
             )}
           </div>
           
           {/* Demand Summary */}
-          <div className="col-span-2 bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
             <h3 className="font-semibold text-stone-800 mb-4">Demand Summary</h3>
             
             {demandRollup.length === 0 ? (
@@ -341,17 +554,15 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
                     <tr className="text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       <th className="pb-3">Commodity</th>
                       <th className="pb-3 text-right">Qty</th>
-                      <th className="pb-3">UOM</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {demandRollup.map(item => (
                       <tr key={item.specId || item.productId}>
-                        <td className="py-2 font-medium text-stone-800">{item.specName}</td>
-                        <td className="py-2 text-right text-stone-600">
-                          {formatDemandQty(item.plannedQty, item.uom)}
+                        <td className="py-2 font-medium text-stone-800 text-sm">{item.specName}</td>
+                        <td className="py-2 text-right text-stone-600 text-sm">
+                          {formatDemandQty(item.plannedQty, item.uom)} {item.uom}
                         </td>
-                        <td className="py-2 text-stone-500">{item.uom}</td>
                       </tr>
                     ))}
                   </tbody>

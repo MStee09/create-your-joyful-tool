@@ -297,6 +297,17 @@ export interface CommoditySpec {
 export type BidEventType = 'SPRING_DRY' | 'SPRING_CHEM' | 'FALL_DRY' | 'CUSTOM';
 export type BidEventStatus = 'draft' | 'sent' | 'collecting' | 'awarded' | 'locked';
 
+// Vendor invitation status for manual tracking
+export type VendorInvitationStatus = 'pending' | 'sent' | 'responded' | 'declined' | 'no_response';
+
+export interface VendorInvitation {
+  vendorId: string;
+  status: VendorInvitationStatus;
+  sentDate?: string;
+  responseDate?: string;
+  notes?: string;
+}
+
 export interface BidEvent {
   id: string;
   seasonYear: number;
@@ -305,6 +316,7 @@ export interface BidEvent {
   status: BidEventStatus;
   dueDate?: string;
   invitedVendorIds: string[];
+  vendorInvitations?: VendorInvitation[];  // Manual tracking of invitation status
   notes?: string;
   createdAt: string;
 }
