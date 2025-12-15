@@ -206,27 +206,66 @@ export function useSupabaseData(user: User | null) {
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
 
-      // Auto-seed default commodity specs for new users
-      if (commoditySpecs.length === 0) {
-        const defaultSpecs: CommoditySpec[] = [
-          { id: crypto.randomUUID(), name: 'AMS 21-0-0-24S', description: 'Ammonium Sulfate - 21% N, 24% S', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 21, p: 0, k: 0, s: 24 } },
-          { id: crypto.randomUUID(), name: 'Urea 46-0-0', description: 'Urea - 46% N', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 46, p: 0, k: 0, s: 0 } },
-          { id: crypto.randomUUID(), name: 'KCL 0-0-60', description: 'Potassium Chloride (Muriate of Potash) - 60% K', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 0, p: 0, k: 60, s: 0 } },
-          { id: crypto.randomUUID(), name: 'SOP 0-0-50-18S', description: 'Sulfate of Potash - 50% K, 18% S', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 0, p: 0, k: 50, s: 18 } },
-        ];
-        
-        for (const spec of defaultSpecs) {
-          await supabase.from('commodity_specs').insert([{
-            id: spec.id,
-            user_id: user.id,
-            name: spec.name,
-            description: spec.description,
-            unit: spec.unit,
-            category: spec.category,
-            analysis: spec.analysis as any,
-          }]);
+      // Sync: if a product is marked as a commodity, ensure it exists as a commodity spec
+      const commodityProducts = productMasters.filter(
+        (p) => p.productType === 'commodity' || p.isBidEligible
+      );
+
+      const existingByProductId = new Set(
+        commoditySpecs.flatMap((s) => (s.productId ? [s.productId] : []))
+      );
+      const existingByName = new Set(
+        commoditySpecs.map((s) => (s.specName || s.name).trim().toLowerCase())
+      );
+
+      const specsToCreate = commodityProducts
+        .filter((p) => {
+          const nameKey = p.name.trim().toLowerCase();
+          return !existingByProductId.has(p.id) && !existingByName.has(nameKey);
+        })
+        .map((p) => {
+          const unit = (p.defaultUnit === 'gal' || p.defaultUnit === 'lbs' || p.defaultUnit === 'ton')
+            ? p.defaultUnit
+            : 'ton';
+
+          const category = p.category.startsWith('fertilizer') ? 'fertilizer' : 'chemical';
+
+          const spec: CommoditySpec = {
+            id: crypto.randomUUID(),
+            productId: p.id,
+            name: p.name,
+            specName: p.name,
+            unit: unit as any,
+            uom: unit as any,
+            category,
+            analysis: p.analysis,
+            description: undefined,
+          };
+          return spec;
+        });
+
+      if (specsToCreate.length > 0) {
+        const { data: inserted, error: insertError } = await supabase
+          .from('commodity_specs')
+          .insert(
+            specsToCreate.map((s) => ({
+              id: s.id,
+              user_id: user.id,
+              name: s.name,
+              description: s.description,
+              unit: s.unit,
+              category: s.category,
+              analysis: s.analysis as any,
+            }))
+          )
+          .select('*');
+
+        if (insertError) {
+          console.error('Error seeding commodity specs from products:', insertError);
+        } else {
+          const insertedSpecs = (inserted || []).map(dbCommoditySpecToCommoditySpec);
+          commoditySpecs = [...commoditySpecs, ...insertedSpecs];
         }
-        commoditySpecs = defaultSpecs;
       }
 
       // Get saved current season ID or use first season
