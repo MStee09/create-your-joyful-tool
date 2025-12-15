@@ -200,11 +200,34 @@ export function useSupabaseData(user: User | null) {
       const productMasters = (productsRes.data || []).map(dbProductMasterToProductMaster);
       const vendorOfferings = (offeringsRes.data || []).map(dbVendorOfferingToVendorOffering);
       const inventory = (inventoryRes.data || []).map(dbInventoryToInventory);
-      const commoditySpecs = (commoditySpecsRes.data || []).map(dbCommoditySpecToCommoditySpec);
+      let commoditySpecs = (commoditySpecsRes.data || []).map(dbCommoditySpecToCommoditySpec);
       const bidEvents = (bidEventsRes.data || []).map(dbBidEventToBidEvent);
       const vendorQuotes = (quotesRes.data || []).map(dbVendorQuoteToVendorQuote);
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
+
+      // Auto-seed default commodity specs for new users
+      if (commoditySpecs.length === 0) {
+        const defaultSpecs: CommoditySpec[] = [
+          { id: crypto.randomUUID(), name: 'AMS 21-0-0-24S', description: 'Ammonium Sulfate - 21% N, 24% S', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 21, p: 0, k: 0, s: 24 } },
+          { id: crypto.randomUUID(), name: 'Urea 46-0-0', description: 'Urea - 46% N', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 46, p: 0, k: 0, s: 0 } },
+          { id: crypto.randomUUID(), name: 'KCL 0-0-60', description: 'Potassium Chloride (Muriate of Potash) - 60% K', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 0, p: 0, k: 60, s: 0 } },
+          { id: crypto.randomUUID(), name: 'SOP 0-0-50-18S', description: 'Sulfate of Potash - 50% K, 18% S', unit: 'ton' as const, category: 'fertilizer', analysis: { n: 0, p: 0, k: 50, s: 18 } },
+        ];
+        
+        for (const spec of defaultSpecs) {
+          await supabase.from('commodity_specs').insert([{
+            id: spec.id,
+            user_id: user.id,
+            name: spec.name,
+            description: spec.description,
+            unit: spec.unit,
+            category: spec.category,
+            analysis: spec.analysis as any,
+          }]);
+        }
+        commoditySpecs = defaultSpecs;
+      }
 
       // Get saved current season ID or use first season
       const savedSeasonId = localStorage.getItem('farmcalc-current-season');
