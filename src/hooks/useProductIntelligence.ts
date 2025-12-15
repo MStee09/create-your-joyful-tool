@@ -107,15 +107,48 @@ export const useProductIntelligence = () => {
     return state.applicationOverrides[applicationId] || null;
   }, [state.applicationOverrides]);
 
+  const [isScraping, setIsScraping] = useState(false);
+
+  // Scrape product data from URL
+  const scrapeFromUrl = useCallback(async (
+    url: string
+  ): Promise<{
+    productName?: string;
+    form?: 'liquid' | 'dry';
+    category?: string;
+    analysis?: any;
+    activeIngredients?: string;
+    generalNotes?: string;
+    suggestedRoles?: string[];
+  } | null> => {
+    setIsScraping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-product-url', {
+        body: { url },
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('URL scraping failed:', error);
+      toast.error('Failed to scrape product URL. The page may not be accessible.');
+      return null;
+    } finally {
+      setIsScraping(false);
+    }
+  }, []);
+
   return {
     // State
     analyses: state.analyses,
     purposes: state.purposes,
     applicationOverrides: state.applicationOverrides,
     isExtracting,
+    isScraping,
 
     // Actions
     extractFromLabel,
+    scrapeFromUrl,
     saveAnalysis,
     getAnalysis,
     savePurpose,

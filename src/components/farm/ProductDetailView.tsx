@@ -16,6 +16,8 @@ import {
   Sparkles,
   Loader2,
   BadgeCheck,
+  Link,
+  ExternalLink,
 } from 'lucide-react';
 import type { 
   ProductMaster, 
@@ -36,6 +38,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { VendorOfferingsTable } from './VendorOfferingsTable';
 import { ProductPurposeEditor } from './ProductPurposeEditor';
 import { RoleSuggestionPanel } from './RoleSuggestionPanel';
+import { UrlScrapeReviewModal } from './UrlScrapeReviewModal';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import type { ProductPurpose, ProductRole, RoleSuggestion } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
@@ -89,9 +92,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [suggestionSourceInfo, setSuggestionSourceInfo] = useState<string>('');
 
   // Product intelligence
-  const { getPurpose, savePurpose, getAnalysis } = useProductIntelligence();
+  const { getPurpose, savePurpose, getAnalysis, scrapeFromUrl, isScraping } = useProductIntelligence();
   const purpose = getPurpose(product.id);
   const analysis = getAnalysis(product.id);
+  
+  // URL scraping state
+  const [productUrl, setProductUrl] = useState(product.productUrl || '');
+  const [showUrlScrapeReview, setShowUrlScrapeReview] = useState(false);
+  const [scrapedData, setScrapedData] = useState<any>(null);
 
   // Get stock info
   const productInventory = inventory.filter(i => i.productId === product.id);
@@ -293,6 +301,87 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const handleCancelSuggestions = () => {
     setPendingSuggestions(null);
+  };
+
+  // URL Scraping handler
+  const handleScrapeUrl = async () => {
+    if (!productUrl.trim()) {
+      toast.error('Please enter a product URL');
+      return;
+    }
+    
+    // Validate URL
+    try {
+      new URL(productUrl);
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    // Save URL to product first
+    onUpdateProduct({ ...product, productUrl });
+
+    const data = await scrapeFromUrl(productUrl);
+    if (data) {
+      setScrapedData(data);
+      setShowUrlScrapeReview(true);
+    }
+  };
+
+  const handleApplyScrapedData = (fieldsToApply: string[]) => {
+    const updates: Partial<ProductMaster> = {};
+    
+    if (fieldsToApply.includes('name') && scrapedData.productName) {
+      updates.name = scrapedData.productName;
+    }
+    if (fieldsToApply.includes('form') && scrapedData.form) {
+      updates.form = scrapedData.form;
+      updates.defaultUnit = scrapedData.form === 'liquid' ? 'gal' : 'lbs';
+    }
+    if (fieldsToApply.includes('category') && scrapedData.category) {
+      updates.category = scrapedData.category;
+    }
+    if (fieldsToApply.includes('analysis') && scrapedData.analysis?.npks) {
+      const npks = scrapedData.analysis.npks;
+      if (npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0) {
+        updates.analysis = { n: npks.n, p: npks.p, k: npks.k, s: npks.s };
+      }
+    }
+    if (fieldsToApply.includes('density') && scrapedData.analysis?.densityLbsPerGal) {
+      updates.densityLbsPerGal = scrapedData.analysis.densityLbsPerGal;
+    }
+    if (fieldsToApply.includes('activeIngredients') && scrapedData.activeIngredients) {
+      updates.activeIngredients = scrapedData.activeIngredients;
+    }
+    if (fieldsToApply.includes('generalNotes') && scrapedData.generalNotes) {
+      updates.generalNotes = scrapedData.generalNotes;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onUpdateProduct({ ...product, ...updates });
+      toast.success(`Applied ${Object.keys(updates).length} field(s) from URL`);
+    }
+
+    // Handle roles if suggested
+    if (fieldsToApply.includes('roles') && scrapedData.suggestedRoles?.length > 0) {
+      const newPurpose: ProductPurpose = {
+        ...purpose,
+        id: purpose?.id || crypto.randomUUID(),
+        productId: product.id,
+        roles: scrapedData.suggestedRoles,
+        rolesConfirmed: true,
+        confirmedAt: new Date().toISOString(),
+      };
+      savePurpose(product.id, newPurpose);
+    }
+
+    setShowUrlScrapeReview(false);
+    setScrapedData(null);
+  };
+
+  const handleCancelScrapeReview = () => {
+    setShowUrlScrapeReview(false);
+    setScrapedData(null);
   };
 
   const StockStatusBadge = () => {
@@ -764,10 +853,57 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
         {/* Right Column - Documents & Notes */}
         <div className="space-y-6">
-          {/* Documents Card */}
           <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="font-semibold text-foreground mb-4">Documents</h3>
+            <h3 className="font-semibold text-foreground mb-4">Documents & Links</h3>
             <div className="space-y-4">
+              {/* Product URL with Scrape */}
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  Product URL
+                  <span className="text-xs font-normal ml-1">(manufacturer page)</span>
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="url"
+                      value={productUrl}
+                      onChange={(e) => setProductUrl(e.target.value)}
+                      onBlur={() => {
+                        if (productUrl !== product.productUrl) {
+                          onUpdateProduct({ ...product, productUrl });
+                        }
+                      }}
+                      placeholder="https://manufacturer.com/product"
+                      className="w-full pl-9 pr-8 py-2 border border-input rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {productUrl && (
+                      <a
+                        href={productUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-primary"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleScrapeUrl}
+                    disabled={isScraping || !productUrl.trim()}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isScraping ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {isScraping ? 'Scraping...' : 'Scrape'}
+                  </button>
+                </div>
+              </div>
+
               {/* Product Label */}
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Product Label</label>
@@ -894,6 +1030,16 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* URL Scrape Review Modal */}
+      {showUrlScrapeReview && scrapedData && (
+        <UrlScrapeReviewModal
+          data={scrapedData}
+          sourceUrl={productUrl}
+          onApply={handleApplyScrapedData}
+          onCancel={handleCancelScrapeReview}
+        />
+      )}
     </div>
   );
 };
