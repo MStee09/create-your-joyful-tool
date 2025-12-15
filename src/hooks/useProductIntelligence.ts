@@ -127,15 +127,14 @@ export const useProductIntelligence = () => {
         body: { url },
       });
 
-      if (error) throw error;
-      
-      // Check if the response contains an error message
-      if (data?.error) {
-        const errorMsg = data.error;
-        if (errorMsg.includes('JavaScript')) {
+      // Handle both error object and error in response body
+      const errorMsg = error?.message || data?.error;
+      if (errorMsg) {
+        console.warn('URL scraping issue:', errorMsg);
+        if (errorMsg.includes('JavaScript') || errorMsg.includes('meaningful content')) {
           toast.error('This page requires JavaScript to load. Try uploading the product label PDF instead.');
         } else {
-          toast.error(errorMsg);
+          toast.error('Could not scrape this page. Try uploading the product label PDF instead.');
         }
         return null;
       }
