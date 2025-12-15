@@ -1499,9 +1499,9 @@ const AppWithAuth: React.FC<{ skipAuth: boolean; onSkipAuth: () => void }> = ({ 
     );
   }
 
-  // Show auth page if not logged in and not skipping
-  if (!user && !skipAuth) {
-    return <AuthPage onAuthSuccess={onSkipAuth} />;
+  // Show auth page if not logged in
+  if (!user) {
+    return <AuthPage />;
   }
 
   return <AppContent />;

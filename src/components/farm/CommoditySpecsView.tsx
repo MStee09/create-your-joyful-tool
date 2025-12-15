@@ -83,8 +83,10 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
     const newSpec: CommoditySpec = {
       id: generateId(),
       productId: '', // Will be set when linking products
+      name: specName.trim(),
       specName: specName.trim(),
       analysis: specAnalysis.trim() || undefined,
+      unit: specUom,
       uom: specUom,
       category: specCategory,
     };
@@ -100,8 +102,10 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
     
     const updated: CommoditySpec = {
       ...editingSpec,
+      name: specName.trim(),
       specName: specName.trim(),
       analysis: specAnalysis.trim() || undefined,
+      unit: specUom,
       uom: specUom,
       category: specCategory,
     };
@@ -145,10 +149,10 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
   
   const openEditModal = (spec: CommoditySpec) => {
     setEditingSpec(spec);
-    setSpecName(spec.specName);
-    setSpecAnalysis(spec.analysis || '');
-    setSpecUom(spec.uom);
-    setSpecCategory(spec.category);
+    setSpecName(spec.name || spec.specName || '');
+    setSpecAnalysis(typeof spec.analysis === 'string' ? spec.analysis : '');
+    setSpecUom(spec.unit || spec.uom || 'ton');
+    setSpecCategory((spec.category === 'fertilizer' || spec.category === 'chemical') ? spec.category : 'fertilizer');
   };
   
   return (
@@ -246,7 +250,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
                   </div>
                   
                   {spec.analysis && (
-                    <p className="text-sm text-stone-500 mb-4">{spec.analysis}</p>
+                    <p className="text-sm text-stone-500 mb-4">{typeof spec.analysis === 'string' ? spec.analysis : JSON.stringify(spec.analysis)}</p>
                   )}
                   
                   {/* Linked Products */}
