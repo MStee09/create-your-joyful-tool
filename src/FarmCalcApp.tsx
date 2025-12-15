@@ -1241,6 +1241,7 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             vendorOfferings={state.vendorOfferings || []}
             inventory={state.inventory}
+            currentSeason={currentSeason}
             onUpdateVendors={handleUpdateVendors}
             onNavigateToProduct={() => setActiveView('products')}
           />

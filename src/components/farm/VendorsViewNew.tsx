@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Vendor, ProductMaster, VendorOffering, InventoryItem } from '@/types';
+import type { Vendor, ProductMaster, VendorOffering, InventoryItem, Season } from '@/types';
 import { VendorsListView } from './VendorsListView';
 import { VendorDetailView } from './VendorDetailView';
 
@@ -8,6 +8,7 @@ interface VendorsViewNewProps {
   productMasters: ProductMaster[];
   vendorOfferings: VendorOffering[];
   inventory: InventoryItem[];
+  currentSeason?: Season | null;
   onUpdateVendors: (vendors: Vendor[]) => void;
   onNavigateToProduct: (productId: string) => void;
 }
@@ -17,6 +18,7 @@ export const VendorsViewNew: React.FC<VendorsViewNewProps> = ({
   productMasters,
   vendorOfferings,
   inventory,
+  currentSeason,
   onUpdateVendors,
   onNavigateToProduct,
 }) => {
@@ -51,6 +53,7 @@ export const VendorsViewNew: React.FC<VendorsViewNewProps> = ({
       vendors={vendors}
       productMasters={productMasters}
       vendorOfferings={vendorOfferings}
+      currentSeason={currentSeason}
       onUpdateVendors={onUpdateVendors}
       onSelectVendor={setSelectedVendorId}
     />
