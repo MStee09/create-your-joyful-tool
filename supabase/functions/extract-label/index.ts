@@ -78,7 +78,41 @@ Rules:
 - For secondary nutrients (Ca, Mg, C), look for Calcium, Magnesium, Carbon, Organic Matter percentages
 - For micros, look for trace element percentages - they are often listed as small decimals like 0.05%
 
-IMPORTANT: Return ONLY valid JSON, no markdown or explanation.`;
+IMPORTANT: Return ONLY valid JSON, no markdown code blocks, no explanation. Just the JSON object.`;
+
+function parseJsonResponse(content: string): any {
+  // Try direct parse first
+  try {
+    return JSON.parse(content.trim());
+  } catch {
+    // Continue to cleaning attempts
+  }
+
+  // Remove markdown code blocks
+  let cleanContent = content
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // Try parsing cleaned content
+  try {
+    return JSON.parse(cleanContent);
+  } catch {
+    // Continue to more aggressive cleaning
+  }
+
+  // Try to find JSON object in the content
+  const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      // Failed to parse extracted JSON
+    }
+  }
+
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -97,12 +131,29 @@ serve(async (req) => {
       { role: 'system', content: EXTRACTION_PROMPT },
     ];
 
+    // Determine media type from base64 header
+    let mediaType = 'application/pdf';
+    if (labelBase64) {
+      if (labelBase64.startsWith('data:image/png')) {
+        mediaType = 'image/png';
+      } else if (labelBase64.startsWith('data:image/jpeg') || labelBase64.startsWith('data:image/jpg')) {
+        mediaType = 'image/jpeg';
+      } else if (labelBase64.startsWith('data:image/webp')) {
+        mediaType = 'image/webp';
+      }
+    }
+
+    console.log('Processing document:', fileName, 'Media type:', mediaType);
+
     // If we have base64 PDF/image, include it
     if (labelBase64) {
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: `Extract product analysis from this label. File name: ${fileName || 'unknown'}` },
+          { 
+            type: 'text', 
+            text: `Extract product analysis from this label document. File name: ${fileName || 'unknown'}. Please return ONLY valid JSON with no markdown formatting.` 
+          },
           { 
             type: 'image_url', 
             image_url: { url: labelBase64 } 
@@ -112,7 +163,7 @@ serve(async (req) => {
     } else if (labelText) {
       messages.push({
         role: 'user',
-        content: `Extract product analysis from this label text:\n\n${labelText}`
+        content: `Extract product analysis from this label text. Return ONLY valid JSON:\n\n${labelText}`
       });
     } else {
       throw new Error('Either labelText or labelBase64 is required');
@@ -120,14 +171,16 @@ serve(async (req) => {
 
     console.log('Calling Lovable AI for label extraction...');
     
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Try with gemini-2.5-pro first for better PDF handling
+    let model = 'google/gemini-2.5-pro';
+    let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model,
         messages,
       }),
     });
@@ -155,21 +208,20 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
-    if (!content) {
-      throw new Error('No content in AI response');
+    console.log('AI response length:', content?.length || 0);
+    console.log('AI response preview:', content?.substring(0, 200));
+
+    if (!content || content.trim().length < 10) {
+      console.error('Empty or too short AI response:', content);
+      throw new Error('AI returned an empty or invalid response. The document may be unreadable or in an unsupported format.');
     }
 
-    console.log('AI response:', content);
-
-    // Parse the JSON response
-    let extracted;
-    try {
-      // Remove any markdown code blocks if present
-      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      extracted = JSON.parse(cleanContent);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      throw new Error('Failed to parse AI response as JSON');
+    // Parse the JSON response with robust handling
+    const extracted = parseJsonResponse(content);
+    
+    if (!extracted) {
+      console.error('Failed to parse AI response as JSON. Content:', content.substring(0, 500));
+      throw new Error('Failed to parse AI response. The model returned invalid JSON. Please try a different document or format.');
     }
 
     // Build the result with all extracted fields
@@ -203,6 +255,8 @@ serve(async (req) => {
       },
       suggestedRoles: extracted.suggestedRoles || [],
     };
+
+    console.log('Successfully extracted product data:', result.productName);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
