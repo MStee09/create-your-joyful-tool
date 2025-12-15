@@ -8,7 +8,7 @@ import { SeasonStrip } from './SeasonStrip';
 import { FunctionCoverageBar } from './FunctionCoverageBar';
 import { CropTypeSelector } from './CropTypeSelector';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 interface SeasonOverviewBarProps {
   cropName: string;
   totalAcres: number;
@@ -38,19 +38,35 @@ const StatusBadge: React.FC<{ status: SeasonSummary['status'] }> = ({ status }) 
   );
 };
 
-const IntensityDots: React.FC<{ intensity: number }> = ({ intensity }) => {
+const IntensityDots: React.FC<{ intensity: number; label?: string }> = ({ intensity, label }) => {
   const filled = Math.round(intensity);
   return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map(i => (
-        <div
-          key={i}
-          className={`w-2 h-2 rounded-full ${
-            i <= filled ? 'bg-primary' : 'bg-muted'
-          }`}
-        />
-      ))}
-    </div>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1.5 cursor-help">
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div
+                  key={i}
+                  className={`w-2 h-2 rounded-full ${
+                    i <= filled ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+            {label && (
+              <span className="text-xs text-muted-foreground">{label}</span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-xs">
+          <p className="text-xs">
+            Intensity reflects how many passes, how selective, and how late in the season a crop is actively managed.
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -210,10 +226,10 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
             <span className="text-muted-foreground/50">·</span>
             <span>{formatNumber(totalAcres, 0)} ac</span>
             <span className="text-muted-foreground/50">·</span>
-            <div className="flex items-center gap-1.5">
-              <IntensityDots intensity={summary.programIntensity} />
-              <span className="text-xs">Intensity</span>
-            </div>
+            <IntensityDots 
+              intensity={summary.programIntensity} 
+              label={summary.intensityLabel || 'Intensity'} 
+            />
           </div>
         </div>
 
