@@ -268,6 +268,14 @@ const ProductsViewNew: React.FC<{
     onUpdateProductMasters(productMasters.map(p => p.id === product.id ? product : p));
   };
 
+  const handleDeleteProduct = (productId: string) => {
+    onUpdateProductMasters(productMasters.filter(p => p.id !== productId));
+    // Also remove related offerings and inventory
+    onUpdateOfferings(vendorOfferings.filter(o => o.productId !== productId));
+    onUpdateInventory(inventory.filter(i => i.productId !== productId));
+    setSelectedProductId(null);
+  };
+
   if (selectedProduct) {
     return (
       <ProductDetailView
@@ -278,6 +286,7 @@ const ProductsViewNew: React.FC<{
         onUpdateProduct={handleUpdateProduct}
         onUpdateOfferings={onUpdateOfferings}
         onUpdateInventory={onUpdateInventory}
+        onDeleteProduct={handleDeleteProduct}
         onBack={() => setSelectedProductId(null)}
         onNavigateToVendor={onNavigateToVendor}
       />
