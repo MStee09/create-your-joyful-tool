@@ -5,6 +5,12 @@ import type { ProductPurpose, ProductRole, ApplicationOverride } from '@/types/p
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ProductRowReadableProps {
   application: Application;
@@ -44,6 +50,13 @@ const SHORT_ROLE_LABELS: Record<ProductRole, string> = {
   'rooting-vigor': 'Root',
   'water-conditioning': 'Water',
   'adjuvant': 'Adj',
+};
+
+// Coverage label based on percentage
+const getCoverageLabel = (percentage: number): string => {
+  if (percentage >= 90) return 'Core';
+  if (percentage >= 50) return 'Building';
+  return 'Trial';
 };
 
 export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
@@ -117,6 +130,9 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
     setIsEditingWhyHere(false);
   };
 
+  const isFullCoverage = acresPercentage >= 100;
+  const coverageLabel = getCoverageLabel(acresPercentage);
+
   return (
     <div 
       className="group relative pl-5 pr-4 py-3 bg-secondary/30 hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer"
@@ -145,9 +161,19 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             </p>
           )}
           
-          {/* Product name with role chips */}
+          {/* Product name with coverage badge and role chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-medium text-foreground">{product.name}</h4>
+            
+            {/* Coverage badge - promoted to header level */}
+            <span className={cn(
+              'px-2 py-0.5 rounded-full text-[10px] font-medium',
+              isFullCoverage 
+                ? 'bg-primary/15 text-primary' 
+                : 'bg-muted text-muted-foreground'
+            )}>
+              {coverageLabel} • {formatNumber(acresPercentage, 0)}% ({formatNumber(acresTreated, 0)} ac)
+            </span>
             
             {/* Role chips - compact inline display */}
             {roles.length > 0 && (
@@ -173,30 +199,56 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             )}
           </div>
           
-          {/* Sentence-style details with coverage-weighted costs */}
-          <p className="text-sm text-muted-foreground mt-1">
-            <span className="text-foreground">{formatNumber(application.rate, 1)} {application.rateUnit}</span>
-            <span className="mx-2">•</span>
-            <span className={`font-medium ${acresPercentage < 50 ? 'text-muted-foreground' : 'text-foreground'}`}>
-              {formatNumber(acresPercentage, 0)}%
-            </span>
-            <span className="text-muted-foreground/70"> ({formatNumber(acresTreated, 0)} ac)</span>
-            <span className="mx-2">•</span>
-            {/* Show both costs when partial coverage, single cost when 100% */}
-            {acresPercentage >= 100 ? (
-              <span className="text-primary font-medium">{formatCurrency(treatedCostPerAcre)}/ac</span>
-            ) : (
+          {/* Rate line */}
+          <p className="text-sm text-muted-foreground mt-1.5">
+            {formatNumber(application.rate, 1)} {application.rateUnit}
+          </p>
+          
+          {/* Cost breakdown - stacked with clear hierarchy */}
+          <div className="flex items-baseline gap-4 mt-1 text-sm">
+            {isFullCoverage ? (
+              /* Single cost when 100% coverage */
               <>
-                <span className="text-foreground">{formatCurrency(treatedCostPerAcre)}/ac</span>
-                <span className="text-xs text-muted-foreground ml-0.5">treated</span>
-                <span className="mx-1 text-muted-foreground">→</span>
-                <span className="text-primary font-medium">{formatCurrency(fieldAvgCostPerAcre)}/ac</span>
-                <span className="text-xs text-muted-foreground ml-0.5">field</span>
+                <span className="text-primary font-semibold">
+                  {formatCurrency(treatedCostPerAcre)}/ac
+                </span>
+                <span className="text-muted-foreground/70 text-xs">
+                  {formatCurrency(totalCost)} total
+                </span>
+              </>
+            ) : (
+              /* Split costs when partial coverage */
+              <>
+                {/* Field avg - PRIMARY (budget truth) */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-primary font-semibold cursor-help">
+                        {formatCurrency(fieldAvgCostPerAcre)}/ac{' '}
+                        <span className="underline decoration-dotted decoration-primary/50">field</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p>Field avg = treated cost × % of acres</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        {formatCurrency(treatedCostPerAcre)} × {formatNumber(acresPercentage, 0)}% = {formatCurrency(fieldAvgCostPerAcre)}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                {/* Treated - SECONDARY (intensity context) */}
+                <span className="text-muted-foreground">
+                  {formatCurrency(treatedCostPerAcre)}/ac treated
+                </span>
+                
+                {/* Total - TERTIARY */}
+                <span className="text-muted-foreground/70 text-xs">
+                  {formatCurrency(totalCost)} total
+                </span>
               </>
             )}
-            <span className="mx-2">•</span>
-            <span className="font-medium">{formatCurrency(totalCost)}</span>
-          </p>
+          </div>
           
           {/* Why Here note - pass-level intent */}
           {(whyHere || isEditingWhyHere) && (
