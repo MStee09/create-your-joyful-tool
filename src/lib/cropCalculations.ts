@@ -1,4 +1,4 @@
-import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit } from '@/types/farm';
+import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType } from '@/types/farm';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
 
 export interface CoverageGroup {
@@ -26,10 +26,21 @@ export interface PassSummary {
   costPerFieldAcre: number;
 }
 
+export interface IntensityBreakdown {
+  passScore: number;
+  selectivityScore: number;
+  lateScore: number;
+  costScore: number;
+}
+
+export type IntensityLabel = 'Low' | 'Moderate' | 'Managed' | 'High' | 'Very High';
+
 export interface SeasonSummary {
   totalCost: number;
   costPerAcre: number;
-  programIntensity: number; // 0-5 scale based on avg acres coverage
+  programIntensity: number; // 1-5 dots
+  intensityLabel: IntensityLabel;
+  intensityBreakdown?: IntensityBreakdown;
   status: 'balanced' | 'heavy-early' | 'heavy-late' | 'skewed';
   nutrients: { n: number; p: number; k: number; s: number };
   nutrientTiming: {
@@ -226,10 +237,97 @@ export const calculatePassSummary = (
   };
 };
 
+// Late-season stage thresholds by crop type
+const LATE_STAGE_THRESHOLDS: Record<CropType, string[]> = {
+  corn: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'],
+  soybeans: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'],
+  wheat: ['Heading', 'Flowering', 'Grain Fill', 'Maturity'],
+  small_grains: ['Heading', 'Flowering', 'Grain Fill', 'Maturity'],
+  edible_beans: ['R1', 'R2', 'R3', 'R4', 'R5'],
+  other: ['Late'],
+};
+
+// Check if a timing is "late season" based on crop type
+const isLateSeasonTiming = (timing: ApplicationTiming, cropType: CropType): boolean => {
+  const lateStages = LATE_STAGE_THRESHOLDS[cropType] || LATE_STAGE_THRESHOLDS.corn;
+  return lateStages.includes(timing.growthStageStart || '') || 
+         lateStages.includes(timing.growthStageEnd || '');
+};
+
+// Classify pass selectivity: trial (≤30%), selective (31-74%), core (≥75%)
+const getPassSelectivityType = (avgAcresPercentage: number): 'trial' | 'selective' | 'core' => {
+  if (avgAcresPercentage <= 30) return 'trial';
+  if (avgAcresPercentage < 75) return 'selective';
+  return 'core';
+};
+
+// Calculate true program intensity based on management pressure
+export const calculateProgramIntensity = (
+  crop: Crop,
+  passSummaries: PassSummary[],
+  cropCostPerAcre: number,
+  farmAvgCostPerAcre: number = 100 // Default baseline
+): { score: number; dots: number; label: IntensityLabel; breakdown: IntensityBreakdown } => {
+  const REFERENCE_PASSES = 8;
+  const LATE_REFERENCE = 2;
+  
+  // Only count passes with applications
+  const activePasses = passSummaries.filter(p => p.applications.length > 0);
+  
+  // 1. Pass Count Pressure (40%) - "How many times do I go across the field?"
+  const totalPasses = activePasses.length;
+  const passScore = Math.min(totalPasses / REFERENCE_PASSES, 1.0);
+  
+  // 2. Selectivity Load (30%) - "How much am I managing parts of the field differently?"
+  let selectivityNumerator = 0;
+  activePasses.forEach(pass => {
+    const type = getPassSelectivityType(pass.avgAcresPercentage);
+    if (type === 'trial') selectivityNumerator += 1.0;      // Trials count full
+    else if (type === 'selective') selectivityNumerator += 0.7; // Selective counts 70%
+    // Core passes don't add selectivity load
+  });
+  const selectivityScore = Math.min(selectivityNumerator / REFERENCE_PASSES, 1.0);
+  
+  // 3. Late-Season Pressure (20%) - "How far into the season am I still making decisions?"
+  const cropType = crop.cropType || 'corn';
+  const latePasses = activePasses.filter(p => 
+    isLateSeasonTiming(p.timing, cropType)
+  ).length;
+  const lateScore = Math.min(latePasses / LATE_REFERENCE, 1.0);
+  
+  // 4. Cost Deviation (10%) - Only boosts if meaningfully above average
+  const costDeviation = farmAvgCostPerAcre > 0 
+    ? (cropCostPerAcre - farmAvgCostPerAcre) / farmAvgCostPerAcre 
+    : 0;
+  const costScore = Math.max(0, Math.min(costDeviation, 0.3));
+  
+  // Combined score (0-1)
+  const score = 
+    0.4 * passScore +
+    0.3 * selectivityScore +
+    0.2 * lateScore +
+    0.1 * costScore;
+  
+  // Map to dots (1-5)
+  const dots = score <= 0.2 ? 1 : score <= 0.4 ? 2 : score <= 0.6 ? 3 : score <= 0.8 ? 4 : 5;
+  
+  // Label
+  const labels: IntensityLabel[] = ['Low', 'Moderate', 'Managed', 'High', 'Very High'];
+  const label = labels[dots - 1];
+  
+  return { 
+    score, 
+    dots, 
+    label, 
+    breakdown: { passScore, selectivityScore, lateScore, costScore } 
+  };
+};
+
 // Calculate full season summary
 export const calculateSeasonSummary = (
   crop: Crop,
-  products: Product[]
+  products: Product[],
+  farmAvgCostPerAcre?: number
 ): SeasonSummary => {
   const passSummaries = crop.applicationTimings.map(timing => 
     calculatePassSummary(timing, crop, products)
@@ -237,7 +335,6 @@ export const calculateSeasonSummary = (
 
   let totalCost = 0;
   const nutrients = { n: 0, p: 0, k: 0, s: 0 };
-  let totalIntensity = 0;
 
   passSummaries.forEach(pass => {
     totalCost += pass.totalCost;
@@ -245,14 +342,17 @@ export const calculateSeasonSummary = (
     nutrients.p += pass.nutrients.p;
     nutrients.k += pass.nutrients.k;
     nutrients.s += pass.nutrients.s;
-    totalIntensity += pass.avgAcresPercentage;
   });
 
-  // Normalize intensity to 0-5 scale (100% avg = 5)
-  const avgIntensity = passSummaries.length > 0 
-    ? totalIntensity / passSummaries.length 
-    : 0;
-  const programIntensity = Math.min(5, (avgIntensity / 100) * 5);
+  const costPerAcre = crop.totalAcres > 0 ? totalCost / crop.totalAcres : 0;
+  
+  // Calculate true intensity using the new model
+  const intensity = calculateProgramIntensity(
+    crop, 
+    passSummaries, 
+    costPerAcre, 
+    farmAvgCostPerAcre
+  );
 
   // Calculate nutrient timing distribution
   const numTimings = passSummaries.length;
@@ -286,8 +386,10 @@ export const calculateSeasonSummary = (
 
   return {
     totalCost,
-    costPerAcre: crop.totalAcres > 0 ? totalCost / crop.totalAcres : 0,
-    programIntensity,
+    costPerAcre,
+    programIntensity: intensity.dots,
+    intensityLabel: intensity.label,
+    intensityBreakdown: intensity.breakdown,
     status,
     nutrients,
     nutrientTiming,
