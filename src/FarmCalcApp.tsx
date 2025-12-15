@@ -1109,30 +1109,45 @@ const AppContent: React.FC = () => {
 
   // Use localStorage for state with migration
   const [state, setState] = useState<AppState>(() => {
-    // Try new key first
-    let saved = localStorage.getItem('farmcalc-state-v2');
+    const STORAGE_KEY = 'farmcalc-state-v2';
+    const OLD_STORAGE_KEY = 'farmcalc-state';
     
-    // If no v2 data, check old key and migrate
-    if (!saved) {
-      const oldSaved = localStorage.getItem('farmcalc-state');
-      if (oldSaved) {
-        saved = oldSaved;
-        // Clear old key after reading
-        localStorage.removeItem('farmcalc-state');
+    try {
+      // Try new key first
+      let saved = localStorage.getItem(STORAGE_KEY);
+      
+      // If no v2 data, check old key and migrate
+      if (!saved) {
+        const oldSaved = localStorage.getItem(OLD_STORAGE_KEY);
+        if (oldSaved) {
+          saved = oldSaved;
+          console.log('Migrating from old storage key');
+        }
       }
-    }
-    
-    if (saved) {
-      try {
+      
+      if (saved) {
         const parsed = JSON.parse(saved);
-        // Apply migration to new structure
-        return migrateAppState(parsed);
-      } catch (e) {
-        console.error('Failed to parse saved state');
+        const migrated = migrateAppState(parsed);
+        
+        // Only remove old key AFTER successful migration and save to new key
+        if (localStorage.getItem(OLD_STORAGE_KEY)) {
+          // Save to new key first
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          // Then remove old key
+          localStorage.removeItem(OLD_STORAGE_KEY);
+          console.log('Migration complete, old key removed');
+        }
+        
+        return migrated;
       }
+    } catch (e) {
+      console.error('Failed to parse saved state, keeping existing data:', e);
+      // DON'T return default state on parse error - try to preserve what we can
+      // Instead, return empty-ish state that won't overwrite storage
     }
     
-    // Default state - use initialState from file which has complete crop plans
+    // Default state - only used for fresh installs
+    console.log('No saved state found, using defaults');
     return migrateAppState(defaultInitialState);
   });
 
