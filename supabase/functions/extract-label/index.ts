@@ -21,15 +21,21 @@ Return a JSON object with the following structure:
     "s": <number 0-100>,
     "sForm": "<'sulfate' | 'thiosulfate' | 'elemental' | null>"
   },
+  "secondary": {
+    "ca": <number or null - Calcium %>,
+    "mg": <number or null - Magnesium %>,
+    "c": <number or null - Carbon/Organic matter %>
+  },
   "micros": {
-    "boron": <number or null>,
-    "zinc": <number or null>,
-    "manganese": <number or null>,
-    "iron": <number or null>,
-    "copper": <number or null>,
-    "molybdenum": <number or null>,
-    "cobalt": <number or null>,
-    "nickel": <number or null>
+    "b": <number or null - Boron %>,
+    "zn": <number or null - Zinc %>,
+    "mn": <number or null - Manganese %>,
+    "fe": <number or null - Iron %>,
+    "cu": <number or null - Copper %>,
+    "mo": <number or null - Molybdenum %>,
+    "co": <number or null - Cobalt %>,
+    "ni": <number or null - Nickel %>,
+    "cl": <number or null - Chlorine %>
   },
   "carbonSources": {
     "humicAcid": <number or null>,
@@ -69,6 +75,8 @@ Rules:
 - For applicationRates, summarize the recommended rates per acre or per 100 lbs seed
 - For mixingInstructions, include any compatibility info, order of mixing, or tank-mix notes
 - Extract safety info from SDS documents into cautions field
+- For secondary nutrients (Ca, Mg, C), look for Calcium, Magnesium, Carbon, Organic Matter percentages
+- For micros, look for trace element percentages - they are often listed as small decimals like 0.05%
 
 IMPORTANT: Return ONLY valid JSON, no markdown or explanation.`;
 
@@ -183,6 +191,7 @@ serve(async (req) => {
       // Analysis
       analysis: {
         npks: extracted.npks || { n: 0, p: 0, k: 0, s: 0 },
+        secondary: extracted.secondary,
         micros: extracted.micros,
         carbonSources: extracted.carbonSources,
         biology: extracted.biology,

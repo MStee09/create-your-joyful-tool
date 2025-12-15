@@ -202,11 +202,36 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           updates.densityLbsPerGal = data.densityLbsPerGal;
         }
         
-        // NPK-S Analysis
-        if (data.analysis?.npks) {
-          const npks = data.analysis.npks;
-          if (npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0) {
-            updates.analysis = { n: npks.n, p: npks.p, k: npks.k, s: npks.s };
+        // Build full nutrient analysis from extracted data
+        if (data.analysis?.npks || data.analysis?.secondary || data.analysis?.micros) {
+          const npks = data.analysis.npks || { n: 0, p: 0, k: 0, s: 0 };
+          const secondary = data.analysis.secondary || {};
+          const micros = data.analysis.micros || {};
+          
+          // Only update if there's any nutrient data
+          const hasNutrients = npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0 ||
+            secondary.ca || secondary.mg || secondary.c ||
+            micros.b || micros.zn || micros.mn || micros.fe || micros.cu || micros.mo;
+          
+          if (hasNutrients) {
+            updates.analysis = {
+              n: npks.n || 0,
+              p: npks.p || 0,
+              k: npks.k || 0,
+              s: npks.s || 0,
+              ...(secondary.ca && { ca: secondary.ca }),
+              ...(secondary.mg && { mg: secondary.mg }),
+              ...(secondary.c && { c: secondary.c }),
+              ...(micros.b && { b: micros.b }),
+              ...(micros.zn && { zn: micros.zn }),
+              ...(micros.mn && { mn: micros.mn }),
+              ...(micros.fe && { fe: micros.fe }),
+              ...(micros.cu && { cu: micros.cu }),
+              ...(micros.mo && { mo: micros.mo }),
+              ...(micros.co && { co: micros.co }),
+              ...(micros.ni && { ni: micros.ni }),
+              ...(micros.cl && { cl: micros.cl }),
+            };
           }
         }
         
@@ -499,10 +524,34 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     if (fieldsToApply.includes('category') && scrapedData.category) {
       updates.category = scrapedData.category;
     }
-    if (fieldsToApply.includes('analysis') && scrapedData.analysis?.npks) {
-      const npks = scrapedData.analysis.npks;
-      if (npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0) {
-        updates.analysis = { n: npks.n, p: npks.p, k: npks.k, s: npks.s };
+    if (fieldsToApply.includes('analysis') && (scrapedData.analysis?.npks || scrapedData.analysis?.secondary || scrapedData.analysis?.micros)) {
+      const npks = scrapedData.analysis.npks || { n: 0, p: 0, k: 0, s: 0 };
+      const secondary = scrapedData.analysis.secondary || {};
+      const micros = scrapedData.analysis.micros || {};
+      
+      const hasNutrients = npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0 ||
+        secondary.ca || secondary.mg || secondary.c ||
+        micros.b || micros.zn || micros.mn || micros.fe || micros.cu || micros.mo;
+      
+      if (hasNutrients) {
+        updates.analysis = {
+          n: npks.n || 0,
+          p: npks.p || 0,
+          k: npks.k || 0,
+          s: npks.s || 0,
+          ...(secondary.ca && { ca: secondary.ca }),
+          ...(secondary.mg && { mg: secondary.mg }),
+          ...(secondary.c && { c: secondary.c }),
+          ...(micros.b && { b: micros.b }),
+          ...(micros.zn && { zn: micros.zn }),
+          ...(micros.mn && { mn: micros.mn }),
+          ...(micros.fe && { fe: micros.fe }),
+          ...(micros.cu && { cu: micros.cu }),
+          ...(micros.mo && { mo: micros.mo }),
+          ...(micros.co && { co: micros.co }),
+          ...(micros.ni && { ni: micros.ni }),
+          ...(micros.cl && { cl: micros.cl }),
+        };
       }
     }
     if (fieldsToApply.includes('density') && scrapedData.analysis?.densityLbsPerGal) {
