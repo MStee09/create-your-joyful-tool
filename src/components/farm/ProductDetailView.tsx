@@ -130,22 +130,131 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
     setEditingReorder(false);
   };
 
-  const handleUploadDocument = (type: 'label' | 'sds', file: File) => {
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleUploadDocument = async (type: 'label' | 'sds', file: File) => {
     if (file.type !== 'application/pdf') {
-      alert('Please upload a PDF file');
+      toast.error('Please upload a PDF file');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast.error('File size must be less than 5MB');
       return;
     }
+    
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const base64 = e.target?.result as string;
+      
+      // Save the document first
       if (type === 'label') {
         onUpdateProduct({ ...product, labelData: base64, labelFileName: file.name });
       } else {
         onUpdateProduct({ ...product, sdsData: base64, sdsFileName: file.name });
+      }
+      
+      // Now extract data from it
+      setIsExtracting(true);
+      toast.info('Extracting product data from document...');
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('extract-label', {
+          body: {
+            labelBase64: base64,
+            fileName: file.name,
+          },
+        });
+        
+        if (error) throw error;
+        
+        // Build updates from extracted data
+        const updates: Partial<ProductMaster> = {};
+        
+        // Product name (only if current is generic)
+        if (data.productName && (product.name === 'New Product' || product.name.startsWith('Untitled'))) {
+          updates.name = data.productName;
+        }
+        
+        // Form
+        if (data.form && (data.form === 'liquid' || data.form === 'dry')) {
+          updates.form = data.form;
+          updates.defaultUnit = data.form === 'liquid' ? 'gal' : 'lbs';
+        }
+        
+        // Category
+        if (data.category) {
+          updates.category = data.category;
+        }
+        
+        // Density
+        if (data.densityLbsPerGal && data.densityLbsPerGal > 0) {
+          updates.densityLbsPerGal = data.densityLbsPerGal;
+        }
+        
+        // NPK-S Analysis
+        if (data.analysis?.npks) {
+          const npks = data.analysis.npks;
+          if (npks.n > 0 || npks.p > 0 || npks.k > 0 || npks.s > 0) {
+            updates.analysis = { n: npks.n, p: npks.p, k: npks.k, s: npks.s };
+          }
+        }
+        
+        // Active ingredients
+        if (data.activeIngredients) {
+          updates.activeIngredients = data.activeIngredients;
+        }
+        
+        // Build notes from extracted data
+        const notesParts: string[] = [];
+        if (data.applicationRates) {
+          notesParts.push(`**Application Rates:**\n${data.applicationRates}`);
+        }
+        if (data.storageHandling) {
+          notesParts.push(`**Storage & Handling:**\n${data.storageHandling}`);
+        }
+        if (data.cautions) {
+          notesParts.push(`**Cautions:**\n${data.cautions}`);
+        }
+        if (notesParts.length > 0 && !product.generalNotes) {
+          updates.generalNotes = notesParts.join('\n\n');
+        }
+        
+        // Mixing notes
+        if (data.mixingInstructions && !product.mixingNotes) {
+          updates.mixingNotes = data.mixingInstructions;
+        }
+        
+        // Crop rate notes from approved uses
+        if (data.analysis?.approvedUses?.length > 0 && !product.cropRateNotes) {
+          updates.cropRateNotes = `Approved uses: ${data.analysis.approvedUses.join(', ')}`;
+        }
+        
+        // Apply all updates at once
+        if (Object.keys(updates).length > 0) {
+          onUpdateProduct({ ...product, ...updates });
+          toast.success(`Extracted ${Object.keys(updates).length} fields from ${type}`);
+        } else {
+          toast.info('Document processed, but no new data to update');
+        }
+        
+        // Handle roles if suggested
+        if (data.suggestedRoles?.length > 0) {
+          const newPurpose: ProductPurpose = {
+            ...purpose,
+            id: purpose?.id || crypto.randomUUID(),
+            productId: product.id,
+            roles: data.suggestedRoles,
+            rolesConfirmed: false, // User should confirm
+          };
+          savePurpose(product.id, newPurpose);
+          toast.info(`Suggested ${data.suggestedRoles.length} role(s) - review in Product Intelligence`);
+        }
+        
+      } catch (extractError) {
+        console.error('Extraction failed:', extractError);
+        toast.error('Failed to extract data from document');
+      } finally {
+        setIsExtracting(false);
       }
     };
     reader.readAsDataURL(file);

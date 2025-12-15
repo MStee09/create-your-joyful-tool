@@ -6,10 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const EXTRACTION_PROMPT = `You are an agricultural product label analyst. Extract structured data from this product label.
+const EXTRACTION_PROMPT = `You are an agricultural product label and SDS analyst. Extract ALL available structured data from this document.
 
 Return a JSON object with the following structure:
 {
+  "productName": "<exact product name from label>",
+  "form": "<'liquid' | 'dry' | null>",
+  "category": "<'biological' | 'micronutrient' | 'herbicide' | 'fungicide' | 'insecticide' | 'seed-treatment' | 'adjuvant' | 'fertilizer-liquid' | 'fertilizer-dry' | 'other' | null>",
   "npks": {
     "n": <number 0-100>,
     "nForm": "<'urea' | 'nh4' | 'no3' | 'mixed' | null>",
@@ -43,17 +46,29 @@ Return a JSON object with the following structure:
   },
   "densityLbsPerGal": <number or null>,
   "approvedUses": ["<foliar, in-furrow, fertigation, seed treatment, etc>"],
+  "activeIngredients": "<string list of active ingredients>",
+  "applicationRates": "<string summary of recommended rates>",
+  "mixingInstructions": "<string mixing/compatibility notes>",
+  "storageHandling": "<string storage and handling notes>",
+  "cautions": "<string cautions, precautions, or safety notes>",
+  "manufacturer": "<company/manufacturer name>",
   "extractionConfidence": "<high | medium | low>",
   "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"]
 }
 
 Rules:
-- Extract ONLY what's explicitly stated on the label
+- Extract EVERYTHING explicitly stated on the label/SDS
 - Use null for values not found
-- Set extractionConfidence to "high" if most key data is clearly found, "medium" if some is ambiguous, "low" if label is hard to read or incomplete
-- For suggestedRoles, infer based on the product composition (e.g., has microbials = biostimulant, high NPK = fertility-macro)
+- For productName, use the main product name displayed on the label
+- For form, determine if it's a liquid or dry product based on packaging description, density info, or application instructions
+- For category, infer from the product type and use
+- Set extractionConfidence to "high" if most key data is clearly found, "medium" if some is ambiguous, "low" if document is hard to read
+- For suggestedRoles, infer based on the product composition
 - All nutrient percentages should be numeric (e.g., 10-34-0 means n=10, p=34, k=0)
-- For density, look for "lbs/gal", "weight per gallon", or "density"
+- For density, look for "lbs/gal", "weight per gallon", "density", or "specific gravity"
+- For applicationRates, summarize the recommended rates per acre or per 100 lbs seed
+- For mixingInstructions, include any compatibility info, order of mixing, or tank-mix notes
+- Extract safety info from SDS documents into cautions field
 
 IMPORTANT: Return ONLY valid JSON, no markdown or explanation.`;
 
@@ -149,8 +164,23 @@ serve(async (req) => {
       throw new Error('Failed to parse AI response as JSON');
     }
 
-    // Build the result
+    // Build the result with all extracted fields
     const result = {
+      // Product master fields
+      productName: extracted.productName || null,
+      form: extracted.form || null,
+      category: extracted.category || null,
+      densityLbsPerGal: extracted.densityLbsPerGal || null,
+      activeIngredients: extracted.activeIngredients || null,
+      manufacturer: extracted.manufacturer || null,
+      
+      // Notes fields
+      applicationRates: extracted.applicationRates || null,
+      mixingInstructions: extracted.mixingInstructions || null,
+      storageHandling: extracted.storageHandling || null,
+      cautions: extracted.cautions || null,
+      
+      // Analysis
       analysis: {
         npks: extracted.npks || { n: 0, p: 0, k: 0, s: 0 },
         micros: extracted.micros,
