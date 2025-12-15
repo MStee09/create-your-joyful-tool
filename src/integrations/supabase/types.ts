@@ -117,6 +117,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          product_id: string | null
           unit: string | null
           user_id: string
         }
@@ -127,6 +128,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          product_id?: string | null
           unit?: string | null
           user_id: string
         }
@@ -137,10 +139,19 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          product_id?: string | null
           unit?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "commodity_specs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_masters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
@@ -267,6 +278,7 @@ export type Database = {
         Row: {
           analysis: Json | null
           category: string | null
+          commodity_spec_id: string | null
           created_at: string
           crop_rate_notes: string | null
           default_unit: string | null
@@ -274,9 +286,11 @@ export type Database = {
           form: string
           general_notes: string | null
           id: string
+          is_bid_eligible: boolean
           label_file_name: string | null
           mixing_notes: string | null
           name: string
+          product_type: string | null
           reorder_point: number | null
           sds_file_name: string | null
           updated_at: string
@@ -285,6 +299,7 @@ export type Database = {
         Insert: {
           analysis?: Json | null
           category?: string | null
+          commodity_spec_id?: string | null
           created_at?: string
           crop_rate_notes?: string | null
           default_unit?: string | null
@@ -292,9 +307,11 @@ export type Database = {
           form?: string
           general_notes?: string | null
           id?: string
+          is_bid_eligible?: boolean
           label_file_name?: string | null
           mixing_notes?: string | null
           name: string
+          product_type?: string | null
           reorder_point?: number | null
           sds_file_name?: string | null
           updated_at?: string
@@ -303,6 +320,7 @@ export type Database = {
         Update: {
           analysis?: Json | null
           category?: string | null
+          commodity_spec_id?: string | null
           created_at?: string
           crop_rate_notes?: string | null
           default_unit?: string | null
@@ -310,15 +328,25 @@ export type Database = {
           form?: string
           general_notes?: string | null
           id?: string
+          is_bid_eligible?: boolean
           label_file_name?: string | null
           mixing_notes?: string | null
           name?: string
+          product_type?: string | null
           reorder_point?: number | null
           sds_file_name?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_masters_commodity_spec_id_fkey"
+            columns: ["commodity_spec_id"]
+            isOneToOne: false
+            referencedRelation: "commodity_specs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
