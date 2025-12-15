@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { MessageSquare, Edit3 } from 'lucide-react';
+import { MessageSquare, Edit3, Award } from 'lucide-react';
 import type { Application, Product, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
+import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ProductRole, ApplicationOverride } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
+import { getAwardedPriceInfo } from '@/lib/priceBookUtils';
 import {
   Tooltip,
   TooltipContent,
@@ -20,6 +22,9 @@ interface ProductRowReadableProps {
   acresPercentage: number;
   purpose?: ProductPurpose | null;
   override?: ApplicationOverride | null;
+  productMasters?: ProductMaster[];
+  priceBook?: PriceBookEntry[];
+  seasonYear?: number;
   onEdit: () => void;
   onUpdateOverride?: (override: ApplicationOverride) => void;
 }
@@ -67,6 +72,9 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   acresPercentage,
   purpose,
   override,
+  productMasters = [],
+  priceBook = [],
+  seasonYear = new Date().getFullYear(),
   onEdit,
   onUpdateOverride,
 }) => {
@@ -80,6 +88,9 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       </div>
     );
   }
+
+  // Check if this product has an awarded bid price
+  const awardedPriceInfo = getAwardedPriceInfo(product.id, seasonYear, productMasters, priceBook);
 
   // Calculate costs - treated (intensity) and field (budget)
   let treatedCostPerAcre = 0;
@@ -164,6 +175,26 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
           {/* Product name with coverage badge and role chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-medium text-foreground">{product.name}</h4>
+            
+            {/* Awarded bid price indicator */}
+            {awardedPriceInfo.isAwarded && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 text-emerald-600 rounded text-[10px] font-medium">
+                      <Award className="w-3 h-3" />
+                      Bid
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <p className="font-medium">Awarded bid price</p>
+                    <p className="text-muted-foreground">
+                      {formatCurrency(awardedPriceInfo.price || 0)}/{awardedPriceInfo.priceUom}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             
             {/* Coverage badge - promoted to header level */}
             <span className={cn(
