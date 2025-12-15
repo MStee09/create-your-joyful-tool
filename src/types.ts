@@ -136,6 +136,11 @@ export interface ProductMaster {
   // Inventory tracking
   reorderPoint?: number;
   reorderUnit?: 'gal' | 'lbs';
+  
+  // Procurement classification
+  productType?: ProductType;  // commodity | specialty
+  isBidEligible?: boolean;
+  commoditySpecId?: string;   // Link to commodity spec if commodity
 }
 
 // LEGACY: Old Product interface for migration
@@ -241,6 +246,12 @@ export interface AppState {
   currentSeasonId: string | null;
   currentCropId: string | null;
   dataVersion?: number;  // For migration tracking
+  // Procurement system
+  commoditySpecs: CommoditySpec[];
+  bidEvents: BidEvent[];
+  vendorQuotes: VendorQuote[];
+  awards: Award[];
+  priceBook: PriceBookEntry[];
 }
 
 export interface NutrientSummary {
@@ -263,4 +274,86 @@ export interface ProductWithVendor extends ProductMaster {
   preferredVendor?: Vendor;
   totalOnHand?: number;
   stockStatus?: 'ok' | 'low' | 'out';
+}
+
+// ============================================================================
+// PROCUREMENT SYSTEM TYPES
+// ============================================================================
+
+// Product classification for bidding
+export type ProductType = 'commodity' | 'specialty';
+
+// Commodity spec - canonical definition for bidding
+export interface CommoditySpec {
+  id: string;
+  productId: string;          // Links to ProductMaster
+  specName: string;           // "AMS 21-0-0-24S", "Glyphosate 4lb ae"
+  analysis?: string;          // Optional text analysis
+  uom: 'ton' | 'gal' | 'lbs';
+  category: 'fertilizer' | 'chemical';
+}
+
+// Bid event types
+export type BidEventType = 'SPRING_DRY' | 'SPRING_CHEM' | 'FALL_DRY' | 'CUSTOM';
+export type BidEventStatus = 'draft' | 'sent' | 'collecting' | 'awarded' | 'locked';
+
+export interface BidEvent {
+  id: string;
+  seasonYear: number;
+  eventType: BidEventType;
+  name: string;               // "2026 Spring Dry Fert Bid"
+  status: BidEventStatus;
+  dueDate?: string;
+  invitedVendorIds: string[];
+  notes?: string;
+  createdAt: string;
+}
+
+// Demand rollup - auto-calculated from crop plans
+export interface DemandRollup {
+  specId: string;
+  productId: string;
+  productName: string;
+  specName: string;
+  plannedQty: number;
+  uom: 'ton' | 'gal' | 'lbs';
+  cropBreakdown: Array<{ cropName: string; qty: number }>;
+}
+
+// Vendor quote
+export interface VendorQuote {
+  id: string;
+  bidEventId: string;
+  vendorId: string;
+  specId: string;
+  price: number;
+  priceUom: 'ton' | 'gal' | 'lbs';
+  minQty?: number;
+  maxQty?: number;
+  isDeliveredIncluded: boolean;
+  validUntil?: string;
+  notes?: string;
+}
+
+// Award (supports split awards)
+export interface Award {
+  id: string;
+  bidEventId: string;
+  specId: string;
+  vendorId: string;
+  awardedQty?: number;        // If blank, assume all
+  awardedPrice: number;
+  effectiveDate: string;
+}
+
+// Price book - what crop plans read
+export interface PriceBookEntry {
+  id: string;
+  seasonYear: number;
+  specId: string;
+  productId: string;
+  price: number;
+  priceUom: 'ton' | 'gal' | 'lbs';
+  vendorId?: string;
+  source: 'estimated' | 'awarded' | 'manual_override';
 }
