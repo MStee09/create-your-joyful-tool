@@ -213,62 +213,10 @@ export function useSupabaseData(user: User | null) {
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
 
-      // Sync: commodity/bid-eligible products should exist as commodity specs.
-      // Some older products may not have productType/isBidEligible persisted yet, so we also infer
-      // from category/form/unit (e.g. Fertilizer (Dry) commodities like AMS/Urea/KCL/SOP).
-      const commodityProducts = productMasters.filter((p) => {
-        const cat = String(p.category || '');
-        const inferredCommodity =
-          (p.form === 'dry' && cat === 'fertilizer-dry') ||
-          (cat.startsWith('fertilizer') && (p.defaultUnit === 'ton' || p.defaultUnit === 'lbs'));
-        return p.productType === 'commodity' || p.isBidEligible || inferredCommodity;
-      });
-
-      const existingByProductId = new Set(
-        commoditySpecs.flatMap((s) => (s.productId ? [s.productId] : []))
-      );
-      const existingByName = new Set(
-        commoditySpecs.map((s) => (s.name || '').trim().toLowerCase()).filter(Boolean)
-      );
-
-      const specsToCreate = commodityProducts
-        .filter((p) => {
-          const nameKey = p.name.trim().toLowerCase();
-          return !existingByProductId.has(p.id) && !existingByName.has(nameKey);
-        })
-        .map((p) => {
-          const cat = String(p.category || '');
-          const unit: 'ton' | 'gal' | 'lbs' =
-            p.defaultUnit === 'gal' || p.defaultUnit === 'lbs' || p.defaultUnit === 'ton'
-              ? (p.defaultUnit as any)
-              : 'ton';
-          const category: 'fertilizer' | 'chemical' = cat.startsWith('fertilizer') ? 'fertilizer' : 'chemical';
-
-          return {
-            id: crypto.randomUUID(),
-            user_id: user.id,
-            product_id: p.id,
-            name: p.name,
-            description: undefined,
-            unit,
-            category,
-            analysis: (p.analysis ?? null) as any,
-          };
-        });
-
-      if (specsToCreate.length > 0) {
-        const { data: inserted, error: insertError } = await supabase
-          .from('commodity_specs')
-          .insert(specsToCreate)
-          .select('*');
-
-        if (insertError) {
-          console.error('Error seeding commodity specs from products:', insertError);
-        } else {
-          const insertedSpecs = (inserted || []).map(dbCommoditySpecToCommoditySpec);
-          commoditySpecs = [...commoditySpecs, ...insertedSpecs];
-        }
-      }
+      // NOTE: Auto-sync of commodity specs from products has been removed.
+      // Specs should only be created manually or via the explicit "Create new spec" action
+      // from the product detail page. The commoditySpecId on ProductMaster is the source
+      // of truth for linking products to specs.
 
       // Get saved current season ID or use first season
       const savedSeasonId = localStorage.getItem('farmcalc-current-season');
