@@ -242,6 +242,7 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
         bidEventId: event.id,
         vendorId,
         specId,
+        commoditySpecId: specId,
         price,
         priceUom: rollup?.uom || 'ton',
         isDeliveredIncluded: true,
@@ -268,6 +269,8 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
         bidEventId: event.id,
         specId,
         vendorId,
+        vendorQuoteId: eventQuotes.find(q => q.vendorId === vendorId && q.specId === specId)?.id || '',
+        quantity: demandRollup.find(r => r.specId === specId)?.plannedQty || 0,
         awardedPrice: price,
         effectiveDate: new Date().toISOString(),
       };

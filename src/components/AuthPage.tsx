@@ -1,31 +1,45 @@
 import React, { useState } from 'react';
-import { Leaf, Mail, Lock, User } from 'lucide-react';
+import { Leaf, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
-interface AuthPageProps {
-  onAuthSuccess: () => void;
-}
-
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
+export const AuthPage: React.FC = () => {
   const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setLoading(true);
 
     try {
       if (isLogin) {
-        await signIn(email, password);
+        const { error } = await signIn(email, password);
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please try again.');
+          } else {
+            setError(error.message);
+          }
+        }
       } else {
-        await signUp(email, password);
+        const { error } = await signUp(email, password);
+        if (error) {
+          if (error.message.includes('already registered')) {
+            setError('This email is already registered. Please sign in instead.');
+          } else {
+            setError(error.message);
+          }
+        } else {
+          setSuccessMessage('Account created successfully! You can now sign in.');
+          setIsLogin(true);
+        }
       }
-      onAuthSuccess();
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -89,6 +103,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               </div>
             )}
 
+            {successMessage && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm">
+                {successMessage}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -100,25 +120,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+                setSuccessMessage('');
+              }}
               className="text-sm text-emerald-600 hover:underline"
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
           </div>
-
-          <div className="mt-6 pt-6 border-t border-stone-200">
-            <button
-              onClick={onAuthSuccess}
-              className="w-full py-2 border border-stone-300 text-stone-700 rounded-lg font-medium hover:bg-stone-50"
-            >
-              Continue without account
-            </button>
-            <p className="text-xs text-stone-500 text-center mt-2">
-              Your data will be saved locally in your browser
-            </p>
-          </div>
         </div>
+
+        <p className="text-xs text-stone-500 text-center mt-4">
+          Your data is securely stored in the cloud
+        </p>
       </div>
     </div>
   );

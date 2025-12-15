@@ -79,6 +79,7 @@ export interface Vendor {
   tags: VendorTag[];
   
   // Notes
+  notes?: string;
   generalNotes?: string;
   freightNotes?: string; // "Freight included on totes", "Spring-only pricing"
 }
@@ -95,6 +96,7 @@ export interface VendorOffering {
   
   // Packaging info
   packaging?: string;  // "2.5 gal jug", "275 gal tote", "50 lb bag"
+  packagingOptions?: PackagingOption[];
   sku?: string;
   
   // Terms
@@ -286,11 +288,14 @@ export type ProductType = 'commodity' | 'specialty';
 // Commodity spec - canonical definition for bidding
 export interface CommoditySpec {
   id: string;
-  productId: string;          // Links to ProductMaster
-  specName: string;           // "AMS 21-0-0-24S", "Glyphosate 4lb ae"
-  analysis?: string;          // Optional text analysis
-  uom: 'ton' | 'gal' | 'lbs';
-  category: 'fertilizer' | 'chemical';
+  productId?: string;          // Links to ProductMaster
+  name: string;                // "AMS 21-0-0-24S", "Glyphosate 4lb ae"
+  specName?: string;           // Legacy alias
+  description?: string;        // Detailed description
+  analysis?: NutrientAnalysis | string;  // Optional analysis
+  unit: 'ton' | 'gal' | 'lbs';
+  uom?: 'ton' | 'gal' | 'lbs'; // Legacy alias
+  category?: 'fertilizer' | 'chemical' | string;
 }
 
 // Bid event types
@@ -310,15 +315,16 @@ export interface VendorInvitation {
 
 export interface BidEvent {
   id: string;
-  seasonYear: number;
-  eventType: BidEventType;
+  seasonId?: string;
+  seasonYear?: number;
+  eventType?: BidEventType;
   name: string;               // "2026 Spring Dry Fert Bid"
   status: BidEventStatus;
   dueDate?: string;
   invitedVendorIds: string[];
   vendorInvitations?: VendorInvitation[];  // Manual tracking of invitation status
   notes?: string;
-  createdAt: string;
+  createdAt?: Date | string;
 }
 
 // Demand rollup - auto-calculated from crop plans
@@ -337,12 +343,14 @@ export interface VendorQuote {
   id: string;
   bidEventId: string;
   vendorId: string;
-  specId: string;
+  specId?: string;
+  commoditySpecId: string;
   price: number;
-  priceUom: 'ton' | 'gal' | 'lbs';
+  priceUom?: 'ton' | 'gal' | 'lbs';
+  deliveryTerms?: string;
   minQty?: number;
   maxQty?: number;
-  isDeliveredIncluded: boolean;
+  isDeliveredIncluded?: boolean;
   validUntil?: string;
   notes?: string;
 }
@@ -351,21 +359,29 @@ export interface VendorQuote {
 export interface Award {
   id: string;
   bidEventId: string;
-  specId: string;
-  vendorId: string;
-  awardedQty?: number;        // If blank, assume all
-  awardedPrice: number;
-  effectiveDate: string;
+  vendorQuoteId: string;
+  specId?: string;
+  vendorId?: string;
+  quantity: number;
+  awardedQty?: number;        // Legacy alias
+  awardedPrice?: number;
+  effectiveDate?: string;
+  notes?: string;
 }
 
 // Price book - what crop plans read
 export interface PriceBookEntry {
   id: string;
-  seasonYear: number;
-  specId: string;
-  productId: string;
-  price: number;
-  priceUom: 'ton' | 'gal' | 'lbs';
+  seasonId?: string;
+  seasonYear?: number;
+  commoditySpecId?: string;
+  specId?: string;
+  productId?: string;
   vendorId?: string;
-  source: 'estimated' | 'awarded' | 'manual_override';
+  price: number;
+  unit?: 'ton' | 'gal' | 'lbs';
+  priceUom?: 'ton' | 'gal' | 'lbs';
+  source?: 'estimated' | 'awarded' | 'manual' | 'manual_override';
+  effectiveDate?: string;
+  notes?: string;
 }
