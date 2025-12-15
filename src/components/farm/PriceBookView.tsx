@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List } from 'lucide-react';
+import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List, Plus, Edit2, Trash2, X } from 'lucide-react';
 import type { PriceBookEntry, ProductMaster, Vendor, BidEvent, CommoditySpec } from '@/types';
-import { formatCurrency } from '@/utils/farmUtils';
+import { formatCurrency, generateId } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -19,6 +19,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   LineChart,
   Line,
@@ -41,6 +50,7 @@ interface PriceBookViewProps {
   bidEvents: BidEvent[];
   commoditySpecs: CommoditySpec[];
   currentSeasonYear: number;
+  onUpdatePriceBook?: (priceBook: PriceBookEntry[]) => void;
 }
 
 type SortField = 'product' | 'price' | 'vendor' | 'source' | 'season';
@@ -53,6 +63,7 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
   bidEvents,
   commoditySpecs,
   currentSeasonYear,
+  onUpdatePriceBook,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeason, setFilterSeason] = useState<string>('all');
@@ -62,6 +73,18 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
   const [expandedSeasons, setExpandedSeasons] = useState<Set<number>>(new Set([currentSeasonYear]));
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table');
   const [selectedChartProduct, setSelectedChartProduct] = useState<string>('all');
+  
+  // Modal state for add/edit
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<PriceBookEntry | null>(null);
+  const [entryForm, setEntryForm] = useState({
+    productId: '',
+    specId: '',
+    seasonYear: currentSeasonYear,
+    price: '',
+    priceUom: 'ton' as 'ton' | 'gal' | 'lbs',
+    vendorId: '',
+  });
 
   // Get unique seasons from price book
   const seasons = useMemo(() => {
@@ -322,6 +345,101 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
     'hsl(25, 95%, 53%)',  // orange
   ];
 
+  // Get all products (product masters + commodity specs) for dropdown
+  const allProducts = useMemo(() => {
+    const products: Array<{ id: string; name: string; type: 'product' | 'spec' }> = [];
+    
+    productMasters.forEach(p => {
+      products.push({ id: p.id, name: p.name, type: 'product' });
+    });
+    
+    commoditySpecs.forEach(s => {
+      // Only add specs that don't have a matching product already
+      if (!products.some(p => p.id === s.productId)) {
+        products.push({ id: s.id, name: s.specName, type: 'spec' });
+      }
+    });
+    
+    return products.sort((a, b) => a.name.localeCompare(b.name));
+  }, [productMasters, commoditySpecs]);
+
+  // Handlers for add/edit/delete
+  const handleOpenAddModal = () => {
+    setEditingEntry(null);
+    setEntryForm({
+      productId: allProducts[0]?.id || '',
+      specId: '',
+      seasonYear: currentSeasonYear,
+      price: '',
+      priceUom: 'ton',
+      vendorId: '',
+    });
+    setShowEntryModal(true);
+  };
+
+  const handleOpenEditModal = (entry: PriceBookEntry) => {
+    setEditingEntry(entry);
+    setEntryForm({
+      productId: entry.productId,
+      specId: entry.specId,
+      seasonYear: entry.seasonYear,
+      price: entry.price.toString(),
+      priceUom: entry.priceUom,
+      vendorId: entry.vendorId || '',
+    });
+    setShowEntryModal(true);
+  };
+
+  const handleSaveEntry = () => {
+    if (!onUpdatePriceBook) return;
+    if (!entryForm.productId || !entryForm.price) return;
+
+    const price = parseFloat(entryForm.price);
+    if (isNaN(price) || price <= 0) return;
+
+    if (editingEntry) {
+      // Update existing
+      const updated = priceBook.map(e => 
+        e.id === editingEntry.id 
+          ? {
+              ...e,
+              productId: entryForm.productId,
+              specId: entryForm.specId || entryForm.productId,
+              seasonYear: entryForm.seasonYear,
+              price,
+              priceUom: entryForm.priceUom,
+              vendorId: entryForm.vendorId || undefined,
+              source: 'manual_override' as const,
+            }
+          : e
+      );
+      onUpdatePriceBook(updated);
+    } else {
+      // Add new
+      const newEntry: PriceBookEntry = {
+        id: `pb-manual-${generateId()}`,
+        productId: entryForm.productId,
+        specId: entryForm.specId || entryForm.productId,
+        seasonYear: entryForm.seasonYear,
+        price,
+        priceUom: entryForm.priceUom,
+        vendorId: entryForm.vendorId || undefined,
+        source: 'manual_override',
+      };
+      onUpdatePriceBook([...priceBook, newEntry]);
+    }
+
+    setShowEntryModal(false);
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    if (!onUpdatePriceBook) return;
+    if (!confirm('Delete this price book entry?')) return;
+    
+    onUpdatePriceBook(priceBook.filter(e => e.id !== entryId));
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -335,6 +453,12 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
             Historical awarded prices and cost references by season
           </p>
         </div>
+        {onUpdatePriceBook && (
+          <Button onClick={handleOpenAddModal} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Add Entry
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -728,11 +852,12 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
                             </TableHead>
                             <TableHead>Source</TableHead>
                             <TableHead>Bid Event</TableHead>
+                            {onUpdatePriceBook && <TableHead className="w-20">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {entries.map(entry => (
-                            <TableRow key={entry.id} className="hover:bg-muted/20">
+                            <TableRow key={entry.id} className="hover:bg-muted/20 group">
                               <TableCell>
                                 <div>
                                   <p className="font-medium text-foreground">{entry.productName}</p>
@@ -767,6 +892,26 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
                                   <span className="text-sm text-muted-foreground/50">—</span>
                                 )}
                               </TableCell>
+                              {onUpdatePriceBook && (
+                                <TableCell>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => handleOpenEditModal(entry)}
+                                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                                      title="Edit entry"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEntry(entry.id)}
+                                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                      title="Delete entry"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -780,6 +925,123 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
           )}
         </>
       )}
+
+      {/* Add/Edit Entry Modal */}
+      <Dialog open={showEntryModal} onOpenChange={setShowEntryModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingEntry ? 'Edit Price Book Entry' : 'Add Price Book Entry'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Product Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="product">Product / Commodity</Label>
+              <Select 
+                value={entryForm.productId} 
+                onValueChange={(v) => setEntryForm(prev => ({ ...prev, productId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select product..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {allProducts.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      <span className="text-muted-foreground text-xs ml-2">
+                        ({p.type === 'spec' ? 'Commodity' : 'Product'})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Season Year */}
+            <div className="space-y-2">
+              <Label htmlFor="season">Season Year</Label>
+              <Select 
+                value={entryForm.seasonYear.toString()} 
+                onValueChange={(v) => setEntryForm(prev => ({ ...prev, seasonYear: parseInt(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {[currentSeasonYear - 2, currentSeasonYear - 1, currentSeasonYear, currentSeasonYear + 1].map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Price and Unit */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">Price</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={entryForm.price}
+                  onChange={(e) => setEntryForm(prev => ({ ...prev, price: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <Select 
+                  value={entryForm.priceUom} 
+                  onValueChange={(v) => setEntryForm(prev => ({ ...prev, priceUom: v as 'ton' | 'gal' | 'lbs' }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="ton">per ton</SelectItem>
+                    <SelectItem value="gal">per gal</SelectItem>
+                    <SelectItem value="lbs">per lb</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Vendor (Optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="vendor">Vendor (Optional)</Label>
+              <Select 
+                value={entryForm.vendorId || 'none'} 
+                onValueChange={(v) => setEntryForm(prev => ({ ...prev, vendorId: v === 'none' ? '' : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vendor..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="none">No vendor</SelectItem>
+                  {vendors.map(v => (
+                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEntryModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEntry}
+              disabled={!entryForm.productId || !entryForm.price || parseFloat(entryForm.price) <= 0}
+            >
+              {editingEntry ? 'Save Changes' : 'Add Entry'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

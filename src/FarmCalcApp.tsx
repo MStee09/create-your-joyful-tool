@@ -1387,6 +1387,7 @@ const AppContent: React.FC = () => {
             bidEvents={state.bidEvents || []}
             commoditySpecs={state.commoditySpecs || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+            onUpdatePriceBook={(priceBook) => setState(prev => ({ ...prev, priceBook }))}
           />
         );
       case 'exports':
