@@ -613,7 +613,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           {/* Conversions Card */}
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="font-semibold text-foreground mb-4">Conversions & Calculations</h3>
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {product.form === 'liquid' && (
                 <div>
                   <label className="block text-sm text-muted-foreground mb-1">Density (lbs/gal)</label>
@@ -636,35 +636,17 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   ) : (
                     <button 
                       onClick={() => { setEditingDensity(true); setDensityValue(product.densityLbsPerGal || 0); }}
-                      className="flex items-center gap-2 text-foreground hover:text-primary"
+                      className="flex items-center gap-2 text-foreground hover:text-primary group"
                     >
                       <span className="text-lg font-semibold">
                         {product.densityLbsPerGal ? formatNumber(product.densityLbsPerGal, 1) : '—'}
                       </span>
-                      <Edit2 className="w-3 h-3" />
+                      <Edit2 className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                     </button>
                   )}
                 </div>
               )}
               
-              {preferredOffering && (
-                <>
-                  <div>
-                    <label className="block text-sm text-muted-foreground mb-1">Cost per lb</label>
-                    <p className="text-lg font-semibold text-foreground">
-                      {costPerLb ? formatCurrency(costPerLb) : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-muted-foreground mb-1">Best Price</label>
-                    <p className="text-lg font-semibold text-primary">
-                      {formatCurrency(preferredOffering.price)}/{preferredOffering.priceUnit}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{preferredVendor?.name}</p>
-                  </div>
-                </>
-              )}
-
               <div>
                 <label className="block text-sm text-muted-foreground mb-1">Reorder Point</label>
                 {editingReorder ? (
@@ -686,15 +668,43 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                 ) : (
                   <button 
                     onClick={() => { setEditingReorder(true); setReorderValue(product.reorderPoint || 0); }}
-                    className="flex items-center gap-2 text-foreground hover:text-primary"
+                    className="flex items-center gap-2 text-foreground hover:text-primary group"
                   >
                     <span className="text-lg font-semibold">
                       {product.reorderPoint ? formatNumber(product.reorderPoint, 0) : '—'}
                     </span>
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                   </button>
                 )}
               </div>
+
+              {preferredOffering ? (
+                <>
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-1">Cost per lb</label>
+                    <p className="text-lg font-semibold text-foreground">
+                      {costPerLb ? formatCurrency(costPerLb) : '—'}
+                    </p>
+                    {!costPerLb && product.form === 'liquid' && !product.densityLbsPerGal && (
+                      <p className="text-xs text-muted-foreground">Set density to calculate</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-muted-foreground mb-1">Best Price</label>
+                    <p className="text-lg font-semibold text-primary">
+                      {formatCurrency(preferredOffering.price)}/{preferredOffering.priceUnit}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{preferredVendor?.name}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-2">
+                  <label className="block text-sm text-muted-foreground mb-1">Pricing</label>
+                  <p className="text-sm text-muted-foreground">
+                    Add a vendor offering below to see pricing calculations
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
