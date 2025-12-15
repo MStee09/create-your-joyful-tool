@@ -108,15 +108,17 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     const product: ProductMaster = {
       id: generateId(),
       name: newProduct.name.trim(),
-      category: newProduct.category || inferProductCategory(newProduct.name, newProduct.form || 'liquid'),
+      category: inferProductCategory(newProduct.name, newProduct.form || 'liquid'),
       form: newProduct.form || 'liquid',
       defaultUnit: newProduct.form === 'liquid' ? 'gal' : 'lbs',
-      densityLbsPerGal: newProduct.densityLbsPerGal,
     };
     
     onAddProduct(product);
     setShowAddModal(false);
     setNewProduct({ form: 'liquid', category: 'other', defaultUnit: 'gal' });
+    
+    // Navigate to the new product's detail page
+    onSelectProduct(product.id);
   };
 
   const activeFiltersCount = [filterCategory, filterForm, filterVendor, filterStock].filter(Boolean).length;
@@ -311,9 +313,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
       {/* Add Product Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-md m-4">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm m-4">
             <div className="px-6 py-4 border-b border-border">
-              <h3 className="font-semibold text-lg">Add New Product</h3>
+              <h3 className="font-semibold text-lg">Add Product</h3>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -327,48 +329,41 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                   autoFocus
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Form</label>
-                  <select
-                    value={newProduct.form || 'liquid'}
-                    onChange={(e) => setNewProduct({ 
-                      ...newProduct, 
-                      form: e.target.value as 'liquid' | 'dry',
-                      defaultUnit: e.target.value === 'liquid' ? 'gal' : 'lbs',
-                    })}
-                    className="w-full px-3 py-2 border border-input rounded-lg bg-background"
-                  >
-                    <option value="liquid">Liquid</option>
-                    <option value="dry">Dry</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
-                  <select
-                    value={newProduct.category || 'other'}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as ProductCategory })}
-                    className="w-full px-3 py-2 border border-input rounded-lg bg-background"
-                  >
-                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
+              <div>
+                <label className="block text-sm font-medium mb-2">Form</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="productForm"
+                      checked={newProduct.form === 'liquid'}
+                      onChange={() => setNewProduct({ 
+                        ...newProduct, 
+                        form: 'liquid',
+                        defaultUnit: 'gal',
+                      })}
+                      className="w-4 h-4 text-primary"
+                    />
+                    <Droplets className="w-4 h-4 text-blue-600" />
+                    <span>Liquid</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="productForm"
+                      checked={newProduct.form === 'dry'}
+                      onChange={() => setNewProduct({ 
+                        ...newProduct, 
+                        form: 'dry',
+                        defaultUnit: 'lbs',
+                      })}
+                      className="w-4 h-4 text-primary"
+                    />
+                    <Weight className="w-4 h-4 text-amber-600" />
+                    <span>Dry</span>
+                  </label>
                 </div>
               </div>
-              {newProduct.form === 'liquid' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Density (lbs/gal) - Optional</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={newProduct.densityLbsPerGal || ''}
-                    onChange={(e) => setNewProduct({ ...newProduct, densityLbsPerGal: Number(e.target.value) || undefined })}
-                    placeholder="e.g., 10.5"
-                    className="w-full px-3 py-2 border border-input rounded-lg bg-background"
-                  />
-                </div>
-              )}
             </div>
             <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
               <button 
@@ -382,7 +377,7 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                 disabled={!newProduct.name?.trim()}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
               >
-                Add Product
+                Create Product
               </button>
             </div>
           </div>
