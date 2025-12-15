@@ -128,10 +128,22 @@ export const useProductIntelligence = () => {
       });
 
       if (error) throw error;
+      
+      // Check if the response contains an error message
+      if (data?.error) {
+        const errorMsg = data.error;
+        if (errorMsg.includes('JavaScript')) {
+          toast.error('This page requires JavaScript to load. Try uploading the product label PDF instead.');
+        } else {
+          toast.error(errorMsg);
+        }
+        return null;
+      }
+      
       return data;
     } catch (error) {
       console.error('URL scraping failed:', error);
-      toast.error('Failed to scrape product URL. The page may not be accessible.');
+      toast.error('Failed to scrape product URL. Try uploading the product label PDF instead.');
       return null;
     } finally {
       setIsScraping(false);
