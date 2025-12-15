@@ -264,8 +264,8 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.price || ''}
-                  onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                  value={formData.price ?? ''}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value === '' ? undefined : Number(e.target.value) })}
                   placeholder="0.00"
                   className="flex-1 px-3 py-2 border border-input rounded-lg text-sm bg-background"
                 />
