@@ -1,23 +1,17 @@
 import React, { useMemo } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import type { Season, Product } from '@/types/farm';
-import type { ProductPurpose } from '@/types/productIntelligence';
-import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
-import type { LiquidUnit, DryUnit } from '@/types/farm';
-import { RolesNeededQueue } from './RolesNeededQueue';
+import { formatCurrency, formatNumber, calculateCropCosts, calculateCropNutrientSummary } from '@/lib/calculations';
+import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 
 interface DashboardViewProps {
   season: Season | null;
   products: Product[];
-  purposes?: Record<string, ProductPurpose>;
-  onNavigateToProduct?: (productId: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ 
   season, 
   products, 
-  purposes = {},
-  onNavigateToProduct,
 }) => {
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
@@ -27,26 +21,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     
     season.crops.forEach(crop => {
       totalAcres += crop.totalAcres;
-      
-      crop.applications.forEach(app => {
-        const product = products.find(p => p.id === app.productId);
-        const tier = crop.tiers.find(t => t.id === app.tierId);
-        if (!product || !tier) return;
-        
-        const tierAcres = crop.totalAcres * (tier.percentage / 100);
-        let costPerAcre = 0;
-        
-        if (product.form === 'liquid') {
-          const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-          costPerAcre = gallonsPerAcre * product.price;
-        } else {
-          const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-          const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-          costPerAcre = poundsPerAcre * pricePerPound;
-        }
-        
-        totalCost += costPerAcre * tierAcres;
-      });
+      const costs = calculateCropCosts(crop, products);
+      totalCost += costs.totalCost;
     });
     
     return {
@@ -61,48 +37,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!season) return [];
     
     return season.crops.map(crop => {
-      let cropCost = 0;
-      
-      crop.applications.forEach(app => {
-        const product = products.find(p => p.id === app.productId);
-        const tier = crop.tiers.find(t => t.id === app.tierId);
-        if (!product || !tier) return;
-        
-        const tierAcres = crop.totalAcres * (tier.percentage / 100);
-        let costPerAcre = 0;
-        
-        if (product.form === 'liquid') {
-          const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-          costPerAcre = gallonsPerAcre * product.price;
-        } else {
-          const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-          const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-          costPerAcre = poundsPerAcre * pricePerPound;
-        }
-        
-        cropCost += costPerAcre * tierAcres;
-      });
+      const costs = calculateCropCosts(crop, products);
+      const nutrients = calculateCropNutrientSummary(crop, products);
       
       return {
         name: crop.name,
         acres: crop.totalAcres,
-        totalCost: cropCost,
-        costPerAcre: crop.totalAcres > 0 ? cropCost / crop.totalAcres : 0,
+        totalCost: costs.totalCost,
+        costPerAcre: costs.costPerAcre,
         applicationCount: crop.applicationTimings.length,
+        nutrients,
       };
     });
-  }, [season, products]);
-
-  // Get products used in the current season's plan
-  const productsInPlan = useMemo(() => {
-    if (!season) return [];
-    const productIds = new Set<string>();
-    season.crops.forEach(crop => {
-      crop.applications.forEach(app => {
-        productIds.add(app.productId);
-      });
-    });
-    return products.filter(p => productIds.has(p.id));
   }, [season, products]);
 
   // Get comparative indicator for crop cost/acre vs farm average
@@ -124,7 +70,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="bg-card rounded-xl p-8 shadow-sm border border-border mb-8">
         <div className="text-center">
           <p className="text-4xl font-bold text-primary mb-1">
-            {formatCurrency(stats.totalCost, 0)}
+            {formatCurrency(stats.totalCost)}
           </p>
           <p className="text-sm text-muted-foreground mb-4">
             Total Plan Cost ({season?.year || new Date().getFullYear()})
@@ -137,64 +83,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Two-column layout for queue and table */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Roles Needed Queue */}
-        <div className="lg:col-span-1">
-          {productsInPlan.length > 0 && onNavigateToProduct && (
-            <RolesNeededQueue
-              products={productsInPlan}
-              purposes={purposes}
-              onSelectProduct={onNavigateToProduct}
-              maxVisible={6}
-            />
-          )}
+      {/* Crop Summary Table */}
+      <div className="bg-card rounded-xl shadow-sm border border-border mb-8">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="font-semibold text-foreground">Crop Cost Summary</h3>
         </div>
-
-        {/* Right column - Crop Summary Table */}
-        <div className="lg:col-span-2 bg-card rounded-xl shadow-sm border border-border">
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="font-semibold text-foreground">Crop Cost Summary</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Passes</th>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
+                <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Passes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {cropSummaries.map((crop, idx) => (
+                <tr key={idx} className="hover:bg-muted/30">
+                  <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
+                      {getComparativeIndicator(crop.costPerAcre)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">{crop.applicationCount}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {cropSummaries.map((crop, idx) => (
-                  <tr key={idx} className="hover:bg-muted/30">
-                    <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
-                        {getComparativeIndicator(crop.costPerAcre)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost, 0)}</td>
-                    <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
-                    <td className="px-6 py-4 text-right text-muted-foreground">{crop.applicationCount}</td>
-                  </tr>
-                ))}
-                {cropSummaries.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                      No crops configured. Add crops in the Crop Plans section.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+              {cropSummaries.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                    No crops configured. Add crops in the Crop Plans section.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* Nutrient Summary Cards */}
+      {cropSummaries.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-foreground mb-4">Nutrient Summary (lbs/acre)</h3>
+          <div className="grid grid-cols-3 gap-4">
+            {cropSummaries.map((crop, idx) => (
+              <NutrientSummaryCompact
+                key={idx}
+                nutrientSummary={crop.nutrients}
+                cropName={crop.name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
