@@ -133,7 +133,13 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                 const isEditing = editingId === offering.id;
 
                 return (
-                  <tr key={offering.id} className="hover:bg-muted/30">
+                  <tr
+                    key={offering.id}
+                    className={`hover:bg-muted/30 ${isEditing ? '' : 'cursor-pointer'}`}
+                    onClick={() => {
+                      if (!isEditing) startEdit(offering);
+                    }}
+                  >
                     <td className="px-3 py-2">
                       {isEditing ? (
                         <select
