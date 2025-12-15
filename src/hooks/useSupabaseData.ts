@@ -58,6 +58,10 @@ const dbProductMasterToProductMaster = (row: any): ProductMaster => ({
   labelFileName: row.label_file_name,
   sdsFileName: row.sds_file_name,
   reorderPoint: row.reorder_point ? Number(row.reorder_point) : undefined,
+  // Procurement
+  productType: row.product_type || undefined,
+  isBidEligible: row.is_bid_eligible ?? false,
+  commoditySpecId: row.commodity_spec_id || undefined,
 });
 
 const dbVendorOfferingToVendorOffering = (row: any): VendorOffering => ({
@@ -94,6 +98,7 @@ const dbInventoryToInventory = (row: any): InventoryItem => ({
 
 const dbCommoditySpecToCommoditySpec = (row: any): CommoditySpec => ({
   id: row.id,
+  productId: row.product_id || undefined,
   name: row.name,
   description: row.description,
   unit: row.unit || 'ton',
@@ -206,36 +211,33 @@ export function useSupabaseData(user: User | null) {
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
 
-      // Sync: any dry fertilizer products should exist as a commodity spec
-      // (Our DB doesn't store productType/isBidEligible flags yet, so we infer from category/form.)
-       const commodityProducts = productMasters.filter((p) => {
-         const cat = String(p.category || '');
-         return (
-           cat === 'fertilizer-dry' ||
-           (cat.startsWith('fertilizer') && (p.defaultUnit === 'ton' || p.defaultUnit === 'lbs'))
-         );
-       });
+      // Sync: any product marked Commodity or Bid-Eligible should exist as a commodity spec
+      const commodityProducts = productMasters.filter(
+        (p) => p.productType === 'commodity' || p.isBidEligible
+      );
 
+      const existingByProductId = new Set(
+        commoditySpecs.flatMap((s) => (s.productId ? [s.productId] : []))
+      );
       const existingByName = new Set(
         commoditySpecs.map((s) => (s.name || '').trim().toLowerCase()).filter(Boolean)
       );
 
       const specsToCreate = commodityProducts
-        .filter((p) => !existingByName.has(p.name.trim().toLowerCase()))
-        .map((p) => {
-          const unit: 'ton' | 'gal' | 'lbs' = 'ton';
-          const category: 'fertilizer' | 'chemical' = 'fertilizer';
-
-          return {
-            id: crypto.randomUUID(),
-            user_id: user.id,
-            name: p.name,
-            description: undefined,
-            unit,
-            category,
-            analysis: (p.analysis ?? null) as any,
-          };
-        });
+        .filter((p) => {
+          const nameKey = p.name.trim().toLowerCase();
+          return !existingByProductId.has(p.id) && !existingByName.has(nameKey);
+        })
+        .map((p) => ({
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          product_id: p.id,
+          name: p.name,
+          description: undefined,
+          unit: 'ton' as const,
+          category: 'fertilizer' as const,
+          analysis: (p.analysis ?? null) as any,
+        }));
 
       if (specsToCreate.length > 0) {
         const { data: inserted, error: insertError } = await supabase
@@ -374,6 +376,10 @@ export function useSupabaseData(user: User | null) {
         label_file_name: product.labelFileName,
         sds_file_name: product.sdsFileName,
         reorder_point: product.reorderPoint,
+        // Procurement
+        product_type: product.productType ?? null,
+        is_bid_eligible: product.isBidEligible ?? false,
+        commodity_spec_id: product.commoditySpecId ?? null,
       });
       if (error) console.error('Error upserting product:', error);
     }
@@ -459,6 +465,7 @@ export function useSupabaseData(user: User | null) {
       const { error } = await supabase.from('commodity_specs').upsert({
         id: spec.id,
         user_id: user.id,
+        product_id: spec.productId ?? null,
         name: spec.name,
         description: spec.description,
         unit: spec.unit,
