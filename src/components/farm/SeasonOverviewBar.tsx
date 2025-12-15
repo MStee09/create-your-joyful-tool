@@ -38,7 +38,11 @@ const StatusBadge: React.FC<{ status: SeasonSummary['status'] }> = ({ status }) 
   );
 };
 
-const IntensityDots: React.FC<{ intensity: number; label?: string }> = ({ intensity, label }) => {
+const IntensityDots: React.FC<{ 
+  intensity: number; 
+  label?: string;
+  breakdown?: { passScore: number; selectivityScore: number; lateScore: number; costScore: number };
+}> = ({ intensity, label, breakdown }) => {
   const filled = Math.round(intensity);
   return (
     <TooltipProvider>
@@ -60,10 +64,30 @@ const IntensityDots: React.FC<{ intensity: number; label?: string }> = ({ intens
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-xs">
-          <p className="text-xs">
+        <TooltipContent side="bottom" className="max-w-xs space-y-2">
+          <p className="text-xs font-medium">
             Intensity reflects how many passes, how selective, and how late in the season a crop is actively managed.
           </p>
+          {breakdown && (
+            <div className="space-y-1 pt-1 border-t border-border/50">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Passes</span>
+                <span className="font-medium">{Math.round(breakdown.passScore * 100)}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Selectivity</span>
+                <span className="font-medium">{Math.round(breakdown.selectivityScore * 100)}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Late-season</span>
+                <span className="font-medium">{Math.round(breakdown.lateScore * 100)}%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Cost deviation</span>
+                <span className="font-medium">{Math.round(breakdown.costScore * 100)}%</span>
+              </div>
+            </div>
+          )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -229,6 +253,7 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
             <IntensityDots 
               intensity={summary.programIntensity} 
               label={summary.intensityLabel || 'Intensity'} 
+              breakdown={summary.intensityBreakdown}
             />
           </div>
         </div>
