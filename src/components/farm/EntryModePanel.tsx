@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Trash2, Droplet, Weight } from 'lucide-react';
-import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
+import { X, Trash2, Droplet, Weight, ChevronDown } from 'lucide-react';
+import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor, TierLabel } from '@/types/farm';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
-import { ACRES_PRESETS, getApplicationAcresPercentage } from '@/lib/cropCalculations';
+import { ACRES_PRESETS, getApplicationAcresPercentage, calculateAutoTier, getTierDisplayLabel } from '@/lib/cropCalculations';
 import {
   Select,
   SelectContent,
@@ -40,6 +40,8 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
   );
   const [role, setRole] = useState(application?.role || '');
   const [showCustomAcres, setShowCustomAcres] = useState(false);
+  const [tierOverride, setTierOverride] = useState<TierLabel | undefined>(application?.tierOverride);
+  const [showTierOverride, setShowTierOverride] = useState(!!application?.tierOverride);
 
   const product = products.find(p => p.id === productId);
 
@@ -87,8 +89,11 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
 
   const acresTreated = crop.totalAcres * (acresPercentage / 100);
   const totalCost = costPerAcre * acresTreated;
+  const wholeFieldCostPerAcre = costPerAcre * (acresPercentage / 100);
 
-  // Available rate units based on product form
+  // Auto-tier calculation
+  const tierAuto = calculateAutoTier(acresPercentage);
+  const tierFinal = tierOverride ?? tierAuto;
   const rateUnits = product?.form === 'liquid' 
     ? ['oz', 'qt', 'gal'] 
     : ['oz', 'lbs', 'g', 'ton'];
@@ -124,6 +129,8 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
       rate,
       rateUnit,
       acresPercentage,
+      tierAuto,
+      tierOverride,
       role: role.trim() || undefined,
     };
     onSave(updated);
@@ -266,7 +273,44 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
               <span className="text-muted-foreground">
                 {formatNumber(acresPercentage, 0)}% = {formatNumber(acresTreated, 0)} acres
               </span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                tierFinal === 'core' ? 'bg-primary/10 text-primary' :
+                tierFinal === 'selective' ? 'bg-amber-500/10 text-amber-600' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                {getTierDisplayLabel(tierFinal)}
+              </span>
             </div>
+
+            {/* Tier Override */}
+            {showTierOverride ? (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs text-muted-foreground">Override:</span>
+                <select
+                  value={tierOverride || ''}
+                  onChange={(e) => setTierOverride(e.target.value as TierLabel || undefined)}
+                  className="flex-1 px-2 py-1 text-xs bg-background border border-input rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Auto ({getTierDisplayLabel(tierAuto)})</option>
+                  <option value="core">Core</option>
+                  <option value="selective">Selective</option>
+                  <option value="trial">Trial</option>
+                </select>
+                <button
+                  onClick={() => { setShowTierOverride(false); setTierOverride(undefined); }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowTierOverride(true)}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Override tier
+              </button>
+            )}
           </div>
         </div>
 
@@ -292,6 +336,13 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
             <span className="font-medium text-primary">{formatCurrency(costPerAcre)}</span>
           </div>
           <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              Whole-field equivalent:
+              <span className="text-xs text-muted-foreground/70" title="Treated cost × % acres">(?)</span>
+            </span>
+            <span className="font-medium text-foreground">{formatCurrency(wholeFieldCostPerAcre)}/ac</span>
+          </div>
+          <div className="flex justify-between text-sm border-t border-border pt-2 mt-2">
             <span className="text-muted-foreground">Total ({formatNumber(acresTreated, 0)} ac):</span>
             <span className="font-semibold text-foreground">{formatCurrency(totalCost)}</span>
           </div>

@@ -1,6 +1,23 @@
-import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType } from '@/types/farm';
+import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType, TierLabel } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
+
+// Auto-tier calculation based on 80/40 thresholds
+export const calculateAutoTier = (treatedPercent: number): TierLabel => {
+  if (treatedPercent >= 80) return 'core';
+  if (treatedPercent >= 40) return 'selective';
+  return 'trial';
+};
+
+// Get final tier (override takes precedence)
+export const getTierFinal = (app: Application): TierLabel => {
+  return app.tierOverride ?? app.tierAuto ?? calculateAutoTier(app.acresPercentage ?? 100);
+};
+
+// Tier display label (capitalized)
+export const getTierDisplayLabel = (tier: TierLabel): string => {
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+};
 
 export interface CoverageGroup {
   acresPercentage: number;
@@ -153,9 +170,9 @@ export const calculateApplicationNutrients = (
   return result;
 };
 
-// Get tier label based on acres percentage
+// Get tier label based on acres percentage (updated to 80/40 thresholds)
 const getTierLabel = (acresPercentage: number): CoverageGroup['tierLabel'] => {
-  if (acresPercentage >= 75) return 'Core';
+  if (acresPercentage >= 80) return 'Core';
   if (acresPercentage >= 40) return 'Selective';
   return 'Trial';
 };
@@ -413,10 +430,10 @@ const isLateSeasonTiming = (timing: ApplicationTiming, cropType: CropType): bool
          lateStages.includes(timing.growthStageEnd || '');
 };
 
-// Classify pass selectivity: trial (≤30%), selective (31-74%), core (≥75%)
+// Classify pass selectivity: trial (<40%), selective (40-79%), core (≥80%)
 const getPassSelectivityType = (avgAcresPercentage: number): 'trial' | 'selective' | 'core' => {
-  if (avgAcresPercentage <= 30) return 'trial';
-  if (avgAcresPercentage < 75) return 'selective';
+  if (avgAcresPercentage < 40) return 'trial';
+  if (avgAcresPercentage < 80) return 'selective';
   return 'core';
 };
 

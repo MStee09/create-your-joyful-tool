@@ -410,7 +410,7 @@ export const calculatePlannedUsage = (
     totalAcres: number; 
     tiers: Array<{ id: string; percentage: number }>;
     applicationTimings: Array<{ id: string; name: string }>;
-    applications: Array<{ productId: string; timingId: string; tierId: string; rate: number; rateUnit: string }>;
+    applications: Array<{ productId: string; timingId: string; tierId?: string; rate: number; rateUnit: string; acresPercentage?: number }>;
     seedTreatments: Array<{ productId: string; ratePerCwt: number; rateUnit: string; plantingRateLbsPerAcre: number }>;
   }> } | null,
   products: Product[]
@@ -425,8 +425,15 @@ export const calculatePlannedUsage = (
       const product = products.find(p => p.id === app.productId);
       if (!product) return;
       
-      const tier = crop.tiers.find(t => t.id === app.tierId);
-      const tierAcres = tier ? crop.totalAcres * (tier.percentage / 100) : crop.totalAcres;
+      // Use acresPercentage if available, fall back to tier percentage
+      let acresMultiplier = 1;
+      if (app.acresPercentage !== undefined) {
+        acresMultiplier = app.acresPercentage / 100;
+      } else if (app.tierId) {
+        const tier = crop.tiers.find(t => t.id === app.tierId);
+        acresMultiplier = tier ? tier.percentage / 100 : 1;
+      }
+      const treatedAcres = crop.totalAcres * acresMultiplier;
       const timing = crop.applicationTimings.find(t => t.id === app.timingId);
       
       let quantityPerAcre = 0;
@@ -436,7 +443,7 @@ export const calculatePlannedUsage = (
         quantityPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
       }
       
-      const totalQuantity = quantityPerAcre * tierAcres;
+      const totalQuantity = quantityPerAcre * treatedAcres;
       const unit: 'gal' | 'lbs' = product.form === 'liquid' ? 'gal' : 'lbs';
       
       if (!usageMap.has(app.productId)) {
@@ -453,7 +460,7 @@ export const calculatePlannedUsage = (
       item.usages.push({
         cropName: crop.name,
         timingName: timing?.name || 'Unknown',
-        acresTreated: tierAcres,
+        acresTreated: treatedAcres,
         quantityNeeded: totalQuantity,
       });
     });
