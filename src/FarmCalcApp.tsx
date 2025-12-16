@@ -84,13 +84,8 @@ import { SeedTreatmentCalculator } from './components/SeedTreatmentCalculator';
 import { NutrientSummaryPanel, NutrientSummaryCompact } from './components/NutrientSummary';
 import { EnhancedExportView } from './components/EnhancedExportView';
 
-// Import data sync hooks (only used when authenticated)
-import {
-  useSyncSeasons,
-  useSyncProducts,
-  useSyncVendors,
-  useSyncInventory,
-} from './lib/useDataSync';
+// Import Supabase data hook
+import { useSupabaseData } from './hooks/useSupabaseData';
 
 // Import initial data from external file
 import { initialState as defaultInitialState, initialProducts, initialVendors } from './initialData';
@@ -1147,153 +1142,158 @@ const SettingsView: React.FC<{
 };
 
 // ============================================================================
-// MAIN APP CONTENT (Uses hooks for data)
+// ============================================================================
+// MAIN APP CONTENT (uses Supabase when authenticated)
 // ============================================================================
 
 const AppContent: React.FC = () => {
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Use Supabase data when authenticated
+  const supabaseData = useSupabaseData(user);
+  
+  // Destructure Supabase data and handlers
+  const {
+    seasons,
+    vendors,
+    productMasters,
+    vendorOfferings,
+    inventory,
+    commoditySpecs,
+    bidEvents,
+    vendorQuotes,
+    awards,
+    priceBook,
+    currentSeasonId,
+    loading: supabaseLoading,
+    error: supabaseError,
+    setCurrentSeasonId,
+    updateSeasons,
+    updateVendors,
+    updateProductMasters,
+    updateVendorOfferings,
+    updateInventory,
+    updateCommoditySpecs,
+    updateBidEvents,
+    updateVendorQuotes,
+    updateAwards,
+    updatePriceBook,
+    refetch,
+  } = supabaseData;
 
-  // Use localStorage for state with migration
-  const [state, setState] = useState<AppState>(() => {
-    const STORAGE_KEY = 'farmcalc-state-v2';
-    const OLD_STORAGE_KEY = 'farmcalc-state';
-    
-    try {
-      // Try new key first
-      let saved = localStorage.getItem(STORAGE_KEY);
-      
-      // If no v2 data, check old key and migrate
-      if (!saved) {
-        const oldSaved = localStorage.getItem(OLD_STORAGE_KEY);
-        if (oldSaved) {
-          saved = oldSaved;
-          console.log('Migrating from old storage key');
-        }
-      }
-      
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const migrated = migrateAppState(parsed);
-        
-        // Only remove old key AFTER successful migration and save to new key
-        if (localStorage.getItem(OLD_STORAGE_KEY)) {
-          // Save to new key first
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-          // Then remove old key
-          localStorage.removeItem(OLD_STORAGE_KEY);
-          console.log('Migration complete, old key removed');
-        }
-        
-        return migrated;
-      }
-    } catch (e) {
-      console.error('Failed to parse saved state, keeping existing data:', e);
-      // DON'T return default state on parse error - try to preserve what we can
-      // Instead, return empty-ish state that won't overwrite storage
-    }
-    
-    // Default state - only used for fresh installs
-    console.log('No saved state found, using defaults');
-    return migrateAppState(defaultInitialState);
-  });
+  // Show loading state while Supabase data is loading
+  if (supabaseLoading) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-stone-600">Loading your data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (supabaseError) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
+          <div className="text-red-500 mb-4">
+            <X className="w-12 h-12 mx-auto" />
+          </div>
+          <h2 className="text-xl font-semibold text-stone-800 mb-2">Error Loading Data</h2>
+          <p className="text-stone-600 mb-4">{supabaseError}</p>
+          <button
+            onClick={refetch}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Build state object for compatibility with existing code
+  const state = {
+    seasons,
+    vendors,
+    productMasters,
+    vendorOfferings,
+    inventory,
+    commoditySpecs,
+    bidEvents,
+    vendorQuotes,
+    awards,
+    priceBook,
+    currentSeasonId,
+  };
 
   // Get legacy products for backward-compatible components
-  const legacyProducts = useMemo(() => 
-    getProductsAsLegacy(state.productMasters || [], state.vendorOfferings || []),
-    [state.productMasters, state.vendorOfferings]
-  );
+  const legacyProducts = getProductsAsLegacy(productMasters || [], vendorOfferings || []);
 
-  // Save to localStorage - strip large binary data (PDFs) to avoid quota issues
-  useEffect(() => {
-    // Create a copy without labelData and sdsData (they're too large for localStorage)
-    const stateToSave = {
-      ...state,
-      productMasters: state.productMasters?.map(p => ({
-        ...p,
-        labelData: undefined,  // Strip PDF data
-        sdsData: undefined,    // Strip PDF data
-        // Keep the filenames so we know files existed
-      })) || [],
-    };
-    
-    try {
-      localStorage.setItem('farmcalc-state-v2', JSON.stringify(stateToSave));
-    } catch (e) {
-      if (e instanceof Error && e.name === 'QuotaExceededError') {
-        console.warn('localStorage quota exceeded, attempting to clear old data...');
-        // Try to save without any extra data
-        try {
-          localStorage.setItem('farmcalc-state-v2', JSON.stringify(stateToSave));
-        } catch {
-          console.error('Still cannot save to localStorage after cleanup');
-        }
-      }
-    }
-  }, [state]);
-
-  const currentSeason = state.seasons.find(s => s.id === state.currentSeasonId) || null;
+  const currentSeason = seasons.find(s => s.id === currentSeasonId) || null;
 
   const handleSeasonChange = (seasonId: string) => {
-    setState(prev => ({ ...prev, currentSeasonId: seasonId }));
+    setCurrentSeasonId(seasonId);
   };
 
-  const handleUpdateSeason = (updatedSeason: Season) => {
-    setState(prev => ({
-      ...prev,
-      seasons: prev.seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s),
-    }));
+  const handleUpdateSeason = async (updatedSeason: Season) => {
+    const newSeasons = seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s);
+    await updateSeasons(newSeasons);
   };
 
-  const handleAddSeason = (season: Season) => {
-    setState(prev => ({
-      ...prev,
-      seasons: [...prev.seasons, season],
-      currentSeasonId: season.id,
-    }));
+  const handleAddSeason = async (season: Season) => {
+    await updateSeasons([...seasons, season]);
+    setCurrentSeasonId(season.id);
   };
 
-  const handleDeleteSeason = (seasonId: string) => {
-    setState(prev => {
-      const newSeasons = prev.seasons.filter(s => s.id !== seasonId);
-      return {
-        ...prev,
-        seasons: newSeasons,
-        currentSeasonId: newSeasons[0]?.id || null,
-      };
-    });
+  const handleDeleteSeason = async (seasonId: string) => {
+    const newSeasons = seasons.filter(s => s.id !== seasonId);
+    await updateSeasons(newSeasons);
+    if (currentSeasonId === seasonId) {
+      setCurrentSeasonId(newSeasons[0]?.id || null);
+    }
   };
 
-  const handleUpdateProducts = (products: Product[]) => {
-    setState(prev => ({ ...prev, products }));
+  const handleUpdateProductMasters = async (newProductMasters: ProductMaster[]) => {
+    await updateProductMasters(newProductMasters);
   };
 
-  const handleUpdateProductMasters = (productMasters: ProductMaster[]) => {
-    setState(prev => ({ ...prev, productMasters }));
+  const handleUpdateVendorOfferings = async (newOfferings: VendorOffering[]) => {
+    await updateVendorOfferings(newOfferings);
   };
 
-  const handleUpdateVendorOfferings = (vendorOfferings: VendorOffering[]) => {
-    setState(prev => ({ ...prev, vendorOfferings }));
+  const handleUpdateVendors = async (newVendors: Vendor[]) => {
+    await updateVendors(newVendors);
   };
 
-  const handleUpdateVendors = (vendors: Vendor[]) => {
-    setState(prev => ({ ...prev, vendors }));
+  const handleUpdateInventory = async (newInventory: InventoryItem[]) => {
+    await updateInventory(newInventory);
   };
 
-  const handleUpdateInventory = (inventory: InventoryItem[]) => {
-    setState(prev => ({ ...prev, inventory }));
-  };
-
-  const handleResetData = () => {
-    localStorage.removeItem('farmcalc-state-v2');
-    setState(migrateAppState(defaultInitialState));
+  const handleResetData = async () => {
+    // Clear all data by updating with empty arrays
+    await Promise.all([
+      updateSeasons([]),
+      updateVendors([]),
+      updateProductMasters([]),
+      updateVendorOfferings([]),
+      updateInventory([]),
+      updateCommoditySpecs([]),
+      updateBidEvents([]),
+      updateVendorQuotes([]),
+      updateAwards([]),
+      updatePriceBook([]),
+    ]);
+    setCurrentSeasonId(null);
   };
 
   const handleSync = async () => {
     setIsSyncing(true);
-    // Placeholder for cloud sync
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await refetch();
     setIsSyncing(false);
   };
 
@@ -1330,7 +1330,7 @@ const AppContent: React.FC = () => {
             onUpdateProductMasters={handleUpdateProductMasters}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onUpdateInventory={handleUpdateInventory}
-            onUpdateSpecs={(specs) => setState(prev => ({ ...prev, commoditySpecs: specs }))}
+            onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
           />
         );
@@ -1370,7 +1370,7 @@ const AppContent: React.FC = () => {
           <CommoditySpecsView
             commoditySpecs={state.commoditySpecs || []}
             productMasters={state.productMasters || []}
-            onUpdateSpecs={(specs) => setState(prev => ({ ...prev, commoditySpecs: specs }))}
+            onUpdateSpecs={updateCommoditySpecs}
             onUpdateProducts={handleUpdateProductMasters}
           />
         );
@@ -1382,7 +1382,7 @@ const AppContent: React.FC = () => {
             commoditySpecs={state.commoditySpecs || []}
             productMasters={state.productMasters || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdateEvents={(events) => setState(prev => ({ ...prev, bidEvents: events }))}
+            onUpdateEvents={updateBidEvents}
             onSelectEvent={(eventId) => setActiveView(`bid-event-${eventId}`)}
           />
         );
@@ -1395,7 +1395,7 @@ const AppContent: React.FC = () => {
             bidEvents={state.bidEvents || []}
             commoditySpecs={state.commoditySpecs || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdatePriceBook={(priceBook) => setState(prev => ({ ...prev, priceBook }))}
+            onUpdatePriceBook={updatePriceBook}
           />
         );
       case 'exports':
@@ -1432,17 +1432,15 @@ const AppContent: React.FC = () => {
                 awards={state.awards || []}
                 priceBook={state.priceBook || []}
                 season={currentSeason}
-                onUpdateEvent={(updatedEvent) => {
-                  setState(prev => ({
-                    ...prev,
-                    bidEvents: (prev.bidEvents || []).map(e => 
-                      e.id === updatedEvent.id ? updatedEvent : e
-                    ),
-                  }));
+                onUpdateEvent={async (updatedEvent) => {
+                  const newEvents = bidEvents.map(e => 
+                    e.id === updatedEvent.id ? updatedEvent : e
+                  );
+                  await updateBidEvents(newEvents);
                 }}
-                onUpdateQuotes={(quotes) => setState(prev => ({ ...prev, vendorQuotes: quotes }))}
-                onUpdateAwards={(awards) => setState(prev => ({ ...prev, awards: awards }))}
-                onUpdatePriceBook={(priceBook) => setState(prev => ({ ...prev, priceBook }))}
+                onUpdateQuotes={updateVendorQuotes}
+                onUpdateAwards={updateAwards}
+                onUpdatePriceBook={updatePriceBook}
                 onBack={() => setActiveView('bid-events')}
               />
             );
