@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef, useCallback } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -1150,6 +1150,11 @@ const AppContent: React.FC = () => {
   const { user, signOut } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState<string[]>([]);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationComplete, setMigrationComplete] = useState(false);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
@@ -1183,6 +1188,43 @@ const AppContent: React.FC = () => {
     refetch,
   } = supabaseData;
 
+  // Check for localStorage data to migrate
+  const { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } = require('./lib/migrateToSupabase');
+  
+  const localDataSummary = getLocalStorageDataSummary();
+  const hasDataToMigrate = hasLocalStorageData() && !migrationComplete;
+  const supabaseIsEmpty = !supabaseLoading && seasons.length === 0 && productMasters.length === 0 && vendors.length === 0;
+
+  // Auto-show migration panel if Supabase is empty but localStorage has data
+  useEffect(() => {
+    if (supabaseIsEmpty && hasDataToMigrate && !showMigration) {
+      setShowMigration(true);
+    }
+  }, [supabaseIsEmpty, hasDataToMigrate]);
+
+  const handleMigrate = async () => {
+    if (!user) return;
+    
+    setIsMigrating(true);
+    setMigrationProgress([]);
+    setMigrationError(null);
+    
+    const result = await migrateToSupabase(user, (msg: string) => {
+      setMigrationProgress(prev => [...prev, msg]);
+    });
+    
+    if (result.success) {
+      setMigrationComplete(true);
+      setShowMigration(false);
+      // Refresh data from Supabase
+      await refetch();
+    } else {
+      setMigrationError(result.error || 'Migration failed');
+    }
+    
+    setIsMigrating(false);
+  };
+
   // Show loading state while Supabase data is loading
   if (supabaseLoading) {
     return (
@@ -1190,6 +1232,98 @@ const AppContent: React.FC = () => {
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-stone-600">Loading your data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show migration panel if there's data to migrate
+  if (showMigration && hasDataToMigrate) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg max-w-lg w-full p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Cloud className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-stone-800">Migrate to Cloud</h2>
+              <p className="text-sm text-stone-500">Transfer your local data to secure cloud storage</p>
+            </div>
+          </div>
+          
+          {localDataSummary && (
+            <div className="bg-stone-50 rounded-lg p-4 mb-6">
+              <p className="text-sm font-medium text-stone-700 mb-3">Data to migrate:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Seasons:</span>
+                  <span className="font-medium">{localDataSummary.seasons}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Vendors:</span>
+                  <span className="font-medium">{localDataSummary.vendors}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Products:</span>
+                  <span className="font-medium">{localDataSummary.products}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Offerings:</span>
+                  <span className="font-medium">{localDataSummary.vendorOfferings}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Inventory:</span>
+                  <span className="font-medium">{localDataSummary.inventory}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Specs:</span>
+                  <span className="font-medium">{localDataSummary.commoditySpecs}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {migrationProgress.length > 0 && (
+            <div className="bg-stone-900 rounded-lg p-4 mb-6 max-h-48 overflow-y-auto font-mono text-xs">
+              {migrationProgress.map((msg, i) => (
+                <div key={i} className="text-emerald-400">{msg}</div>
+              ))}
+            </div>
+          )}
+          
+          {migrationError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-700">{migrationError}</p>
+            </div>
+          )}
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowMigration(false)}
+              disabled={isMigrating}
+              className="flex-1 px-4 py-2 border border-stone-300 text-stone-700 rounded-lg hover:bg-stone-50 disabled:opacity-50"
+            >
+              Skip for Now
+            </button>
+            <button
+              onClick={handleMigrate}
+              disabled={isMigrating}
+              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isMigrating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Migrating...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Migrate Data
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     );
