@@ -14,8 +14,22 @@ import type {
   Product,
   AppState
 } from '@/types';
-import { migrateAppState, migrateProducts } from './dataMigration';
-import { generateId, inferProductCategory } from './calculations';
+import { migrateAppState } from './dataMigration';
+
+// Generate proper UUID
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Check if a string is a valid UUID
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
 
 // Read localStorage data
 export const getLocalStorageData = (): AppState | null => {
@@ -48,12 +62,33 @@ export const migrateToSupabase = async (
   }
 
   try {
-    // 1. Migrate Vendors
+    // ID mapping tables (old ID -> new UUID)
+    const vendorIdMap = new Map<string, string>();
+    const productIdMap = new Map<string, string>();
+    const seasonIdMap = new Map<string, string>();
+    const specIdMap = new Map<string, string>();
+    const bidEventIdMap = new Map<string, string>();
+    const quoteIdMap = new Map<string, string>();
+    const tierIdMap = new Map<string, string>();
+    const timingIdMap = new Map<string, string>();
+
+    // Helper to get or create UUID for an ID
+    const getNewId = (oldId: string, idMap: Map<string, string>): string => {
+      if (!oldId) return generateUUID();
+      if (isValidUUID(oldId)) return oldId; // Already a valid UUID
+      if (idMap.has(oldId)) return idMap.get(oldId)!;
+      const newId = generateUUID();
+      idMap.set(oldId, newId);
+      return newId;
+    };
+
+    // 1. Migrate Vendors first (products reference vendors)
     onProgress?.('Migrating vendors...');
     const vendors = data.vendors || [];
     for (const vendor of vendors) {
+      const newId = getNewId(vendor.id, vendorIdMap);
       const { error } = await supabase.from('vendors').upsert([{
-        id: vendor.id,
+        id: newId,
         user_id: user.id,
         name: vendor.name,
         contact_email: vendor.contactEmail || null,
@@ -71,12 +106,37 @@ export const migrateToSupabase = async (
     }
     onProgress?.(`Migrated ${vendors.length} vendors`);
 
-    // 2. Migrate Product Masters
+    // 2. Migrate Commodity Specs (products may reference specs)
+    onProgress?.('Migrating commodity specs...');
+    const commoditySpecs = data.commoditySpecs || [];
+    for (const spec of commoditySpecs) {
+      const newId = getNewId(spec.id, specIdMap);
+      const { error } = await supabase.from('commodity_specs').upsert([{
+        id: newId,
+        user_id: user.id,
+        product_id: null, // Will be updated after products are migrated
+        name: spec.name || spec.specName,
+        description: spec.description || null,
+        unit: spec.unit || spec.uom || 'ton',
+        analysis: (spec.analysis || null) as any,
+        category: spec.category || null,
+      }]);
+      if (error) {
+        console.error('Commodity spec upsert error:', error);
+        throw new Error(`Failed to migrate commodity spec: ${error.message}`);
+      }
+    }
+    onProgress?.(`Migrated ${commoditySpecs.length} commodity specs`);
+
+    // 3. Migrate Product Masters
     onProgress?.('Migrating products...');
     const productMasters = data.productMasters || [];
     for (const product of productMasters) {
+      const newId = getNewId(product.id, productIdMap);
+      const newSpecId = product.commoditySpecId ? getNewId(product.commoditySpecId, specIdMap) : null;
+      
       const { error } = await supabase.from('product_masters').upsert([{
-        id: product.id,
+        id: newId,
         user_id: user.id,
         name: product.name,
         category: product.category || null,
@@ -92,7 +152,7 @@ export const migrateToSupabase = async (
         reorder_point: product.reorderPoint || null,
         product_type: product.productType || null,
         is_bid_eligible: product.isBidEligible ?? false,
-        commodity_spec_id: product.commoditySpecId || null,
+        commodity_spec_id: newSpecId,
       }]);
       if (error) {
         console.error('Product upsert error:', error);
@@ -101,15 +161,19 @@ export const migrateToSupabase = async (
     }
     onProgress?.(`Migrated ${productMasters.length} products`);
 
-    // 3. Migrate Vendor Offerings
+    // 4. Migrate Vendor Offerings (references products and vendors)
     onProgress?.('Migrating vendor offerings...');
     const vendorOfferings = data.vendorOfferings || [];
     for (const offering of vendorOfferings) {
+      const newId = generateUUID();
+      const newProductId = getNewId(offering.productId, productIdMap);
+      const newVendorId = getNewId(offering.vendorId, vendorIdMap);
+      
       const { error } = await supabase.from('vendor_offerings').upsert([{
-        id: offering.id,
+        id: newId,
         user_id: user.id,
-        product_id: offering.productId,
-        vendor_id: offering.vendorId,
+        product_id: newProductId,
+        vendor_id: newVendorId,
         price: offering.price || 0,
         price_unit: offering.priceUnit || 'gal',
         sku: offering.sku || null,
@@ -126,14 +190,17 @@ export const migrateToSupabase = async (
     }
     onProgress?.(`Migrated ${vendorOfferings.length} vendor offerings`);
 
-    // 4. Migrate Inventory
+    // 5. Migrate Inventory (references products)
     onProgress?.('Migrating inventory...');
     const inventory = data.inventory || [];
     for (const item of inventory) {
+      const newId = generateUUID();
+      const newProductId = getNewId(item.productId, productIdMap);
+      
       const { error } = await supabase.from('inventory').upsert([{
-        id: item.id,
+        id: newId,
         user_id: user.id,
-        product_id: item.productId,
+        product_id: newProductId,
         quantity: item.quantity || 0,
         unit: item.unit || 'gal',
         packaging_name: item.packagingName || null,
@@ -147,16 +214,50 @@ export const migrateToSupabase = async (
     }
     onProgress?.(`Migrated ${inventory.length} inventory items`);
 
-    // 5. Migrate Seasons (with crops)
+    // 6. Migrate Seasons with updated crop plan IDs
     onProgress?.('Migrating seasons and crop plans...');
     const seasons = data.seasons || [];
     for (const season of seasons) {
+      const newSeasonId = getNewId(season.id, seasonIdMap);
+      
+      // Update product IDs and tier IDs within crop plans
+      const updatedCrops = (season.crops || []).map(crop => {
+        // Update tier IDs
+        const updatedTiers = (crop.tiers || []).map(tier => {
+          const newTierId = getNewId(tier.id, tierIdMap);
+          return { ...tier, id: newTierId };
+        });
+        
+        // Update timing IDs
+        const updatedTimings = (crop.applicationTimings || []).map(timing => {
+          const newTimingId = getNewId(timing.id, timingIdMap);
+          return { ...timing, id: newTimingId };
+        });
+        
+        // Update applications with new product, tier, and timing IDs
+        const updatedApplications = (crop.applications || []).map(app => ({
+          ...app,
+          id: generateUUID(),
+          productId: getNewId(app.productId, productIdMap),
+          tierId: app.tierId ? getNewId(app.tierId, tierIdMap) : undefined,
+          timingId: getNewId(app.timingId, timingIdMap),
+        }));
+        
+        return {
+          ...crop,
+          id: generateUUID(),
+          tiers: updatedTiers,
+          applicationTimings: updatedTimings,
+          applications: updatedApplications,
+        };
+      });
+      
       const { error } = await supabase.from('seasons').upsert([{
-        id: season.id,
+        id: newSeasonId,
         user_id: user.id,
         year: season.year,
         name: season.name,
-        crops: (season.crops || []) as any,
+        crops: updatedCrops as any,
       }]);
       if (error) {
         console.error('Season upsert error:', error);
@@ -165,39 +266,22 @@ export const migrateToSupabase = async (
     }
     onProgress?.(`Migrated ${seasons.length} seasons`);
 
-    // 6. Migrate Commodity Specs
-    onProgress?.('Migrating commodity specs...');
-    const commoditySpecs = data.commoditySpecs || [];
-    for (const spec of commoditySpecs) {
-      const { error } = await supabase.from('commodity_specs').upsert([{
-        id: spec.id,
-        user_id: user.id,
-        product_id: spec.productId || null,
-        name: spec.name || spec.specName,
-        description: spec.description || null,
-        unit: spec.unit || spec.uom || 'ton',
-        analysis: (spec.analysis || null) as any,
-        category: spec.category || null,
-      }]);
-      if (error) {
-        console.error('Commodity spec upsert error:', error);
-        throw new Error(`Failed to migrate commodity spec: ${error.message}`);
-      }
-    }
-    onProgress?.(`Migrated ${commoditySpecs.length} commodity specs`);
-
-    // 7. Migrate Bid Events
+    // 7. Migrate Bid Events (references seasons)
     onProgress?.('Migrating bid events...');
     const bidEvents = data.bidEvents || [];
     for (const event of bidEvents) {
+      const newId = getNewId(event.id, bidEventIdMap);
+      const newSeasonId = event.seasonId ? getNewId(event.seasonId, seasonIdMap) : null;
+      const newInvitedVendorIds = (event.invitedVendorIds || []).map(id => getNewId(id, vendorIdMap));
+      
       const { error } = await supabase.from('bid_events').upsert([{
-        id: event.id,
+        id: newId,
         user_id: user.id,
         name: event.name,
-        season_id: event.seasonId || null,
+        season_id: newSeasonId,
         status: event.status || 'draft',
         due_date: event.dueDate || null,
-        invited_vendor_ids: event.invitedVendorIds || [],
+        invited_vendor_ids: newInvitedVendorIds,
         vendor_invitations: event.vendorInvitations || {},
         notes: event.notes || null,
       }]);
@@ -212,12 +296,17 @@ export const migrateToSupabase = async (
     onProgress?.('Migrating vendor quotes...');
     const vendorQuotes = data.vendorQuotes || [];
     for (const quote of vendorQuotes) {
+      const newId = getNewId(quote.id, quoteIdMap);
+      const newBidEventId = getNewId(quote.bidEventId, bidEventIdMap);
+      const newVendorId = getNewId(quote.vendorId, vendorIdMap);
+      const newSpecId = getNewId(quote.commoditySpecId, specIdMap);
+      
       const { error } = await supabase.from('vendor_quotes').upsert([{
-        id: quote.id,
+        id: newId,
         user_id: user.id,
-        bid_event_id: quote.bidEventId,
-        vendor_id: quote.vendorId,
-        commodity_spec_id: quote.commoditySpecId,
+        bid_event_id: newBidEventId,
+        vendor_id: newVendorId,
+        commodity_spec_id: newSpecId,
         price: quote.price,
         delivery_terms: quote.deliveryTerms || null,
         notes: quote.notes || null,
@@ -233,11 +322,15 @@ export const migrateToSupabase = async (
     onProgress?.('Migrating awards...');
     const awards = data.awards || [];
     for (const award of awards) {
+      const newId = generateUUID();
+      const newBidEventId = getNewId(award.bidEventId, bidEventIdMap);
+      const newQuoteId = getNewId(award.vendorQuoteId, quoteIdMap);
+      
       const { error } = await supabase.from('awards').upsert([{
-        id: award.id,
+        id: newId,
         user_id: user.id,
-        bid_event_id: award.bidEventId,
-        vendor_quote_id: award.vendorQuoteId,
+        bid_event_id: newBidEventId,
+        vendor_quote_id: newQuoteId,
         quantity: award.quantity,
         notes: award.notes || null,
       }]);
@@ -252,13 +345,19 @@ export const migrateToSupabase = async (
     onProgress?.('Migrating price book...');
     const priceBook = data.priceBook || [];
     for (const entry of priceBook) {
+      const newId = generateUUID();
+      const newSeasonId = entry.seasonId ? getNewId(entry.seasonId, seasonIdMap) : null;
+      const newSpecId = entry.commoditySpecId ? getNewId(entry.commoditySpecId, specIdMap) : null;
+      const newProductId = entry.productId ? getNewId(entry.productId, productIdMap) : null;
+      const newVendorId = entry.vendorId ? getNewId(entry.vendorId, vendorIdMap) : null;
+      
       const { error } = await supabase.from('price_book').upsert([{
-        id: entry.id,
+        id: newId,
         user_id: user.id,
-        season_id: entry.seasonId || null,
-        commodity_spec_id: entry.commoditySpecId || null,
-        product_id: entry.productId || null,
-        vendor_id: entry.vendorId || null,
+        season_id: newSeasonId,
+        commodity_spec_id: newSpecId,
+        product_id: newProductId,
+        vendor_id: newVendorId,
         price: entry.price,
         unit: entry.unit || 'ton',
         source: entry.source || 'manual',
