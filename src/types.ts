@@ -172,13 +172,19 @@ export interface ApplicationTiming {
   order: number;
 }
 
+export type TierLabel = 'core' | 'selective' | 'trial';
+
 export interface Application {
   id: string;
   timingId: string;
   productId: string;
   rate: number;
   rateUnit: RateUnit;
-  tierId: string;
+  tierId?: string; // Deprecated - kept for backward compatibility
+  acresPercentage?: number; // 0-100
+  tierAuto?: TierLabel;
+  tierOverride?: TierLabel;
+  role?: string;
 }
 
 export interface SeedTreatment {

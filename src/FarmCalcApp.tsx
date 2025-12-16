@@ -82,7 +82,6 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import { AuthPage } from './components/AuthPage';
 import { SeedTreatmentCalculator } from './components/SeedTreatmentCalculator';
 import { NutrientSummaryPanel, NutrientSummaryCompact } from './components/NutrientSummary';
-import { TierManager } from './components/TierManager';
 import { EnhancedExportView } from './components/EnhancedExportView';
 
 // Import data sync hooks (only used when authenticated)

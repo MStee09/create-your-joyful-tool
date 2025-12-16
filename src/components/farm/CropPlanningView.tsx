@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Check, X, Trash2, Settings, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import { formatNumber, generateId } from '@/utils/farmUtils';
@@ -83,7 +83,6 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [showAddTiming, setShowAddTiming] = useState(false);
   const [newTimingName, setNewTimingName] = useState('');
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
-  const [showTierManager, setShowTierManager] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
 
   // Timeline state
@@ -246,7 +245,6 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
       productId: products[0]?.id || '',
       rate: 0,
       rateUnit: 'oz',
-      tierId: crop.tiers[0]?.id || '',
       acresPercentage: 100,
     };
     onUpdate({
@@ -357,14 +355,6 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
               </button>
             )}
           </div>
-          
-          <button
-            onClick={() => setShowTierManager(!showTierManager)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            Tier Presets
-          </button>
         </div>
 
         {/* Horizontal Timeline */}
@@ -420,37 +410,6 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {/* Tier Presets Manager */}
-        {showTierManager && (
-          <div className="bg-card rounded-xl border border-border p-4 mb-4">
-            <h4 className="text-sm font-medium text-foreground mb-3">Tier Presets</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              These presets appear as quick-fill buttons when editing applications.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {crop.tiers.map(tier => (
-                <div key={tier.id} className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
-                  <span className="text-sm font-medium text-foreground">{tier.name}</span>
-                  <input
-                    type="number"
-                    value={tier.percentage}
-                    onChange={(e) => onUpdate({
-                      ...crop,
-                      tiers: crop.tiers.map(t => 
-                        t.id === tier.id ? { ...t, percentage: Number(e.target.value) } : t
-                      ),
-                    })}
-                    className="w-14 px-2 py-1 text-center border border-input rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                    min={0}
-                    max={100}
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Pass Cards */}
         {crop.applicationTimings.length === 0 ? (
           <div className="text-center py-12">

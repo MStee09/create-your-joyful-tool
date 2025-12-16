@@ -95,7 +95,7 @@ export const CropDetail: React.FC<CropDetailProps> = ({
       productId: products[0]?.id || '',
       rate: 0,
       rateUnit: 'oz',
-      tierId: crop.tiers[0]?.id || '',
+      acresPercentage: 100,
     };
     onUpdate({
       ...crop,
