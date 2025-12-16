@@ -87,6 +87,9 @@ import { EnhancedExportView } from './components/EnhancedExportView';
 // Import Supabase data hook
 import { useSupabaseData } from './hooks/useSupabaseData';
 
+// Import migration utilities
+import { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } from './lib/migrateToSupabase';
+
 // Import initial data from external file
 import { initialState as defaultInitialState, initialProducts, initialVendors } from './initialData';
 
@@ -1189,8 +1192,6 @@ const AppContent: React.FC = () => {
   } = supabaseData;
 
   // Check for localStorage data to migrate
-  const { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } = require('./lib/migrateToSupabase');
-  
   const localDataSummary = getLocalStorageDataSummary();
   const hasDataToMigrate = hasLocalStorageData() && !migrationComplete;
   const supabaseIsEmpty = !supabaseLoading && seasons.length === 0 && productMasters.length === 0 && vendors.length === 0;
