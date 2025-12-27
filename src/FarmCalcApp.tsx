@@ -1613,8 +1613,6 @@ const AppContent: React.FC = () => {
             onResetData={handleResetData}
           />
         );
-      case 'howto':
-        return <HowToPage />;
       default:
         // Check for bid event detail view
         if (activeView.startsWith('bid-event-')) {

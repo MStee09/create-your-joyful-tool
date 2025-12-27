@@ -1,5 +1,5 @@
 import React from 'react';
-import { Leaf, BarChart3, FlaskConical, Building2, Warehouse, FileSpreadsheet, Settings, User, BookOpen } from 'lucide-react';
+import { Leaf, BarChart3, FlaskConical, Building2, Warehouse, FileSpreadsheet, Settings, User } from 'lucide-react';
 
 interface SidebarProps {
   activeView: string;
@@ -16,7 +16,6 @@ const navItems = [
   { id: 'vendors', icon: Building2, label: 'Vendors' },
   { id: 'inventory', icon: Warehouse, label: 'Inventory' },
   { id: 'exports', icon: FileSpreadsheet, label: 'Export' },
-  { id: 'howto', icon: BookOpen, label: 'How To' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 
