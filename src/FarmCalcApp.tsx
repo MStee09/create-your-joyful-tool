@@ -395,7 +395,7 @@ const VendorsView: React.FC<{
 
 import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 import { ProductSelectorModal, type ProductWithContext } from './components/farm/ProductSelectorModal';
-import { InventoryAddModal } from './components/farm/InventoryAddModal';
+import { AddInventoryModal, type PriceHistory } from './components/farm/AddInventoryModal';
 import { formatInventoryDisplay, getDefaultPackagingOptions } from './lib/packagingUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/ui/collapsible';
 
@@ -542,7 +542,26 @@ const InventoryView: React.FC<{
     setShowProductSelector(true);
   };
 
-  const handleAddInventory = (item: InventoryItem) => {
+  const handleAddInventoryData = (data: {
+    quantity: number;
+    unit: string;
+    packageType?: string;
+    packageQuantity?: number;
+    reason?: string;
+    note?: string;
+  }) => {
+    if (!selectedProduct) return;
+    
+    const item: InventoryItem = {
+      id: generateId(),
+      productId: selectedProduct.id,
+      quantity: data.quantity,
+      unit: data.unit as 'gal' | 'lbs',
+      packagingName: data.packageType,
+      packagingSize: data.packageQuantity ? data.quantity / data.packageQuantity : undefined,
+      containerCount: data.packageQuantity,
+    };
+    
     // Check if we have existing inventory for this product with same packaging
     const existing = inventory.find(i => 
       i.productId === item.productId && 
@@ -565,6 +584,32 @@ const InventoryView: React.FC<{
       onUpdateInventory([...inventory, item]);
     }
     
+    setShowAddModal(false);
+    setSelectedProduct(null);
+    setProductContext(null);
+  };
+
+  const handleCreatePurchase = (data: {
+    quantity: number;
+    unit: string;
+    packageType?: string;
+    packageQuantity?: number;
+    vendorId: string;
+    unitPrice: number;
+    date: string;
+    invoiceNumber?: string;
+    seasonYear: number;
+  }) => {
+    // For now, just add inventory (purchase tracking can be added later)
+    handleAddInventoryData({
+      quantity: data.quantity,
+      unit: data.unit,
+      packageType: data.packageType,
+      packageQuantity: data.packageQuantity,
+    });
+  };
+
+  const handleCloseAddModal = () => {
     setShowAddModal(false);
     setSelectedProduct(null);
     setProductContext(null);
@@ -695,14 +740,30 @@ const InventoryView: React.FC<{
       />
 
       {/* Inventory Add Modal */}
-      <InventoryAddModal
-        open={showAddModal}
-        onOpenChange={setShowAddModal}
-        selectedProduct={selectedProduct}
-        productContext={productContext}
-        onBack={handleBackToSelector}
-        onAdd={handleAddInventory}
-      />
+      {showAddModal && selectedProduct && productContext && (
+        <AddInventoryModal
+          product={selectedProduct}
+          vendor={vendors.find(v => v.id === selectedProduct.vendorId) || null}
+          vendors={vendors}
+          onHand={productContext.onHand}
+          planNeeds={productContext.plannedUsage}
+          unit={selectedProduct.form === 'liquid' ? 'gal' : 'lbs'}
+          usedIn={productContext.usedIn.map(u => ({
+            cropName: u.split(' → ')[0] || u,
+            timingName: u.split(' → ')[1] || '',
+          }))}
+          packageOptions={getDefaultPackagingOptions(selectedProduct.form).map(p => ({
+            label: p.name,
+            size: p.unitSize,
+            unit: p.unitType,
+          }))}
+          priceHistory={[]}
+          currentSeasonYear={season?.year || new Date().getFullYear()}
+          onClose={handleCloseAddModal}
+          onAddInventory={handleAddInventoryData}
+          onCreatePurchase={handleCreatePurchase}
+        />
+      )}
 
       {/* Simple On-Hand Inventory Table */}
       {allInventoryItems.length > 0 && (

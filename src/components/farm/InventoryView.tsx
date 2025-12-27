@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Droplets, Weight, Package } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
 import { formatCurrency, generateId } from '@/utils/farmUtils';
 import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
-import { InventoryAddModal } from './InventoryAddModal';
-import { formatInventoryDisplay } from '@/lib/packagingUtils';
+import { AddInventoryModal, type PriceHistory } from './AddInventoryModal';
+import { formatInventoryDisplay, getDefaultPackagingOptions } from '@/lib/packagingUtils';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
@@ -38,7 +38,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setShowProductSelector(true);
   };
 
-  const handleAddInventory = (item: InventoryItem) => {
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setSelectedProduct(null);
+    setProductContext(null);
+  };
+
+  const handleAddInventory = (data: {
+    quantity: number;
+    unit: string;
+    packageType?: string;
+    packageQuantity?: number;
+    reason?: string;
+    note?: string;
+  }) => {
+    if (!selectedProduct) return;
+    
+    const item: InventoryItem = {
+      id: generateId(),
+      productId: selectedProduct.id,
+      quantity: data.quantity,
+      unit: data.unit as 'gal' | 'lbs',
+      packagingName: data.packageType,
+      packagingSize: data.packageQuantity ? data.quantity / data.packageQuantity : undefined,
+      containerCount: data.packageQuantity,
+    };
+    
     // Check if we have existing inventory for this product with same packaging
     const existing = inventory.find(i => 
       i.productId === item.productId && 
@@ -61,9 +86,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       onUpdateInventory([...inventory, item]);
     }
     
-    setShowAddModal(false);
-    setSelectedProduct(null);
-    setProductContext(null);
+    handleCloseAddModal();
+  };
+
+  const handleCreatePurchase = (data: {
+    quantity: number;
+    unit: string;
+    packageType?: string;
+    packageQuantity?: number;
+    vendorId: string;
+    unitPrice: number;
+    date: string;
+    invoiceNumber?: string;
+    seasonYear: number;
+  }) => {
+    // For now, just add inventory (purchase tracking can be added later)
+    handleAddInventory({
+      quantity: data.quantity,
+      unit: data.unit,
+      packageType: data.packageType,
+      packageQuantity: data.packageQuantity,
+    });
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
@@ -90,6 +133,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const vendor = vendors.find(v => v.id === vendorId);
     return vendor?.name;
   };
+
+  // Build package options for selected product
+  const packageOptions = useMemo(() => {
+    if (!selectedProduct) return [];
+    return getDefaultPackagingOptions(selectedProduct.form).map(p => ({
+      label: p.name,
+      size: p.unitSize,
+      unit: p.unitType,
+    }));
+  }, [selectedProduct]);
+
+  // Build used in list
+  const usedIn = useMemo(() => {
+    if (!productContext) return [];
+    return productContext.usedIn.map(u => ({
+      cropName: u.split(' → ')[0] || u,
+      timingName: u.split(' → ')[1] || '',
+    }));
+  }, [productContext]);
+
+  // Get vendor for selected product
+  const selectedVendor = useMemo(() => {
+    if (!selectedProduct) return null;
+    return vendors.find(v => v.id === selectedProduct.vendorId) || null;
+  }, [selectedProduct, vendors]);
 
   return (
     <div className="p-8">
@@ -118,14 +186,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       />
 
       {/* Inventory Add Modal */}
-      <InventoryAddModal
-        open={showAddModal}
-        onOpenChange={setShowAddModal}
-        selectedProduct={selectedProduct}
-        productContext={productContext}
-        onBack={handleBackToSelector}
-        onAdd={handleAddInventory}
-      />
+      {showAddModal && selectedProduct && productContext && (
+        <AddInventoryModal
+          product={selectedProduct}
+          vendor={selectedVendor}
+          vendors={vendors}
+          onHand={productContext.onHand}
+          planNeeds={productContext.plannedUsage}
+          unit={selectedProduct.form === 'liquid' ? 'gal' : 'lbs'}
+          usedIn={usedIn}
+          packageOptions={packageOptions}
+          priceHistory={[]}
+          currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+          onClose={handleCloseAddModal}
+          onAddInventory={handleAddInventory}
+          onCreatePurchase={handleCreatePurchase}
+        />
+      )}
 
       <div className="bg-card rounded-xl shadow-sm border border-border">
         <table className="w-full">
@@ -159,49 +236,41 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <tr key={item.id} className="hover:bg-muted/30">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                        {product.form === 'liquid' ? <Droplets className="w-4 h-4 text-blue-600" /> : <Weight className="w-4 h-4 text-amber-600" />}
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                      }`}>
+                        {product.form === 'liquid' 
+                          ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                          : <Weight className="w-5 h-5 text-amber-600" />}
                       </div>
                       <div>
-                        {vendorName && (
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                            {vendorName}
-                          </p>
-                        )}
-                        <span className="font-medium">{product.name}</span>
+                        <div className="font-medium text-foreground">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">{vendorName}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {/* Container-based display */}
+                    <div className="flex items-center gap-2">
                       {item.containerCount && item.packagingName ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Package className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{display.primary}</p>
-                            <p className="text-xs text-muted-foreground">{display.secondary}</p>
-                          </div>
+                          <span className="font-medium">{display.primary}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="number" 
-                            value={item.quantity} 
-                            onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))} 
-                            className="w-24 px-2 py-1 text-right border border-input rounded bg-background" 
-                            min={0} 
-                          />
-                          <span className="text-muted-foreground">{item.unit}</span>
-                        </div>
+                        <span className="font-medium">{item.quantity.toFixed(1)} {item.unit}</span>
                       )}
                     </div>
+                    {display.secondary && (
+                      <div className="text-sm text-muted-foreground">{display.secondary}</div>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-right font-medium text-primary">{formatCurrency(value)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-medium text-foreground">{formatCurrency(value)}</span>
+                  </td>
                   <td className="px-6 py-4">
                     <button 
-                      onClick={() => onUpdateInventory(inventory.filter(i => i.id !== item.id))} 
-                      className="p-2 text-muted-foreground hover:text-destructive rounded-lg"
+                      onClick={() => onUpdateInventory(inventory.filter(i => i.id !== item.id))}
+                      className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -211,10 +280,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             })}
             {inventory.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
-                  <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No inventory items</p>
-                  <p className="text-sm">Add products you have on hand</p>
+                <td colSpan={4} className="px-6 py-12 text-center">
+                  <div className="text-muted-foreground">
+                    <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No inventory items yet</p>
+                    <p className="text-sm">Click "Add Inventory" to track your on-hand products</p>
+                  </div>
                 </td>
               </tr>
             )}
