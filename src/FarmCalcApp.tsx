@@ -62,6 +62,7 @@ import { CommoditySpecsView } from './components/farm/CommoditySpecsView';
 import { BidEventsView } from './components/farm/BidEventsView';
 import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { PriceBookView } from './components/farm/PriceBookView';
+import { HowToPage } from './components/farm/HowToPage';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -1612,6 +1613,8 @@ const AppContent: React.FC = () => {
             onResetData={handleResetData}
           />
         );
+      case 'howto':
+        return <HowToPage />;
       default:
         // Check for bid event detail view
         if (activeView.startsWith('bid-event-')) {
