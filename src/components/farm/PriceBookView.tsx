@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List, Plus, Edit2, Trash2, X, Download, Upload } from 'lucide-react';
+import { BookOpen, Award, Calendar, Building2, Package, ArrowUpDown, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, BarChart3, List, Plus, Edit2, Trash2, X, Download, Upload, ArrowLeft } from 'lucide-react';
 import type { PriceBookEntry, ProductMaster, Vendor, BidEvent, CommoditySpec } from '@/types';
 import { toast } from 'sonner';
 import { formatCurrency, generateId } from '@/utils/farmUtils';
@@ -43,6 +43,7 @@ import {
   Cell,
 } from 'recharts';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Breadcrumb } from './Breadcrumb';
 
 interface PriceBookViewProps {
   priceBook: PriceBookEntry[];
@@ -52,6 +53,7 @@ interface PriceBookViewProps {
   commoditySpecs: CommoditySpec[];
   currentSeasonYear: number;
   onUpdatePriceBook?: (priceBook: PriceBookEntry[]) => void;
+  onBack?: () => void;
 }
 
 type SortField = 'product' | 'price' | 'vendor' | 'source' | 'season';
@@ -65,6 +67,7 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
   commoditySpecs,
   currentSeasonYear,
   onUpdatePriceBook,
+  onBack,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeason, setFilterSeason] = useState<string>('all');
@@ -576,16 +579,33 @@ export const PriceBookView: React.FC<PriceBookViewProps> = ({
 
   return (
     <div className="p-6 space-y-6">
+      {/* Breadcrumb */}
+      {onBack && (
+        <Breadcrumb
+          items={[
+            { label: 'Procurement', onClick: onBack },
+            { label: 'Price Book' },
+          ]}
+        />
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="w-7 h-7 text-primary" />
-            Price Book
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Historical awarded prices and cost references by season
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button onClick={onBack} className="p-2 hover:bg-muted rounded-lg">
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <BookOpen className="w-7 h-7 text-primary" />
+              Price Book
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Historical awarded prices and cost references by season
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleExportCSV} className="flex items-center gap-2">

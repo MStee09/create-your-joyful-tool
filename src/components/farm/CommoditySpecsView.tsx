@@ -11,6 +11,7 @@ import {
   Search,
   Droplets,
   Weight,
+  ArrowLeft,
 } from 'lucide-react';
 import type { CommoditySpec, ProductMaster } from '@/types';
 import { generateId } from '@/lib/calculations';
@@ -22,12 +23,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Breadcrumb } from './Breadcrumb';
 
 interface CommoditySpecsViewProps {
   commoditySpecs: CommoditySpec[];
   productMasters: ProductMaster[];
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
   onUpdateProducts: (products: ProductMaster[]) => void;
+  onBack?: () => void;
 }
 
 export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
@@ -35,6 +38,7 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
   productMasters,
   onUpdateSpecs,
   onUpdateProducts,
+  onBack,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSpec, setEditingSpec] = useState<CommoditySpec | null>(null);
@@ -180,13 +184,30 @@ export const CommoditySpecsView: React.FC<CommoditySpecsViewProps> = ({
   
   return (
     <div className="p-8">
+      {/* Breadcrumb */}
+      {onBack && (
+        <Breadcrumb
+          items={[
+            { label: 'Procurement', onClick: onBack },
+            { label: 'Commodity Specs' },
+          ]}
+        />
+      )}
+      
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-stone-800">Commodity Specs</h2>
-          <p className="text-stone-500 mt-1">
-            Define what is being purchased for bidding, independent of vendor or crop plan usage
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button onClick={onBack} className="p-2 hover:bg-stone-100 rounded-lg">
+              <ArrowLeft className="w-5 h-5 text-stone-500" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-3xl font-bold text-stone-800">Commodity Specs</h2>
+            <p className="text-stone-500 mt-1">
+              Define what is being purchased for bidding, independent of vendor or crop plan usage
+            </p>
+          </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
