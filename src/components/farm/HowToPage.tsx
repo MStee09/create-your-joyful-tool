@@ -282,6 +282,9 @@ export const HowToPage: React.FC = () => {
             {activeCategory === 'procurement' && (
               <>
                 <Section title="Procurement Overview" icon={ShoppingCart} defaultOpen={true}>
+                  <Warning>
+                    <strong>This section is for COMMODITY products only.</strong> Commodity Specs, Bid Events, and competitive bidding apply to standard products (AMS, Urea, etc.) that multiple vendors can supply. For specialty/proprietary products, simply purchase directly from the vendor and record in Inventory.
+                  </Warning>
                   <p className="text-muted-foreground mb-4">The workflow differs for specialty (buy direct) vs. commodity (bid competitively).</p>
                   <div className="bg-muted rounded-lg p-4 my-4">
                     <div className="flex items-center justify-between text-sm">
@@ -307,16 +310,18 @@ export const HowToPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 my-4">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="font-semibold text-blue-700 dark:text-blue-400">Specialty Flow</div>
-                      <ol className="text-sm text-blue-800 dark:text-blue-300 list-decimal list-inside mt-2">
-                        <li>See need in Demand Rollup</li>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">(Proprietary products, single source)</p>
+                      <ol className="text-sm text-blue-800 dark:text-blue-300 list-decimal list-inside">
+                        <li>Check Inventory for shortages</li>
                         <li>Contact vendor directly</li>
                         <li>Record purchase in Inventory</li>
                       </ol>
                     </div>
                     <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="font-semibold text-orange-700 dark:text-orange-400">Commodity Flow</div>
-                      <ol className="text-sm text-orange-800 dark:text-orange-300 list-decimal list-inside mt-2">
-                        <li>See need in Demand Rollup</li>
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mb-2">(Standard products, multiple vendors)</p>
+                      <ol className="text-sm text-orange-800 dark:text-orange-300 list-decimal list-inside">
+                        <li>Use Demand Rollup for quantities</li>
                         <li>Link product to Commodity Spec</li>
                         <li>Create Bid Event</li>
                         <li>Collect/compare quotes</li>
@@ -326,26 +331,58 @@ export const HowToPage: React.FC = () => {
                   </div>
                 </Section>
 
-                <Section title="Demand Rollup" icon={Calculator}>
-                  <p className="text-muted-foreground mb-4">Aggregates product needs across all crops. Before you buy, know how much you need.</p>
-                  <SubSection title="What It Shows">
-                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                      <li><strong>Total Needed:</strong> Sum across all crops/timings/coverage</li>
-                      <li><strong>Usage Breakdown:</strong> Which crops use it</li>
-                      <li><strong>On-Hand:</strong> Current inventory</li>
-                      <li><strong>To Purchase:</strong> Need minus on-hand</li>
-                    </ul>
-                  </SubSection>
-                  <SubSection title="Example">
-                    <div className="bg-muted rounded-lg p-3 font-mono text-sm my-4">
-                      <div className="text-muted-foreground">AMS 21-0-0-24S</div>
-                      <div className="text-foreground">Corn Pre-Plant: 6.6 tons</div>
-                      <div className="text-foreground">Corn Topdress: 6.6 tons</div>
-                      <div className="text-foreground">Beans Pre-Plant: 3.95 tons</div>
-                      <div className="border-t border-border mt-2 pt-2 font-bold">TOTAL: 17.15 tons | On Hand: 2 | TO BUY: 15.15 tons</div>
+                <Section title="Demand Rollup vs. Inventory" icon={Calculator}>
+                  <p className="text-muted-foreground mb-4">These serve different purposes—understanding the difference is key.</p>
+                  
+                  <div className="grid grid-cols-2 gap-4 my-4">
+                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 mb-2">📦 Inventory Page</div>
+                      <p className="text-sm text-emerald-800 dark:text-emerald-300 mb-2"><strong>What you HAVE</strong></p>
+                      <ul className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
+                        <li>• Current stock on hand</li>
+                        <li>• Product-by-product quantities</li>
+                        <li>• Where to record purchases</li>
+                        <li>• Shows shortages vs. plan</li>
+                      </ul>
+                    </div>
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="font-semibold text-purple-700 dark:text-purple-400 mb-2">📊 Demand Rollup</div>
+                      <p className="text-sm text-purple-800 dark:text-purple-300 mb-2"><strong>What you NEED to buy</strong></p>
+                      <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+                        <li>• Aggregated quantities for bidding</li>
+                        <li>• Grouped by commodity type</li>
+                        <li>• Used to create Bid Events</li>
+                        <li>• Your "shopping list" for vendors</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <Tip>
+                    <strong>When to use which:</strong> Check Inventory to see what you have and what is short. Use Demand Rollup when preparing to send out bid requests to commodity vendors—it gives you the exact quantities to put in your RFQ.
+                  </Tip>
+                  
+                  <SubSection title="Example Workflow">
+                    <div className="bg-muted rounded-lg p-3 text-sm my-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">1</span>
+                        <span className="text-foreground">Inventory shows you need 15 tons of AMS (short 15, have 2)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">2</span>
+                        <span className="text-foreground">Demand Rollup shows: Corn needs 13.2 tons, Beans needs 3.95 tons</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">3</span>
+                        <span className="text-foreground">Create Bid Event for 15 tons AMS, invite vendors</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">4</span>
+                        <span className="text-foreground">Award bid, record purchase in Inventory</span>
+                      </div>
                     </div>
                   </SubSection>
-                  <ProTip>Generate Demand Rollup before vendor meetings. It's your shopping list and gives you credibility when negotiating.</ProTip>
+                  
+                  <ProTip>Demand Rollup is your negotiating tool. Walk into a vendor meeting with exact quantities grouped by commodity—you look prepared and can negotiate volume discounts.</ProTip>
                 </Section>
 
                 <Section title="Commodity Specs" icon={Tag}>
