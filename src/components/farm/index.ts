@@ -19,3 +19,4 @@ export { ProductPurposeEditor } from './ProductPurposeEditor';
 export { FunctionCoverageBar } from './FunctionCoverageBar';
 export { TimingEditorPopover } from './TimingEditorPopover';
 export { CropTypeSelector } from './CropTypeSelector';
+export { HowToPage } from './HowToPage';
