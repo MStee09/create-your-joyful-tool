@@ -10,6 +10,7 @@ import {
   Lock,
   FileText,
   ChevronRight,
+  ArrowLeft,
 } from 'lucide-react';
 import type { BidEvent, BidEventType, BidEventStatus, Vendor, CommoditySpec, ProductMaster } from '@/types';
 import { generateId } from '@/lib/calculations';
@@ -21,6 +22,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Breadcrumb } from './Breadcrumb';
 
 interface BidEventsViewProps {
   bidEvents: BidEvent[];
@@ -30,6 +32,7 @@ interface BidEventsViewProps {
   currentSeasonYear: number;
   onUpdateEvents: (events: BidEvent[]) => void;
   onSelectEvent: (eventId: string) => void;
+  onBack?: () => void;
 }
 
 const STATUS_CONFIG: Record<BidEventStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -55,6 +58,7 @@ export const BidEventsView: React.FC<BidEventsViewProps> = ({
   currentSeasonYear,
   onUpdateEvents,
   onSelectEvent,
+  onBack,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   
@@ -111,13 +115,30 @@ export const BidEventsView: React.FC<BidEventsViewProps> = ({
   
   return (
     <div className="p-8">
+      {/* Breadcrumb */}
+      {onBack && (
+        <Breadcrumb
+          items={[
+            { label: 'Procurement', onClick: onBack },
+            { label: 'Bid Events' },
+          ]}
+        />
+      )}
+      
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-stone-800">Bid Events</h2>
-          <p className="text-stone-500 mt-1">
-            Manage competitive bidding for {currentSeasonYear} commodities
-          </p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button onClick={onBack} className="p-2 hover:bg-stone-100 rounded-lg">
+              <ArrowLeft className="w-5 h-5 text-stone-500" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-3xl font-bold text-stone-800">Bid Events</h2>
+            <p className="text-stone-500 mt-1">
+              Manage competitive bidding for {currentSeasonYear} commodities
+            </p>
+          </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}

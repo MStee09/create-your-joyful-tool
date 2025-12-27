@@ -1440,6 +1440,7 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             onUpdateSpecs={updateCommoditySpecs}
             onUpdateProducts={handleUpdateProductMasters}
+            onBack={() => setActiveView('procurement')}
           />
         );
       case 'bid-events':
@@ -1452,6 +1453,7 @@ const AppContent: React.FC = () => {
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onUpdateEvents={updateBidEvents}
             onSelectEvent={(eventId) => setActiveView(`bid-event-${eventId}`)}
+            onBack={() => setActiveView('procurement')}
           />
         );
       case 'price-book':
@@ -1464,6 +1466,7 @@ const AppContent: React.FC = () => {
             commoditySpecs={state.commoditySpecs || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onUpdatePriceBook={updatePriceBook}
+            onBack={() => setActiveView('procurement')}
           />
         );
       case 'exports':
