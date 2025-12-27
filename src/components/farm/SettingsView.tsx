@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Calendar, Download, Package, Settings, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Calendar, Download, Package, Settings, BookOpen, RotateCcw } from 'lucide-react';
 import type { Season } from '@/types/farm';
 import { generateId } from '@/utils/farmUtils';
 import { HowToPage } from './HowToPage';
@@ -8,9 +8,10 @@ interface SettingsViewProps {
   seasons: Season[];
   onAddSeason: (season: Season) => void;
   onDeleteSeason: (seasonId: string) => void;
+  onResetData?: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason, onDeleteSeason }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason, onDeleteSeason, onResetData }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'howto'>('settings');
   const [showAddSeason, setShowAddSeason] = useState(false);
   const [newSeasonYear, setNewSeasonYear] = useState(new Date().getFullYear() + 1);
@@ -197,29 +198,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
                 <h3 className="font-semibold text-foreground">Data Management</h3>
                 <p className="text-sm text-muted-foreground">Import and export your data</p>
               </div>
-              <div className="p-6">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Your data is currently stored locally in your browser. Export your data regularly for backup.
-                </p>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={handleExportAllData}
-                    className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export All Data
-                  </button>
-                  <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted cursor-pointer">
-                    <Package className="w-4 h-4" />
-                    Import Data
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportData}
-                      className="hidden"
-                    />
-                  </label>
+              <div className="p-6 space-y-6">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your data is currently stored locally in your browser. Export your data regularly for backup.
+                  </p>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={handleExportAllData}
+                      className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export All Data
+                    </button>
+                    <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted cursor-pointer">
+                      <Package className="w-4 h-4" />
+                      Import Data
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportData}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
+                
+                {onResetData && (
+                  <div className="pt-4 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Reset to Default Data</p>
+                        <p className="text-sm text-muted-foreground">Restore all products, vendors, and crop plans to original values.</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Reset all data to default values? This cannot be undone.')) {
+                            onResetData();
+                          }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg font-medium hover:bg-destructive/90"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reset Data
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

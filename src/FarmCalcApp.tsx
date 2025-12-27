@@ -62,7 +62,7 @@ import { CommoditySpecsView } from './components/farm/CommoditySpecsView';
 import { BidEventsView } from './components/farm/BidEventsView';
 import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { PriceBookView } from './components/farm/PriceBookView';
-import { HowToPage } from './components/farm/HowToPage';
+import { SettingsView } from './components/farm/SettingsView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -1076,135 +1076,6 @@ const InventoryView: React.FC<{
 };
 
 // ============================================================================
-// SETTINGS VIEW
-// ============================================================================
-
-const SettingsView: React.FC<{
-  seasons: Season[];
-  onAddSeason: (season: Season) => void;
-  onDeleteSeason: (id: string) => void;
-  onResetData: () => void;
-}> = ({ seasons, onAddSeason, onDeleteSeason, onResetData }) => {
-  const [showAddSeason, setShowAddSeason] = useState(false);
-  const [newSeasonYear, setNewSeasonYear] = useState(new Date().getFullYear() + 1);
-  const [newSeasonName, setNewSeasonName] = useState('Growing Season');
-
-  const handleAddSeason = () => {
-    const season: Season = {
-      id: generateId(),
-      year: newSeasonYear,
-      name: newSeasonName,
-      crops: [],
-      createdAt: new Date(),
-    };
-    onAddSeason(season);
-    setShowAddSeason(false);
-  };
-
-  return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-stone-800">Settings</h2>
-        <p className="text-stone-500 mt-1">Manage seasons and configuration</p>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200">
-        <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
-          <h3 className="font-semibold text-stone-800">Seasons</h3>
-          <button
-            onClick={() => setShowAddSeason(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
-          >
-            <Plus className="w-4 h-4" />
-            New Season
-          </button>
-        </div>
-        <div className="divide-y divide-stone-100">
-          {seasons.map(season => (
-            <div key={season.id} className="px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-stone-800">{season.year} - {season.name}</p>
-                  <p className="text-sm text-stone-500">{season.crops.length} crops</p>
-                </div>
-              </div>
-              <button
-                onClick={() => onDeleteSeason(season.id)}
-                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Reset Data Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200 mt-6">
-        <div className="px-6 py-4 border-b border-stone-200">
-          <h3 className="font-semibold text-stone-800">Data Management</h3>
-        </div>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-stone-800">Reset to Default Data</p>
-              <p className="text-sm text-stone-500">Restore all products, vendors, and crop plans to the original spreadsheet values.</p>
-            </div>
-            <button
-              onClick={() => {
-                if (window.confirm('Reset all data to default spreadsheet values? This cannot be undone.')) {
-                  onResetData();
-                }
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
-            >
-              Reset Data
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {showAddSeason && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md m-4 p-6">
-            <h3 className="font-semibold text-lg mb-4">Create New Season</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Year</label>
-                <input
-                  type="number"
-                  value={newSeasonYear}
-                  onChange={(e) => setNewSeasonYear(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={newSeasonName}
-                  onChange={(e) => setNewSeasonName(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowAddSeason(false)} className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg">
-                Cancel
-              </button>
-              <button onClick={handleAddSeason} className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700">
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ============================================================================
 // ============================================================================
