@@ -200,6 +200,62 @@ export type Database = {
           },
         ]
       }
+      inventory_transactions: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reference_id: string | null
+          reference_type: string | null
+          season_year: number
+          type: string
+          unit: string
+          unit_cost: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          reference_id?: string | null
+          reference_type?: string | null
+          season_year: number
+          type: string
+          unit?: string
+          unit_cost?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          season_year?: number
+          type?: string
+          unit?: string
+          unit_cost?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_masters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_book: {
         Row: {
           commodity_spec_id: string | null
@@ -267,6 +323,67 @@ export type Database = {
           },
           {
             foreignKeyName: "price_book_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_history: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          product_id: string
+          purchase_id: string | null
+          season_year: number
+          unit: string
+          unit_price: number
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          product_id: string
+          purchase_id?: string | null
+          season_year: number
+          unit?: string
+          unit_price: number
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          product_id?: string
+          purchase_id?: string | null
+          season_year?: number
+          unit?: string
+          unit_price?: number
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_masters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_history_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_history_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -371,6 +488,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          invoice_number: string | null
+          line_items: Json
+          notes: string | null
+          season_year: number
+          status: string
+          total_cost: number
+          updated_at: string
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          invoice_number?: string | null
+          line_items?: Json
+          notes?: string | null
+          season_year: number
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          invoice_number?: string | null
+          line_items?: Json
+          notes?: string | null
+          season_year?: number
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seasons: {
         Row: {
