@@ -12,8 +12,11 @@ import type {
   VendorQuote,
   Award,
   PriceBookEntry,
-  Crop
+  Crop,
+  Purchase,
+  InventoryTransaction,
 } from '@/types';
+import type { PriceHistory } from '@/types/farm';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -26,6 +29,9 @@ interface SupabaseDataState {
   vendorQuotes: VendorQuote[];
   awards: Award[];
   priceBook: PriceBookEntry[];
+  purchases: Purchase[];
+  inventoryTransactions: InventoryTransaction[];
+  priceHistory: PriceHistory[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -163,6 +169,9 @@ export function useSupabaseData(user: User | null) {
     vendorQuotes: [],
     awards: [],
     priceBook: [],
+    purchases: [],
+    inventoryTransactions: [],
+    priceHistory: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -189,6 +198,9 @@ export function useSupabaseData(user: User | null) {
         quotesRes,
         awardsRes,
         priceBookRes,
+        purchasesRes,
+        transactionsRes,
+        priceHistoryRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -200,6 +212,9 @@ export function useSupabaseData(user: User | null) {
         supabase.from('vendor_quotes').select('*'),
         supabase.from('awards').select('*'),
         supabase.from('price_book').select('*'),
+        supabase.from('purchases').select('*').order('date', { ascending: false }),
+        supabase.from('inventory_transactions').select('*').order('date', { ascending: false }),
+        supabase.from('price_history').select('*').order('date', { ascending: false }),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -212,6 +227,49 @@ export function useSupabaseData(user: User | null) {
       const vendorQuotes = (quotesRes.data || []).map(dbVendorQuoteToVendorQuote);
       const awards = (awardsRes.data || []).map(dbAwardToAward);
       const priceBook = (priceBookRes.data || []).map(dbPriceBookToPriceBook);
+      
+      // Map purchases
+      const purchases: Purchase[] = (purchasesRes.data || []).map((row: any) => ({
+        id: row.id,
+        date: row.date,
+        vendorId: row.vendor_id,
+        seasonYear: row.season_year,
+        status: row.status,
+        invoiceNumber: row.invoice_number,
+        notes: row.notes,
+        lineItems: row.line_items || [],
+        totalCost: Number(row.total_cost) || 0,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+      
+      // Map inventory transactions
+      const inventoryTransactions: InventoryTransaction[] = (transactionsRes.data || []).map((row: any) => ({
+        id: row.id,
+        date: row.date,
+        productId: row.product_id,
+        type: row.type,
+        quantity: Number(row.quantity) || 0,
+        unit: row.unit,
+        referenceId: row.reference_id,
+        referenceType: row.reference_type,
+        seasonYear: row.season_year,
+        notes: row.notes,
+        unitCost: row.unit_cost ? Number(row.unit_cost) : undefined,
+        createdAt: row.created_at,
+      }));
+      
+      // Map price history
+      const priceHistory: PriceHistory[] = (priceHistoryRes.data || []).map((row: any) => ({
+        id: row.id,
+        productId: row.product_id,
+        vendorId: row.vendor_id,
+        date: row.date,
+        unitPrice: Number(row.unit_price) || 0,
+        unit: row.unit,
+        seasonYear: row.season_year,
+        purchaseId: row.purchase_id,
+      }));
 
       // NOTE: Auto-sync of commodity specs from products has been removed.
       // Specs should only be created manually or via the explicit "Create new spec" action
@@ -233,6 +291,9 @@ export function useSupabaseData(user: User | null) {
         vendorQuotes,
         awards,
         priceBook,
+        purchases,
+        inventoryTransactions,
+        priceHistory,
         currentSeasonId,
         loading: false,
         error: null,
@@ -561,6 +622,109 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, priceBook }));
   }, [user, state.priceBook]);
 
+  // Update purchases
+  const updatePurchases = useCallback(async (purchases: Purchase[]) => {
+    if (!user) return;
+    
+    // Upsert all purchases
+    for (const purchase of purchases) {
+      const { error } = await supabase.from('purchases').upsert({
+        id: purchase.id,
+        user_id: user.id,
+        vendor_id: purchase.vendorId,
+        season_year: purchase.seasonYear,
+        date: purchase.date,
+        status: purchase.status,
+        invoice_number: purchase.invoiceNumber,
+        notes: purchase.notes,
+        line_items: purchase.lineItems as any,
+        total_cost: purchase.totalCost,
+      });
+      if (error) console.error('Error upserting purchase:', error);
+    }
+    
+    setState(prev => ({ ...prev, purchases }));
+  }, [user]);
+
+  // Add a single purchase
+  const addPurchase = useCallback(async (purchase: Purchase) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('purchases').insert({
+      id: purchase.id,
+      user_id: user.id,
+      vendor_id: purchase.vendorId,
+      season_year: purchase.seasonYear,
+      date: purchase.date,
+      status: purchase.status,
+      invoice_number: purchase.invoiceNumber,
+      notes: purchase.notes,
+      line_items: purchase.lineItems as any,
+      total_cost: purchase.totalCost,
+    });
+    
+    if (error) {
+      console.error('Error adding purchase:', error);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, purchases: [...prev.purchases, purchase] }));
+  }, [user]);
+
+  // Add inventory transaction
+  const addInventoryTransaction = useCallback(async (transaction: InventoryTransaction) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('inventory_transactions').insert({
+      id: transaction.id,
+      user_id: user.id,
+      product_id: transaction.productId,
+      type: transaction.type,
+      quantity: transaction.quantity,
+      unit: transaction.unit,
+      reference_id: transaction.referenceId,
+      reference_type: transaction.referenceType,
+      season_year: transaction.seasonYear,
+      notes: transaction.notes,
+      unit_cost: transaction.unitCost,
+      date: transaction.date,
+    });
+    
+    if (error) {
+      console.error('Error adding inventory transaction:', error);
+      return;
+    }
+    
+    setState(prev => ({ 
+      ...prev, 
+      inventoryTransactions: [...prev.inventoryTransactions, transaction] 
+    }));
+  }, [user]);
+
+  // Add price history entry
+  const addPriceHistory = useCallback(async (entry: PriceHistory) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('price_history').insert({
+      id: entry.id,
+      user_id: user.id,
+      product_id: entry.productId,
+      vendor_id: entry.vendorId,
+      date: entry.date,
+      unit_price: entry.unitPrice,
+      unit: entry.unit,
+      season_year: entry.seasonYear,
+      purchase_id: entry.purchaseId,
+    });
+    
+    if (error) {
+      console.error('Error adding price history:', error);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, priceHistory: [...prev.priceHistory, entry] }));
+  }, [user]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -575,5 +739,9 @@ export function useSupabaseData(user: User | null) {
     updateVendorQuotes,
     updateAwards,
     updatePriceBook,
+    updatePurchases,
+    addPurchase,
+    addInventoryTransaction,
+    addPriceHistory,
   };
 }

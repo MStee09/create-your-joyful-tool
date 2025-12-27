@@ -391,3 +391,18 @@ export interface PriceBookEntry {
   effectiveDate?: string;
   notes?: string;
 }
+
+// Re-export purchase types from farm.ts
+export type { 
+  Purchase, 
+  PurchaseLineItem, 
+  InventoryTransaction, 
+  AdjustmentReason,
+  PriceHistory as PriceHistoryRecord,
+  ProductExtended,
+  PackageOptionUI,
+  ProductUsage,
+  ProductInventoryStatus,
+  SeasonPurchaseSummary,
+  PriceComparison,
+} from './types/farm';
