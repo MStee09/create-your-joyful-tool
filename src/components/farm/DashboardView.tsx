@@ -1,17 +1,22 @@
 import React, { useMemo } from 'react';
-import { ArrowUp, ArrowDown } from 'lucide-react';
-import type { Season, Product } from '@/types/farm';
+import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
+import type { Season, Product, InventoryItem } from '@/types/farm';
 import { formatCurrency, formatNumber, calculateCropCosts, calculateCropNutrientSummary } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
+import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
 
 interface DashboardViewProps {
   season: Season | null;
   products: Product[];
+  inventory?: InventoryItem[];
+  onViewChange?: (view: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ 
   season, 
-  products, 
+  products,
+  inventory = [],
+  onViewChange,
 }) => {
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
@@ -64,6 +69,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return null;
   };
 
+  // Calculate plan readiness
+  const readiness = useMemo(() => 
+    calculateReadinessSummary(season, products, inventory),
+    [season, products, inventory]
+  );
+
   return (
     <div className="p-8">
       {/* Hero Section - Total Plan Cost */}
@@ -82,6 +93,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Plan Readiness Widget */}
+      {readiness.totalProducts > 0 && (
+        <div 
+          onClick={() => onViewChange?.('plan-readiness')}
+          className={`bg-card rounded-xl p-6 shadow-sm border border-border mb-8 cursor-pointer hover:border-primary/50 transition-colors ${
+            onViewChange ? '' : 'cursor-default'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground">Plan Readiness</h3>
+            {readiness.blockingCount > 0 ? (
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+            ) : (
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
+            )}
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="h-3 bg-muted rounded-full overflow-hidden flex mb-3">
+            <div 
+              className="h-full bg-emerald-500 transition-all" 
+              style={{ width: `${readiness.readyPct}%` }} 
+            />
+            <div 
+              className="h-full bg-blue-500 transition-all" 
+              style={{ width: `${readiness.onOrderPct}%` }} 
+            />
+            <div 
+              className="h-full bg-red-500 transition-all" 
+              style={{ width: `${readiness.blockingPct}%` }} 
+            />
+          </div>
+          
+          {/* Legend */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span>{readiness.readyCount} Ready</span>
+            <span>•</span>
+            <span>{readiness.onOrderCount} On Order</span>
+            <span>•</span>
+            <span>{readiness.blockingCount} Blocking</span>
+          </div>
+          
+          {/* Blocking Warning */}
+          {readiness.blockingCount > 0 && (
+            <p className="text-sm text-red-600 mt-2 font-medium">
+              {readiness.blockingCount} item{readiness.blockingCount !== 1 ? 's' : ''} blocking plan execution
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Crop Summary Table */}
       <div className="bg-card rounded-xl shadow-sm border border-border mb-8">

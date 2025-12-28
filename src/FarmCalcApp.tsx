@@ -1111,6 +1111,8 @@ const AppContent: React.FC = () => {
           <DashboardView
             season={currentSeason}
             products={legacyProducts}
+            inventory={state.inventory}
+            onViewChange={setActiveView}
           />
         );
       case 'crops':
