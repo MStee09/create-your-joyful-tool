@@ -20,3 +20,5 @@ export { FunctionCoverageBar } from './FunctionCoverageBar';
 export { TimingEditorPopover } from './TimingEditorPopover';
 export { CropTypeSelector } from './CropTypeSelector';
 export { HowToPage } from './HowToPage';
+export { OrdersView } from './OrdersView';
+export { RecordInvoiceModal } from './RecordInvoiceModal';

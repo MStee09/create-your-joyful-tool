@@ -63,6 +63,7 @@ import { BidEventsView } from './components/farm/BidEventsView';
 import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { PriceBookView } from './components/farm/PriceBookView';
 import { SettingsView } from './components/farm/SettingsView';
+import { OrdersView } from './components/farm/OrdersView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -133,12 +134,13 @@ const Sidebar: React.FC<{
   
   const procurementItems = [
     { id: 'procurement', label: 'Demand Rollup' },
+    { id: 'orders', label: 'Orders' },
     { id: 'commodity-specs', label: 'Commodity Specs' },
     { id: 'bid-events', label: 'Bid Events' },
     { id: 'price-book', label: 'Price Book' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
+  const isProcurementActive = activeView === 'procurement' || activeView === 'orders' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -1431,6 +1433,12 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             commoditySpecs={state.commoditySpecs || []}
             onNavigateToSpecs={() => setActiveView('commodity-specs')}
+          />
+        );
+      case 'orders':
+        return (
+          <OrdersView
+            onBack={() => setActiveView('procurement')}
           />
         );
       case 'commodity-specs':
