@@ -64,6 +64,7 @@ import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { PriceBookView } from './components/farm/PriceBookView';
 import { SettingsView } from './components/farm/SettingsView';
 import { OrdersView } from './components/farm/OrdersView';
+import { PlanReadinessView } from './components/farm/PlanReadinessView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -1172,6 +1173,16 @@ const AppContent: React.FC = () => {
         );
       case 'orders':
         return <OrdersView />;
+      case 'plan-readiness':
+        return (
+          <PlanReadinessView
+            inventory={state.inventory}
+            products={legacyProducts}
+            vendors={state.vendors}
+            season={currentSeason}
+            onUpdateInventory={handleUpdateInventory}
+          />
+        );
       case 'commodity-specs':
         return (
           <CommoditySpecsView
