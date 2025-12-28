@@ -393,14 +393,12 @@ const VendorsView: React.FC<{
 };
 
 // ============================================================================
-// INVENTORY VIEW (Plan Readiness)
+// INVENTORY VIEW
 // ============================================================================
 
-import { calculatePlannedUsage, PlannedUsageItem } from './lib/calculations';
 import { ProductSelectorModal, type ProductWithContext } from './components/farm/ProductSelectorModal';
 import { AddInventoryModal, type PriceHistory } from './components/farm/AddInventoryModal';
 import { formatInventoryDisplay, getDefaultPackagingOptions } from './lib/packagingUtils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/ui/collapsible';
 
 const InventoryView: React.FC<{
   inventory: InventoryItem[];
@@ -418,120 +416,6 @@ const InventoryView: React.FC<{
   const [editPackagingSize, setEditPackagingSize] = useState<number>(0);
   const [editContainerCount, setEditContainerCount] = useState<number>(1);
   
-  // Persist Plan Readiness collapsed state
-  const [planReadinessOpen, setPlanReadinessOpen] = useState(() => {
-    const saved = localStorage.getItem('inventory-plan-readiness-open');
-    return saved === 'true'; // Default to closed
-  });
-  
-  useEffect(() => {
-    localStorage.setItem('inventory-plan-readiness-open', String(planReadinessOpen));
-  }, [planReadinessOpen]);
-
-  // Calculate planned usage
-  const plannedUsage = useMemo(() => 
-    calculatePlannedUsage(season, products), 
-    [season, products]
-  );
-
-  // Build readiness data
-  const readinessData = useMemo(() => {
-    const blocking: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      short: number;
-      unit: 'gal' | 'lbs';
-      usages: PlannedUsageItem['usages'];
-      inventoryItem?: InventoryItem;
-    }> = [];
-    
-    const planned: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      remaining: number;
-      unit: 'gal' | 'lbs';
-      value: number;
-      usages: PlannedUsageItem['usages'];
-      inventoryId?: string;
-      inventoryItem?: InventoryItem;
-    }> = [];
-    
-    const unassigned: Array<{
-      product: Product;
-      onHand: number;
-      unit: 'gal' | 'lbs';
-      value: number;
-      inventoryId: string;
-      inventoryItem: InventoryItem;
-    }> = [];
-    
-    // Products with planned usage
-    const plannedProductIds = new Set(plannedUsage.map(p => p.productId));
-    
-    plannedUsage.forEach(usage => {
-      const product = products.find(p => p.id === usage.productId);
-      if (!product) return;
-      
-      const invItem = inventory.find(i => i.productId === usage.productId);
-      const onHand = invItem?.quantity || 0;
-      const remaining = onHand - usage.totalNeeded;
-      
-      let value = onHand * product.price;
-      if (product.priceUnit === 'ton') {
-        value = (onHand / 2000) * product.price;
-      }
-      
-      if (remaining < 0) {
-        blocking.push({
-          product,
-          needed: usage.totalNeeded,
-          onHand,
-          short: Math.abs(remaining),
-          unit: usage.unit,
-          usages: usage.usages,
-          inventoryItem: invItem,
-        });
-      }
-      
-      planned.push({
-        product,
-        needed: usage.totalNeeded,
-        onHand,
-        remaining,
-        unit: usage.unit,
-        value,
-        usages: usage.usages,
-        inventoryId: invItem?.id,
-        inventoryItem: invItem,
-      });
-    });
-    
-    // Inventory items not in plan
-    inventory.forEach(item => {
-      if (plannedProductIds.has(item.productId)) return;
-      
-      const product = products.find(p => p.id === item.productId);
-      if (!product) return;
-      
-      let value = item.quantity * product.price;
-      if (product.priceUnit === 'ton') {
-        value = (item.quantity / 2000) * product.price;
-      }
-      
-      unassigned.push({
-        product,
-        onHand: item.quantity,
-        unit: item.unit,
-        value,
-        inventoryId: item.id,
-        inventoryItem: item,
-      });
-    });
-    
-    return { blocking, planned, unassigned };
-  }, [plannedUsage, inventory, products]);
 
   const handleSelectProduct = (product: Product, context: ProductWithContext) => {
     setSelectedProduct(product);
@@ -618,33 +502,6 @@ const InventoryView: React.FC<{
     setProductContext(null);
   };
 
-  const handleQuickAddFromBlocking = (productId: string, shortAmount: number, unit: 'gal' | 'lbs') => {
-    // Open the modal with context for this product
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    const vendor = vendors.find(v => v.id === product.vendorId);
-    const invItems = inventory.filter(i => i.productId === productId);
-    const onHand = invItems.reduce((sum, i) => sum + i.quantity, 0);
-    const usageItem = plannedUsage.find(u => u.productId === productId);
-    const plannedNeeded = usageItem?.totalNeeded || 0;
-    const usedIn = usageItem?.usages.map(u => `${u.cropName} → ${u.timingName}`) || [];
-    
-    const context: ProductWithContext = {
-      product,
-      vendor,
-      plannedUsage: plannedNeeded,
-      onHand,
-      status: shortAmount > 0 ? 'short' : 'ok',
-      shortfall: shortAmount,
-      usedIn,
-    };
-    
-    setSelectedProduct(product);
-    setProductContext(context);
-    setShowAddModal(true);
-  };
-
   const handleSaveEdit = (id: string, product: Product) => {
     const isBulk = editPackagingType === 'Bulk';
     const totalQuantity = isBulk ? editContainerCount : editPackagingSize * editContainerCount;
@@ -674,8 +531,6 @@ const InventoryView: React.FC<{
   const handleDelete = (id: string) => {
     onUpdateInventory(inventory.filter(i => i.id !== id));
   };
-
-  const hasPlannedUsage = plannedUsage.length > 0;
 
   // Helper to format inventory display
   const formatOnHand = (invItem?: InventoryItem, quantity?: number, unit?: 'gal' | 'lbs') => {
@@ -945,134 +800,6 @@ const InventoryView: React.FC<{
         </div>
       )}
 
-      {/* Collapsible Plan Readiness Section */}
-      {hasPlannedUsage && (
-        <Collapsible open={planReadinessOpen} onOpenChange={setPlanReadinessOpen}>
-          <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors">
-            <span className="flex items-center gap-2 text-sm font-medium text-stone-700">
-              <ChevronRight className={`w-4 h-4 transition-transform ${planReadinessOpen ? 'rotate-90' : ''}`} />
-              Plan Readiness
-            </span>
-            {readinessData.blocking.length > 0 ? (
-              <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
-                {readinessData.blocking.length} items blocking
-              </span>
-            ) : (
-              <span className="px-2 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">
-                Ready to execute
-              </span>
-            )}
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4 space-y-6">
-            {/* Blocking Section (inside collapsible) */}
-            {readinessData.blocking.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wider">
-                    Blocking Plan Execution
-                  </h3>
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
-                  <div className="divide-y divide-red-100">
-                    {readinessData.blocking.map(item => (
-                      <div key={item.product.id} className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                          }`}>
-                            {item.product.form === 'liquid' 
-                              ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                              : <Weight className="w-5 h-5 text-amber-600" />}
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-stone-400 uppercase tracking-wide">
-                              {vendors.find(v => v.id === item.product.vendorId)?.name || ''}
-                            </p>
-                            <p className="font-medium text-stone-800">{item.product.name}</p>
-                            <p className="text-sm text-stone-500">
-                              {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <p className="text-sm text-stone-500">
-                              Need {formatNumber(item.needed, 1)} {item.unit}, have {formatNumber(item.onHand, 1)}
-                            </p>
-                            <p className="font-semibold text-red-600">
-                              Short {formatNumber(item.short, 1)} {item.unit}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleQuickAddFromBlocking(item.product.id, item.short, item.unit)}
-                            className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
-                          >
-                            Add {formatNumber(item.short, 1)}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Planned Usage Overview (inside collapsible) */}
-            <div>
-              <h3 className="text-sm font-semibold text-stone-600 uppercase tracking-wider mb-3">
-                Planned Usage Overview
-              </h3>
-              <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-stone-50">
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
-                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
-                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Planned</th>
-                      <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Remaining</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-200">
-                    {readinessData.planned.map(item => (
-                      <tr key={item.product.id} className="hover:bg-stone-50">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                            }`}>
-                              {item.product.form === 'liquid' 
-                                ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                                : <Weight className="w-5 h-5 text-amber-600" />}
-                            </div>
-                            <div>
-                              <span className="font-medium text-stone-800">{item.product.name}</span>
-                              <p className="text-xs text-stone-400">
-                                {item.usages.map(u => `${u.cropName} → ${u.timingName}`).join(', ')}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-stone-700">{formatNumber(item.onHand, 1)} {item.unit}</span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-stone-600">
-                          {formatNumber(item.needed, 1)} {item.unit}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`font-semibold ${item.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {item.remaining >= 0 ? '+' : ''}{formatNumber(item.remaining, 1)} {item.unit}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
     </div>
   );
 };
