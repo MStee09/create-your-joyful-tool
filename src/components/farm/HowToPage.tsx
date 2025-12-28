@@ -4,7 +4,7 @@ import {
   TrendingUp, CheckCircle, AlertTriangle, ArrowRight, Lightbulb, Zap, Settings,
   FileSpreadsheet, DollarSign, BarChart3, Leaf, Droplets, ClipboardList,
   HelpCircle, PlayCircle, Building2, Tag, ShoppingCart, Scale, Receipt,
-  Calculator, Gavel, BookMarked, Download, FileText
+  Calculator, Gavel, BookMarked, Download, FileText, Truck
 } from 'lucide-react';
 
 // Reusable Components
@@ -282,9 +282,6 @@ export const HowToPage: React.FC = () => {
             {activeCategory === 'procurement' && (
               <>
                 <Section title="Procurement Overview" icon={ShoppingCart} defaultOpen={true}>
-                  <Warning>
-                    <strong>This section is for COMMODITY products only.</strong> Commodity Specs, Bid Events, and competitive bidding apply to standard products (AMS, Urea, etc.) that multiple vendors can supply. For specialty/proprietary products, simply purchase directly from the vendor and record in Inventory.
-                  </Warning>
                   <p className="text-muted-foreground mb-4">The workflow differs for specialty (buy direct) vs. commodity (bid competitively).</p>
                   <div className="bg-muted rounded-lg p-4 my-4">
                     <div className="flex items-center justify-between text-sm">
@@ -292,7 +289,8 @@ export const HowToPage: React.FC = () => {
                         { icon: Calculator, label: 'Demand', sub: 'Rollup' },
                         { icon: Tag, label: 'Commodity', sub: 'Specs' },
                         { icon: Gavel, label: 'Bid', sub: 'Events' },
-                        { icon: Receipt, label: 'Purchase', sub: '& Track' },
+                        { icon: FileSpreadsheet, label: 'Order', sub: 'Create' },
+                        { icon: Receipt, label: 'Invoice', sub: '& Receive' },
                       ].map((item, i, arr) => (
                         <React.Fragment key={item.label}>
                           <div className="text-center">
@@ -307,82 +305,55 @@ export const HowToPage: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  <SubSection title="Key Concepts">
+                    <KeyConcept term="Order">Commitment to buy. Shows in "On Order" but inventory doesn't change yet. Can be prepaid.</KeyConcept>
+                    <KeyConcept term="Invoice">Actual delivery/load. Records what arrived, creates inventory at landed cost.</KeyConcept>
+                    <KeyConcept term="Landed Cost">(Product Price + Freight) ÷ Actual Quantity. The TRUE cost per unit.</KeyConcept>
+                  </SubSection>
                   <div className="grid grid-cols-2 gap-4 my-4">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="font-semibold text-blue-700 dark:text-blue-400">Specialty Flow</div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">(Proprietary products, single source)</p>
-                      <ol className="text-sm text-blue-800 dark:text-blue-300 list-decimal list-inside">
-                        <li>Check Inventory for shortages</li>
-                        <li>Contact vendor directly</li>
-                        <li>Record purchase in Inventory</li>
+                      <ol className="text-sm text-blue-800 dark:text-blue-300 list-decimal list-inside mt-2">
+                        <li>See need in Demand Rollup</li>
+                        <li>Create Order with vendor</li>
+                        <li>Prepay if early order program</li>
+                        <li>Call in delivery when ready</li>
+                        <li>Record Invoice when received</li>
                       </ol>
                     </div>
                     <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="font-semibold text-orange-700 dark:text-orange-400">Commodity Flow</div>
-                      <p className="text-xs text-orange-600 dark:text-orange-400 mb-2">(Standard products, multiple vendors)</p>
-                      <ol className="text-sm text-orange-800 dark:text-orange-300 list-decimal list-inside">
-                        <li>Use Demand Rollup for quantities</li>
+                      <ol className="text-sm text-orange-800 dark:text-orange-300 list-decimal list-inside mt-2">
+                        <li>See need in Demand Rollup</li>
                         <li>Link product to Commodity Spec</li>
                         <li>Create Bid Event</li>
-                        <li>Collect/compare quotes</li>
-                        <li>Award bid, record purchase</li>
+                        <li>Award bid → Creates Order</li>
+                        <li>Record Invoice when received</li>
                       </ol>
                     </div>
                   </div>
                 </Section>
 
-                <Section title="Demand Rollup vs. Inventory" icon={Calculator}>
-                  <p className="text-muted-foreground mb-4">These serve different purposes—understanding the difference is key.</p>
-                  
-                  <div className="grid grid-cols-2 gap-4 my-4">
-                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 mb-2">📦 Inventory Page</div>
-                      <p className="text-sm text-emerald-800 dark:text-emerald-300 mb-2"><strong>What you HAVE</strong></p>
-                      <ul className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
-                        <li>• Current stock on hand</li>
-                        <li>• Product-by-product quantities</li>
-                        <li>• Where to record purchases</li>
-                        <li>• Shows shortages vs. plan</li>
-                      </ul>
-                    </div>
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="font-semibold text-purple-700 dark:text-purple-400 mb-2">📊 Demand Rollup</div>
-                      <p className="text-sm text-purple-800 dark:text-purple-300 mb-2"><strong>What you NEED to buy</strong></p>
-                      <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
-                        <li>• Aggregated quantities for bidding</li>
-                        <li>• Grouped by commodity type</li>
-                        <li>• Used to create Bid Events</li>
-                        <li>• Your "shopping list" for vendors</li>
-                      </ul>
-                    </div>
-                  </div>
-                  
-                  <Tip>
-                    <strong>When to use which:</strong> Check Inventory to see what you have and what is short. Use Demand Rollup when preparing to send out bid requests to commodity vendors—it gives you the exact quantities to put in your RFQ.
-                  </Tip>
-                  
-                  <SubSection title="Example Workflow">
-                    <div className="bg-muted rounded-lg p-3 text-sm my-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">1</span>
-                        <span className="text-foreground">Inventory shows you need 15 tons of AMS (short 15, have 2)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">2</span>
-                        <span className="text-foreground">Demand Rollup shows: Corn needs 13.2 tons, Beans needs 3.95 tons</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">3</span>
-                        <span className="text-foreground">Create Bid Event for 15 tons AMS, invite vendors</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">4</span>
-                        <span className="text-foreground">Award bid, record purchase in Inventory</span>
-                      </div>
+                <Section title="Demand Rollup" icon={Calculator}>
+                  <p className="text-muted-foreground mb-4">Aggregates product needs across all crops. Before you buy, know how much you need.</p>
+                  <SubSection title="What It Shows">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li><strong>Total Needed:</strong> Sum across all crops/timings/coverage</li>
+                      <li><strong>Usage Breakdown:</strong> Which crops use it</li>
+                      <li><strong>On-Hand:</strong> Current inventory</li>
+                      <li><strong>To Purchase:</strong> Need minus on-hand</li>
+                    </ul>
+                  </SubSection>
+                  <SubSection title="Example">
+                    <div className="bg-muted rounded-lg p-3 font-mono text-sm my-4">
+                      <div className="text-muted-foreground">AMS 21-0-0-24S</div>
+                      <div className="text-foreground/70">Corn Pre-Plant: 6.6 tons</div>
+                      <div className="text-foreground/70">Corn Topdress: 6.6 tons</div>
+                      <div className="text-foreground/70">Beans Pre-Plant: 3.95 tons</div>
+                      <div className="border-t border-border mt-2 pt-2 font-bold text-foreground">TOTAL: 17.15 tons | On Hand: 2 | TO BUY: 15.15 tons</div>
                     </div>
                   </SubSection>
-                  
-                  <ProTip>Demand Rollup is your negotiating tool. Walk into a vendor meeting with exact quantities grouped by commodity—you look prepared and can negotiate volume discounts.</ProTip>
+                  <ProTip>Generate Demand Rollup before vendor meetings. It's your shopping list and gives you credibility when negotiating.</ProTip>
                 </Section>
 
                 <Section title="Commodity Specs" icon={Tag}>
@@ -423,21 +394,165 @@ export const HowToPage: React.FC = () => {
                 </Section>
 
                 <Section title="Price Book" icon={BookMarked}>
-                  <p className="text-muted-foreground mb-4">Historical record of what you've paid. Built automatically from purchases and bid awards.</p>
+                  <p className="text-muted-foreground mb-4">Historical record of what you've paid. Built automatically from invoices and bid awards.</p>
                   <SubSection title="What It Shows">
                     <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                      <li>Product, Vendor, Price, Date, Season</li>
+                      <li>Product, Vendor, <strong>Landed Cost</strong>, Date, Season</li>
                       <li>Year-over-year trends</li>
                       <li>Vendor comparison over time</li>
                     </ul>
                   </SubSection>
                   <SubSection title="Using Price History">
                     <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                      <li><strong>Budgeting:</strong> Use last year's prices as starting point</li>
-                      <li><strong>Negotiations:</strong> Know what you've paid before</li>
+                      <li><strong>Budgeting:</strong> Use last year's landed costs as starting point</li>
+                      <li><strong>Negotiations:</strong> Know your true cost including freight</li>
                       <li><strong>Trend analysis:</strong> Identify rising costs</li>
                     </ul>
                   </SubSection>
+                  <Tip>Price Book now tracks landed cost (product + freight), not just product price. This gives you accurate cost comparison.</Tip>
+                </Section>
+
+                <Section title="Creating Orders" icon={FileSpreadsheet}>
+                  <p className="text-muted-foreground mb-4">Orders represent your commitment to purchase. They track what you've ordered but haven't received yet.</p>
+                  <SubSection title="Two Ways to Create Orders">
+                    <div className="grid grid-cols-2 gap-4 my-4">
+                      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <div className="font-semibold text-purple-700 dark:text-purple-400">From Bid Award</div>
+                        <p className="text-sm text-purple-800 dark:text-purple-300 mt-1">
+                          When you award a bid, FarmCalc can automatically create an order with the awarded quantities and prices.
+                        </p>
+                      </div>
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="font-semibold text-blue-700 dark:text-blue-400">Manual Entry</div>
+                        <p className="text-sm text-blue-800 dark:text-blue-300 mt-1">
+                          For specialty products or direct purchases. Select vendor, add products, set quantities.
+                        </p>
+                      </div>
+                    </div>
+                  </SubSection>
+                  <SubSection title="Order Details">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li><strong>Expected Delivery:</strong> Month or date range (flexible, not hard dates)</li>
+                      <li><strong>Delivery Notes:</strong> "Call when ready", "After ground thaws"</li>
+                      <li><strong>Prepayment:</strong> Mark if paid before delivery (early order programs)</li>
+                      <li><strong>Line Items:</strong> Products, quantities, unit prices</li>
+                    </ul>
+                  </SubSection>
+                  <SubSection title="Order Status">
+                    <div className="space-y-2 my-4 text-sm">
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-muted-foreground"></span><strong>Draft</strong> — Still building</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-blue-500"></span><strong>Ordered</strong> — Committed to vendor</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-amber-500"></span><strong>Partial</strong> — Some product received</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-emerald-500"></span><strong>Complete</strong> — All received</div>
+                    </div>
+                  </SubSection>
+                  <ProTip>Orders show in "On Order" in Plan Readiness. This lets you see that product is committed even though it's not on-site yet.</ProTip>
+                </Section>
+
+                <Section title="Recording Invoices" icon={Receipt}>
+                  <p className="text-muted-foreground mb-4">When product arrives, record an invoice to update inventory. Each delivery/load = one invoice.</p>
+                  <SubSection title="What to Enter">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li><strong>Invoice Number:</strong> Vendor's invoice #</li>
+                      <li><strong>Received Date:</strong> When product arrived</li>
+                      <li><strong>Actual Quantities:</strong> What the scale ticket shows</li>
+                      <li><strong>Scale Tickets:</strong> Reference numbers for bulk</li>
+                      <li><strong>Freight Charges:</strong> Single line item, allocated automatically</li>
+                    </ul>
+                  </SubSection>
+                  <SubSection title="Freight Allocation">
+                    <p className="text-muted-foreground mb-2">Freight is divided across products by weight:</p>
+                    <div className="bg-muted rounded-lg p-3 font-mono text-sm my-4">
+                      <div>AMS: 15 tons (55.7%) → $270 freight</div>
+                      <div>Urea: 12 tons (44.3%) → $215 freight</div>
+                      <div className="border-t border-border mt-2 pt-2">
+                        <div>AMS Landed: $415 + $18/ton = <strong>$433/ton</strong></div>
+                        <div>Urea Landed: $510 + $18/ton = <strong>$528/ton</strong></div>
+                      </div>
+                    </div>
+                  </SubSection>
+                  <SubSection title="What Happens on Save">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li>Inventory increases at <strong>landed cost</strong></li>
+                      <li>Price Book gets landed cost entry</li>
+                      <li>Order status updates (partial → complete)</li>
+                      <li>Plan vs Actual uses landed cost for variance</li>
+                    </ul>
+                  </SubSection>
+                  <Warning>
+                    <strong>Multiple Loads:</strong> If an order arrives in two trucks, record two separate invoices. Each has its own freight allocation.
+                  </Warning>
+                </Section>
+
+                <Section title="Package Tier Pricing" icon={Package}>
+                  <p className="text-muted-foreground mb-4">Many specialty products have different prices based on package size. Larger packages = lower per-unit cost.</p>
+                  <SubSection title="Example: Humical">
+                    <div className="space-y-2 my-4">
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-foreground/70">2.5 gal jug</span>
+                        <span className="font-medium text-foreground">$48.00/gal</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-foreground/70">30 gal drum</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-primary">Save 6%</span>
+                          <span className="font-medium text-foreground">$45.00/gal</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-foreground/70">275 gal tote</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-primary">Save 13%</span>
+                          <span className="font-medium text-foreground">$42.00/gal</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                        <span className="text-primary">Bulk (500+ gal)</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-primary">Save 21%</span>
+                          <span className="font-medium text-primary">$38.00/gal</span>
+                        </div>
+                      </div>
+                    </div>
+                  </SubSection>
+                  <SubSection title="Setting Up Package Tiers">
+                    <p className="text-muted-foreground mb-2">In Products → Edit Product → Package Pricing:</p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li>Add each package option with size and price</li>
+                      <li>Set a default package for quick ordering</li>
+                      <li>FarmCalc shows savings when you order</li>
+                    </ul>
+                  </SubSection>
+                  <ProTip>When ordering, FarmCalc calculates the best package option for your quantity and shows potential savings.</ProTip>
+                </Section>
+
+                <Section title="Pending Deliveries" icon={Truck}>
+                  <p className="text-muted-foreground mb-4">Track what's on order and when it's expected. Know what to call in and what's in transit.</p>
+                  <SubSection title="Delivery Statuses">
+                    <div className="space-y-2 my-4 text-sm">
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-muted-foreground"></span><strong>Awaiting Call</strong> — Need to contact vendor to schedule</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-blue-500"></span><strong>Scheduled</strong> — Delivery date set</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-amber-500"></span><strong>In Transit</strong> — On its way</div>
+                      <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-emerald-500"></span><strong>Ready to Receive</strong> — Arriving soon, prepare to record invoice</div>
+                    </div>
+                  </SubSection>
+                  <SubSection title="Dashboard Features">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li>Summary cards showing counts by status</li>
+                      <li>Vendor contact info with one-click calling</li>
+                      <li>Total value of pending deliveries</li>
+                      <li>Weather hints for scheduling</li>
+                      <li>Upcoming deliveries calendar view</li>
+                    </ul>
+                  </SubSection>
+                  <SubSection title="Actions">
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li><strong>Call to Schedule:</strong> Contact vendor, then set scheduled date</li>
+                      <li><strong>Mark In Transit:</strong> When vendor confirms shipment</li>
+                      <li><strong>Record Invoice:</strong> When product arrives</li>
+                    </ul>
+                  </SubSection>
+                  <Tip>Check Pending Deliveries when weather looks good. Call in bulk fertilizer deliveries when ground can support trucks.</Tip>
                 </Section>
               </>
             )}
@@ -511,31 +626,16 @@ export const HowToPage: React.FC = () => {
             { phase: 1, title: 'Planning Phase', when: 'Oct–Feb', color: 'amber',
               tasks: ['Create next year\'s season (clone from current)', 'Update acre allocations', 'Update product prices from quotes', 'Build application timings', 'Assign products to tiers', 'Evaluate trial results—promote winners'] },
             { phase: 2, title: 'Procurement Phase', when: 'Feb–Apr', color: 'blue',
-              tasks: ['Run Demand Rollup', 'Link commodities to specs', 'Create Bid Events', 'Collect and compare quotes', 'Award bids', 'Order from specialty vendors', 'Record purchases as received', 'Check Plan Readiness weekly'] },
+              tasks: ['Run Demand Rollup', 'Link commodities to specs', 'Create Bid Events', 'Collect and compare quotes', 'Award bids → Creates Orders', 'Create Orders for specialty products', 'Prepay early order programs', 'Track Pending Deliveries', 'Call in deliveries when weather is good', 'Record Invoices with freight for landed cost', 'Check Plan Readiness weekly'] },
             { phase: 3, title: 'Execution Phase', when: 'Apr–Oct', color: 'emerald',
               tasks: ['Use Focus Phase view for current window', 'Verify inventory before each timing', 'Print Plan Sheet for shop', 'Document plan changes', 'Note trial observations', 'Record mid-season purchases'] },
             { phase: 4, title: 'Analysis Phase', when: 'Oct–Nov', color: 'purple',
               tasks: ['Review Plan vs. Actual', 'Analyze Price Book trends', 'Evaluate trial ROI', 'Inventory remaining product', 'Record carryover', 'Archive and create next season'] },
           ].map(({ phase, title, when, color, tasks }) => (
             <div key={phase} className="bg-background rounded-xl border border-border overflow-hidden">
-              <div className={`px-5 py-3 border-b border-border ${
-                color === 'amber' ? 'bg-amber-50 dark:bg-amber-900/20' :
-                color === 'blue' ? 'bg-blue-50 dark:bg-blue-900/20' :
-                color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/20' :
-                'bg-purple-50 dark:bg-purple-900/20'
-              }`}>
-                <h4 className={`font-bold flex items-center gap-2 ${
-                  color === 'amber' ? 'text-amber-800 dark:text-amber-300' :
-                  color === 'blue' ? 'text-blue-800 dark:text-blue-300' :
-                  color === 'emerald' ? 'text-emerald-800 dark:text-emerald-300' :
-                  'text-purple-800 dark:text-purple-300'
-                }`}>
-                  <span className={`w-6 h-6 rounded-full text-white text-sm flex items-center justify-center ${
-                    color === 'amber' ? 'bg-amber-500' :
-                    color === 'blue' ? 'bg-blue-500' :
-                    color === 'emerald' ? 'bg-emerald-500' :
-                    'bg-purple-500'
-                  }`}>{phase}</span>
+              <div className={`bg-${color}-50 dark:bg-${color}-900/20 px-5 py-3 border-b border-${color}-200 dark:border-${color}-800`}>
+                <h4 className={`font-bold text-${color}-800 dark:text-${color}-300 flex items-center gap-2`}>
+                  <span className={`w-6 h-6 rounded-full bg-${color}-500 text-white text-sm flex items-center justify-center`}>{phase}</span>
                   {title} <span className="font-normal text-sm ml-2">({when})</span>
                 </h4>
               </div>
@@ -543,7 +643,7 @@ export const HowToPage: React.FC = () => {
                 {tasks.map((task, i) => (
                   <div key={i} className="flex gap-3">
                     <CheckCircle className="w-5 h-5 text-primary flex-shrink-0" />
-                    <span className="text-foreground">{task}</span>
+                    <span className="text-foreground/80">{task}</span>
                   </div>
                 ))}
               </div>
@@ -587,14 +687,23 @@ export const HowToPage: React.FC = () => {
             { term: 'Commodity Spec', def: 'Standardized specification enabling apples-to-apples vendor comparison.' },
             { term: 'Core Tier', def: 'Products applied to 100% of acres.' },
             { term: 'Demand Rollup', def: 'Aggregated product needs across all crops and timings.' },
-            { term: 'Plan Readiness', def: 'Status showing if inventory is sufficient for plan.' },
+            { term: 'Freight Allocation', def: 'Dividing freight charges across products by weight to calculate true cost.' },
+            { term: 'Invoice', def: 'Record of actual delivery. One per truck/load. Contains scale tickets and freight.' },
+            { term: 'Landed Cost', def: '(Product Price + Freight) ÷ Quantity. The TRUE cost per unit after delivery charges.' },
+            { term: 'On Hand', def: 'Inventory physically present and available to use.' },
+            { term: 'On Order', def: 'Product committed to purchase but not yet delivered.' },
+            { term: 'Order', def: 'Commitment to buy from a vendor. May be prepaid. Results in one or more invoices.' },
+            { term: 'Package Tier', def: 'Price level based on package size. Larger packages typically have lower per-unit costs.' },
+            { term: 'Pending Delivery', def: 'An order awaiting delivery. May need to call in or is scheduled/in transit.' },
+            { term: 'Plan Readiness', def: 'Status showing if inventory (on hand + on order) is sufficient for plan.' },
             { term: 'Planning Price', def: 'Estimated price used when building plans.' },
-            { term: 'Price Book', def: 'Historical record of prices paid over time.' },
-            { term: 'Purchase Price', def: 'Actual price paid. May differ from planning price.' },
+            { term: 'Prepaid', def: 'Payment made before delivery, typically for early order discounts.' },
+            { term: 'Price Book', def: 'Historical record of landed costs paid over time.' },
+            { term: 'Scale Ticket', def: 'Weight ticket from bulk delivery. Documents actual quantity received.' },
             { term: 'Selective Tier', def: 'Products applied to ~60% of acres for validation.' },
             { term: 'Specialty Product', def: 'Proprietary product from specific vendor. Single source.' },
             { term: 'Trial Tier', def: 'Products applied to ~25% of acres for testing.' },
-            { term: 'Variance', def: 'Difference between planned and actual costs.' },
+            { term: 'Variance', def: 'Difference between planned and actual (landed) costs.' },
           ].sort((a, b) => a.term.localeCompare(b.term)).map(({ term, def }) => (
             <div key={term} className="flex gap-4 p-4 bg-muted rounded-lg">
               <div className="font-semibold text-foreground min-w-[160px]">{term}</div>
