@@ -16,6 +16,7 @@ import {
   Edit,
   XCircle
 } from 'lucide-react';
+import { RecordInvoiceModal, Order as ModalOrder } from './RecordInvoiceModal';
 
 // Types
 type OrderStatus = 'draft' | 'ordered' | 'confirmed' | 'partial' | 'complete' | 'cancelled';
@@ -144,6 +145,31 @@ export const OrdersView: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'partial' | 'complete'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [invoiceModalOrder, setInvoiceModalOrder] = useState<ModalOrder | null>(null);
+
+  // Convert local Order to modal Order format
+  const toModalOrder = (order: Order): ModalOrder => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    vendorName: order.vendorName,
+    orderDate: order.orderDate,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    deliveryWindow: order.deliveryWindow,
+    subtotal: order.subtotal,
+    receivedTotal: order.receivedTotal,
+    invoiceCount: order.invoiceCount,
+    bidEventId: order.bidEventId,
+    lineItems: order.lineItems.map((li, idx) => ({
+      id: `li-${idx}`,
+      productName: li.productName,
+      orderedQuantity: li.quantity,
+      receivedQuantity: 0,
+      remainingQuantity: li.quantity,
+      unit: li.unit,
+      unitPrice: li.unitPrice,
+    })),
+  });
 
   const filteredOrders = mockOrders.filter(order => {
     if (filter === 'pending' && !['ordered', 'confirmed'].includes(order.status)) return false;
@@ -369,7 +395,13 @@ export const OrdersView: React.FC = () => {
                   {/* Actions */}
                   <div className="px-4 pb-4 flex gap-3">
                     {['ordered', 'confirmed', 'partial'].includes(order.status) && (
-                      <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInvoiceModalOrder(toModalOrder(order));
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors"
+                      >
                         <Receipt className="w-4 h-4" />
                         Record Invoice
                       </button>
@@ -410,6 +442,13 @@ export const OrdersView: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Invoice Modal */}
+      <RecordInvoiceModal
+        isOpen={!!invoiceModalOrder}
+        onClose={() => setInvoiceModalOrder(null)}
+        order={invoiceModalOrder}
+      />
     </div>
   );
 };
