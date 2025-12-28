@@ -1444,19 +1444,7 @@ const AppContent: React.FC = () => {
           />
         );
       case 'orders':
-        return (
-          <OrdersView
-            orders={state.orders || []}
-            invoices={state.invoices || []}
-            vendors={state.vendors}
-            productMasters={state.productMasters || []}
-            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdateOrders={updateOrders}
-            onAddOrder={addOrder}
-            onAddInvoice={addInvoice}
-            onBack={() => setActiveView('procurement')}
-          />
-        );
+        return <OrdersView />;
       case 'commodity-specs':
         return (
           <CommoditySpecsView
