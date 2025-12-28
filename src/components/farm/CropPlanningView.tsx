@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight, List, Droplets, Weight, ChevronsUpDown } from 'lucide-react';
 import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import { formatNumber, generateId } from '@/utils/farmUtils';
@@ -86,9 +86,10 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [showInsights, setShowInsights] = useState(false);
 
   // Timeline state
-  const [viewMode, setViewMode] = useState<'full' | 'focus'>('full');
+  const [viewMode, setViewMode] = useState<'full' | 'focus' | 'compact'>('full');
   const [activePhase, setActivePhase] = useState<TimingBucket>('IN_SEASON');
   const [collapsedPhases, setCollapsedPhases] = useState<Set<TimingBucket>>(new Set());
+  const [expandedPasses, setExpandedPasses] = useState<Set<string>>(new Set());
 
   const { purposes } = useProductIntelligence();
 
@@ -326,6 +327,17 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                 <Focus className="w-4 h-4" />
                 Focus Phase
               </button>
+              <button
+                onClick={() => setViewMode('compact')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'compact' 
+                    ? 'bg-background text-foreground shadow-sm' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                Compact
+              </button>
             </div>
 
             {/* Acres Editor */}
@@ -480,6 +492,187 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
               );
             })}
           </div>
+        ) : viewMode === 'compact' ? (
+          /* COMPACT VIEW */
+          (() => {
+            const allTimings = crop.applicationTimings;
+            const togglePassExpand = (id: string) => {
+              setExpandedPasses(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) {
+                  next.delete(id);
+                } else {
+                  next.add(id);
+                }
+                return next;
+              });
+            };
+            const expandAll = () => setExpandedPasses(new Set(allTimings.map(t => t.id)));
+            const collapseAll = () => setExpandedPasses(new Set());
+
+            return (
+              <div>
+                {/* Expand/Collapse All Buttons */}
+                <div className="flex items-center gap-2 mb-4">
+                  <button
+                    onClick={expandAll}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <ChevronsUpDown className="w-4 h-4" />
+                    Expand All
+                  </button>
+                  <button
+                    onClick={collapseAll}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <List className="w-4 h-4" />
+                    Collapse All
+                  </button>
+                </div>
+
+                {/* Compact Table */}
+                <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border">
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase w-8"></th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase">Pass</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase">Timing</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase">Products</th>
+                        <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase">$/Acre</th>
+                        <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {PHASE_ORDER.map((phase) => {
+                        const config = PHASE_CONFIG[phase];
+                        const Icon = config.icon;
+                        const timings = timingsByPhase[phase];
+                        
+                        if (timings.length === 0) return null;
+
+                        return (
+                          <React.Fragment key={phase}>
+                            {/* Phase Header Row */}
+                            <tr className={`${config.light} border-b ${config.border}`}>
+                              <td colSpan={6} className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-6 h-6 rounded ${config.accent} flex items-center justify-center`}>
+                                    <Icon className="w-3.5 h-3.5 text-white" />
+                                  </div>
+                                  <span className={`font-semibold text-sm ${config.text}`}>{config.label}</span>
+                                  <span className="text-muted-foreground text-xs">({timings.length} passes)</span>
+                                  <span className={`ml-auto font-semibold text-sm ${config.text}`}>
+                                    ${phaseCosts[phase].toFixed(2)}/ac
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Pass Rows */}
+                            {timings.map((timing) => {
+                              const passSummary = calculatePassSummaryWithPriceBook(timing, crop, products, priceBookContext);
+                              const isExpanded = expandedPasses.has(timing.id);
+                              const timingApps = crop.applications.filter(a => a.timingId === timing.id);
+                              const productCount = timingApps.length;
+                              const bucketInfo = timing.timingBucket ? TIMING_BUCKET_INFO[timing.timingBucket] : null;
+
+                              return (
+                                <React.Fragment key={timing.id}>
+                                  {/* Pass Row */}
+                                  <tr 
+                                    onClick={() => togglePassExpand(timing.id)}
+                                    className="hover:bg-muted/30 cursor-pointer transition-colors"
+                                  >
+                                    <td className="px-3 py-2.5 text-center">
+                                      {isExpanded ? (
+                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <span className="font-medium text-foreground">{timing.name}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${config.light} ${config.text}`}>
+                                        {bucketInfo?.label || timing.timingBucket || config.label}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-center">
+                                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                                        {productCount}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right font-medium text-foreground">
+                                      ${passSummary.costPerFieldAcre.toFixed(2)}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right text-muted-foreground">
+                                      ${formatNumber(passSummary.totalCost, 0)}
+                                    </td>
+                                  </tr>
+
+                                  {/* Expanded Product Sub-rows */}
+                                  {isExpanded && timingApps.map((app) => {
+                                    const product = products.find(p => p.id === app.productId);
+                                    if (!product) return null;
+                                    const vendor = vendors.find(v => v.id === product.vendorId);
+                                    const appCostPerAcre = app.rate * (product.price || 0);
+                                    const appTotal = appCostPerAcre * crop.totalAcres;
+
+                                    return (
+                                      <tr 
+                                        key={app.id} 
+                                        className="bg-muted/20 hover:bg-muted/40 transition-colors"
+                                      >
+                                        <td className="px-3 py-2"></td>
+                                        <td className="pl-8 pr-3 py-2" colSpan={2}>
+                                          <div className="flex items-center gap-2">
+                                            <div className={`w-7 h-7 rounded flex items-center justify-center ${
+                                              product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                                            }`}>
+                                              {product.form === 'liquid' 
+                                                ? <Droplets className="w-3.5 h-3.5 text-blue-600" /> 
+                                                : <Weight className="w-3.5 h-3.5 text-amber-600" />
+                                              }
+                                            </div>
+                                            <div>
+                                              <span className="text-sm font-medium text-foreground">{product.name}</span>
+                                              {vendor && (
+                                                <span className="text-xs text-muted-foreground ml-2">{vendor.name}</span>
+                                              )}
+                                            </div>
+                                            {(app.tierAuto || app.tierOverride) && (
+                                              <span className="px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded font-medium capitalize">
+                                                {app.tierOverride || app.tierAuto}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-muted-foreground">
+                                          {formatNumber(app.rate, 2)} {app.rateUnit}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-sm text-foreground">
+                                          ${appCostPerAcre.toFixed(2)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-sm text-muted-foreground">
+                                          ${formatNumber(appTotal, 0)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()
         ) : (
           /* FOCUS VIEW */
           (() => {
