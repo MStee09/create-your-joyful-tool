@@ -1,447 +1,692 @@
 import React, { useState } from 'react';
 import {
-  Package,
-  Truck,
-  FileText,
-  ChevronRight,
-  Plus,
-  Search,
-  Calendar,
-  CheckCircle,
-  Clock,
-  Building2,
-  Phone,
-  Receipt,
-  Eye,
-  Edit,
-  XCircle
+  Package, Truck, FileText, ChevronRight, Plus, Calendar, DollarSign,
+  CheckCircle, Clock, Building2, Phone, Receipt, X, Calculator,
+  Trash2, Info, TrendingDown, ChevronDown, ChevronUp, Sun
 } from 'lucide-react';
-import { RecordInvoiceModal, Order as ModalOrder } from './RecordInvoiceModal';
 
-// Types
-type OrderStatus = 'draft' | 'ordered' | 'confirmed' | 'partial' | 'complete' | 'cancelled';
-type PaymentStatus = 'unpaid' | 'prepaid' | 'partial' | 'paid';
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type OrderStatus = 'ordered' | 'in_transit' | 'complete';
+type PaymentStatus = 'unpaid' | 'prepaid';
+
+interface OrderLineItem {
+  id: string;
+  productName: string;
+  orderedQuantity: number;
+  remainingQuantity: number;
+  unit: string;
+  unitPrice: number;
+  packageType?: string;
+}
 
 interface Order {
   id: string;
   orderNumber: string;
-  vendorId: string;
   vendorName: string;
+  vendorPhone: string;
   orderDate: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  deliveryWindow?: { month?: string; notes?: string };
-  lineItems: { productName: string; quantity: number; unit: string; unitPrice: number }[];
+  deliveryWindow: { month: string; notes?: string };
+  scheduledDate?: string;
+  lineItems: OrderLineItem[];
   subtotal: number;
   receivedTotal: number;
-  invoiceCount: number;
   bidEventId?: string;
-  notes?: string;
 }
 
-// Mock data
+interface PackageTier {
+  id: string;
+  packageType: string;
+  packageSize: number;
+  pricePerUnit: number;
+  minQty?: number;
+}
+
+interface Charge {
+  id: string;
+  type: string;
+  description: string;
+  amount: number;
+}
+
+// ============================================================================
+// SHARED DATA
+// ============================================================================
+
 const mockOrders: Order[] = [
   {
-    id: '1',
-    orderNumber: 'ORD-2026-001',
-    vendorId: 'v1',
-    vendorName: 'Nutrien Ag Solutions',
-    orderDate: '2026-01-15',
-    status: 'ordered',
-    paymentStatus: 'prepaid',
+    id: '1', orderNumber: 'ORD-2026-001', vendorName: 'Nutrien Ag Solutions', vendorPhone: '(320) 555-0123',
+    orderDate: '2026-01-15', status: 'ordered', paymentStatus: 'prepaid',
     deliveryWindow: { month: 'March', notes: 'Call when ground thaws' },
     lineItems: [
-      { productName: 'AMS 21-0-0-24S', quantity: 15, unit: 'tons', unitPrice: 415 },
-      { productName: 'Urea 46-0-0', quantity: 12, unit: 'tons', unitPrice: 510 },
+      { id: 'li-1', productName: 'AMS 21-0-0-24S', orderedQuantity: 15, remainingQuantity: 15, unit: 'tons', unitPrice: 415 },
+      { id: 'li-2', productName: 'Urea 46-0-0', orderedQuantity: 12, remainingQuantity: 12, unit: 'tons', unitPrice: 510 },
     ],
-    subtotal: 12345,
-    receivedTotal: 0,
-    invoiceCount: 0,
-    bidEventId: 'bid-1',
+    subtotal: 12345, receivedTotal: 0, bidEventId: 'bid-1',
   },
   {
-    id: '2',
-    orderNumber: 'ORD-2026-002',
-    vendorId: 'v2',
-    vendorName: 'BW Fusion',
-    orderDate: '2026-02-01',
-    status: 'ordered',
-    paymentStatus: 'unpaid',
+    id: '2', orderNumber: 'ORD-2026-002', vendorName: 'BW Fusion', vendorPhone: '(612) 555-0456',
+    orderDate: '2026-02-01', status: 'ordered', paymentStatus: 'unpaid',
     deliveryWindow: { month: 'April' },
     lineItems: [
-      { productName: 'Humical', quantity: 20, unit: 'gal', unitPrice: 42 },
-      { productName: 'BW-AmiNo', quantity: 15, unit: 'gal', unitPrice: 45.50 },
+      { id: 'li-3', productName: 'Humical', orderedQuantity: 20, remainingQuantity: 20, unit: 'gal', unitPrice: 42, packageType: '275 gal tote' },
     ],
-    subtotal: 1522.50,
-    receivedTotal: 0,
-    invoiceCount: 0,
+    subtotal: 840, receivedTotal: 0,
   },
   {
-    id: '3',
-    orderNumber: 'ORD-2026-003',
-    vendorId: 'v3',
-    vendorName: 'CHS',
-    orderDate: '2026-02-10',
-    status: 'partial',
-    paymentStatus: 'partial',
-    deliveryWindow: { month: 'March' },
+    id: '3', orderNumber: 'ORD-2026-003', vendorName: 'CHS', vendorPhone: '(320) 555-0789',
+    orderDate: '2026-02-10', status: 'in_transit', paymentStatus: 'unpaid',
+    deliveryWindow: { month: 'March' }, scheduledDate: '2026-03-15',
     lineItems: [
-      { productName: 'Glyphosate 4.5#', quantity: 100, unit: 'gal', unitPrice: 15 },
-      { productName: 'Dicamba DGA', quantity: 30, unit: 'gal', unitPrice: 42 },
+      { id: 'li-4', productName: 'Glyphosate 4.5#', orderedQuantity: 50, remainingQuantity: 50, unit: 'gal', unitPrice: 15 },
     ],
-    subtotal: 2760,
-    receivedTotal: 1500,
-    invoiceCount: 1,
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-2026-004',
-    vendorId: 'v1',
-    vendorName: 'Nutrien Ag Solutions',
-    orderDate: '2026-01-20',
-    status: 'complete',
-    paymentStatus: 'paid',
-    lineItems: [
-      { productName: 'MAP 11-52-0', quantity: 8, unit: 'tons', unitPrice: 680 },
-    ],
-    subtotal: 5440,
-    receivedTotal: 5612,
-    invoiceCount: 1,
+    subtotal: 750, receivedTotal: 0,
   },
 ];
 
-const statusConfig: Record<OrderStatus, { label: string; color: string; icon: React.ElementType }> = {
-  draft: { label: 'Draft', color: 'gray', icon: Edit },
-  ordered: { label: 'Ordered', color: 'blue', icon: Clock },
-  confirmed: { label: 'Confirmed', color: 'cyan', icon: CheckCircle },
-  partial: { label: 'Partial', color: 'amber', icon: Package },
-  complete: { label: 'Complete', color: 'emerald', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'red', icon: XCircle },
+const packageTiers: PackageTier[] = [
+  { id: 'pt1', packageType: '2.5 gal jug', packageSize: 2.5, pricePerUnit: 48 },
+  { id: 'pt2', packageType: '30 gal drum', packageSize: 30, pricePerUnit: 45 },
+  { id: 'pt3', packageType: '275 gal tote', packageSize: 275, pricePerUnit: 42 },
+  { id: 'pt4', packageType: 'Bulk (500+ gal)', packageSize: 0, pricePerUnit: 38, minQty: 500 },
+];
+
+const statusConfig = {
+  ordered: { label: 'Ordered', bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
+  in_transit: { label: 'In Transit', bg: 'bg-amber-100', text: 'text-amber-700', icon: Truck },
+  complete: { label: 'Complete', bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle },
 };
 
-const paymentConfig: Record<PaymentStatus, { label: string; color: string }> = {
-  unpaid: { label: 'Unpaid', color: 'gray' },
-  prepaid: { label: 'Prepaid', color: 'emerald' },
-  partial: { label: 'Partial', color: 'amber' },
-  paid: { label: 'Paid', color: 'emerald' },
+const paymentConfig = {
+  unpaid: { label: 'Unpaid', bg: 'bg-muted', text: 'text-muted-foreground' },
+  prepaid: { label: 'Prepaid', bg: 'bg-emerald-100', text: 'text-emerald-700' },
 };
 
-const getStatusClasses = (color: string) => ({
-  bg: color === 'gray' ? 'bg-muted' : 
-      color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30' :
-      color === 'cyan' ? 'bg-cyan-100 dark:bg-cyan-900/30' :
-      color === 'amber' ? 'bg-amber-100 dark:bg-amber-900/30' :
-      color === 'emerald' ? 'bg-emerald-100 dark:bg-emerald-900/30' :
-      color === 'red' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted',
-  text: color === 'gray' ? 'text-muted-foreground' :
-        color === 'blue' ? 'text-blue-600 dark:text-blue-400' :
-        color === 'cyan' ? 'text-cyan-600 dark:text-cyan-400' :
-        color === 'amber' ? 'text-amber-600 dark:text-amber-400' :
-        color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' :
-        color === 'red' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
-});
+// ============================================================================
+// RECORD INVOICE MODAL
+// ============================================================================
 
-export const OrdersView: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'partial' | 'complete'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [invoiceModalOrder, setInvoiceModalOrder] = useState<ModalOrder | null>(null);
+interface RecordInvoiceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  order: Order | null;
+}
 
-  // Convert local Order to modal Order format
-  const toModalOrder = (order: Order): ModalOrder => ({
-    id: order.id,
-    orderNumber: order.orderNumber,
-    vendorName: order.vendorName,
-    orderDate: order.orderDate,
-    status: order.status,
-    paymentStatus: order.paymentStatus,
-    deliveryWindow: order.deliveryWindow,
-    subtotal: order.subtotal,
-    receivedTotal: order.receivedTotal,
-    invoiceCount: order.invoiceCount,
-    bidEventId: order.bidEventId,
-    lineItems: order.lineItems.map((li, idx) => ({
-      id: `li-${idx}`,
-      productName: li.productName,
-      orderedQuantity: li.quantity,
-      receivedQuantity: 0,
-      remainingQuantity: li.quantity,
-      unit: li.unit,
-      unitPrice: li.unitPrice,
-    })),
+const RecordInvoiceModal: React.FC<RecordInvoiceModalProps> = ({ isOpen, onClose, order }) => {
+  const [charges] = useState<Charge[]>([{ id: '1', type: 'freight', description: 'Freight', amount: 485 }]);
+  
+  if (!isOpen || !order) return null;
+
+  const lineItems = order.lineItems.map(li => ({
+    ...li, quantity: li.remainingQuantity, subtotal: li.remainingQuantity * li.unitPrice
+  }));
+
+  const productSubtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const chargesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
+  const invoiceTotal = productSubtotal + chargesTotal;
+
+  // Freight allocation
+  const totalWeight = lineItems.reduce((sum, item) => {
+    const mult = item.unit === 'tons' ? 2000 : 10;
+    return sum + (item.quantity * mult);
+  }, 0);
+
+  const lineItemsWithFreight = lineItems.map(item => {
+    const mult = item.unit === 'tons' ? 2000 : 10;
+    const ratio = totalWeight > 0 ? (item.quantity * mult) / totalWeight : 0;
+    const allocated = chargesTotal * ratio;
+    const landed = item.quantity > 0 ? (item.subtotal + allocated) / item.quantity : 0;
+    return { ...item, allocatedFreight: allocated, landedCost: landed };
   });
-
-  const filteredOrders = mockOrders.filter(order => {
-    if (filter === 'pending' && !['ordered', 'confirmed'].includes(order.status)) return false;
-    if (filter === 'partial' && order.status !== 'partial') return false;
-    if (filter === 'complete' && order.status !== 'complete') return false;
-    if (searchQuery && !order.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const pendingCount = mockOrders.filter(o => ['ordered', 'confirmed'].includes(o.status)).length;
-  const partialCount = mockOrders.filter(o => o.status === 'partial').length;
-
-  // Calculate totals
-  const totalOrdered = mockOrders.reduce((sum, o) => sum + o.subtotal, 0);
-  const totalReceived = mockOrders.reduce((sum, o) => sum + o.receivedTotal, 0);
-  const totalPending = totalOrdered - totalReceived;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Orders</h1>
-          <p className="text-muted-foreground">Track purchases from order to delivery</p>
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors">
-          <Plus className="w-5 h-5" />
-          New Order
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="text-sm text-muted-foreground mb-1">Total Ordered</div>
-          <div className="text-2xl font-bold text-foreground">
-            ${totalOrdered.toLocaleString()}
-          </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="text-sm text-muted-foreground mb-1">Received</div>
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            ${totalReceived.toLocaleString()}
-          </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="text-sm text-muted-foreground mb-1">Pending Delivery</div>
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            ${totalPending.toLocaleString()}
-          </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 border border-border">
-          <div className="text-sm text-muted-foreground mb-1">Awaiting Delivery</div>
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {pendingCount} orders
-          </div>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex bg-muted rounded-lg p-1">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'pending', label: `Pending (${pendingCount})` },
-            { id: 'partial', label: `Partial (${partialCount})` },
-            { id: 'complete', label: 'Complete' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id as typeof filter)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                filter === tab.id
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground text-sm w-64"
-          />
-        </div>
-      </div>
-
-      {/* Orders List */}
-      <div className="space-y-3">
-        {filteredOrders.map(order => {
-          const statusInfo = statusConfig[order.status];
-          const paymentInfo = paymentConfig[order.paymentStatus];
-          const StatusIcon = statusInfo.icon;
-          const isExpanded = expandedOrderId === order.id;
-          const progress = order.subtotal > 0 ? (order.receivedTotal / order.subtotal) * 100 : 0;
-          const statusClasses = getStatusClasses(statusInfo.color);
-          const paymentClasses = getStatusClasses(paymentInfo.color);
-
-          return (
-            <div
-              key={order.id}
-              className="bg-card rounded-xl border border-border overflow-hidden"
-            >
-              {/* Order Header */}
-              <div
-                className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-              >
-                <div className="flex items-center gap-4">
-                  {/* Status Icon */}
-                  <div className={`w-10 h-10 rounded-full ${statusClasses.bg} flex items-center justify-center`}>
-                    <StatusIcon className={`w-5 h-5 ${statusClasses.text}`} />
-                  </div>
-
-                  {/* Order Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-foreground">
-                        {order.orderNumber}
-                      </span>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusClasses.bg} ${statusClasses.text}`}>
-                        {statusInfo.label}
-                      </span>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${paymentClasses.bg} ${paymentClasses.text}`}>
-                        {paymentInfo.label}
-                      </span>
-                      {order.bidEventId && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
-                          From Bid
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Building2 className="w-4 h-4" />
-                        {order.vendorName}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Ordered {new Date(order.orderDate).toLocaleDateString()}
-                      </span>
-                      {order.deliveryWindow?.month && (
-                        <span className="flex items-center gap-1">
-                          <Truck className="w-4 h-4" />
-                          Delivery: {order.deliveryWindow.month}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Amount & Progress */}
-                  <div className="text-right">
-                    <div className="font-semibold text-foreground">
-                      ${order.subtotal.toLocaleString()}
-                    </div>
-                    {order.status === 'partial' && (
-                      <div className="text-sm text-muted-foreground">
-                        ${order.receivedTotal.toLocaleString()} received
-                      </div>
-                    )}
-                    {order.invoiceCount > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {order.invoiceCount} invoice{order.invoiceCount !== 1 ? 's' : ''}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expand Arrow */}
-                  <ChevronRight className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                </div>
-
-                {/* Progress Bar (for partial) */}
-                {order.status === 'partial' && (
-                  <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-500 rounded-full transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Expanded Details */}
-              {isExpanded && (
-                <div className="border-t border-border bg-muted/30">
-                  {/* Line Items */}
-                  <div className="p-4">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Order Items</h4>
-                    <div className="space-y-2">
-                      {order.lineItems.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <span className="text-foreground">{item.productName}</span>
-                          <div className="flex items-center gap-4">
-                            <span className="text-muted-foreground">
-                              {item.quantity} {item.unit} @ ${item.unitPrice}/{item.unit.replace(/s$/, '')}
-                            </span>
-                            <span className="font-medium text-foreground w-24 text-right">
-                              ${(item.quantity * item.unitPrice).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Delivery Notes */}
-                  {order.deliveryWindow?.notes && (
-                    <div className="px-4 pb-4">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Delivery Notes:</strong> {order.deliveryWindow.notes}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="px-4 pb-4 flex gap-3">
-                    {['ordered', 'confirmed', 'partial'].includes(order.status) && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInvoiceModalOrder(toModalOrder(order));
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <Receipt className="w-4 h-4" />
-                        Record Invoice
-                      </button>
-                    )}
-                    {['ordered', 'confirmed'].includes(order.status) && (
-                      <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-                        <Phone className="w-4 h-4" />
-                        Call In Delivery
-                      </button>
-                    )}
-                    <button className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-muted rounded-lg text-sm font-medium text-foreground transition-colors">
-                      <Eye className="w-4 h-4" />
-                      View Details
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-muted rounded-lg text-sm font-medium text-foreground transition-colors">
-                      <FileText className="w-4 h-4" />
-                      View Invoices
-                    </button>
-                  </div>
-                </div>
-              )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Receipt className="w-5 h-5 text-emerald-600" />
             </div>
-          );
-        })}
-      </div>
-
-      {/* Empty State */}
-      {filteredOrders.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">No orders found</h3>
-          <p className="text-muted-foreground mb-4">
-            {filter !== 'all' ? 'Try changing your filter.' : 'Create your first order to get started.'}
-          </p>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors">
-            <Plus className="w-5 h-5" />
-            New Order
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Record Invoice</h2>
+              <p className="text-sm text-muted-foreground">{order.orderNumber} · {order.vendorName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg">
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Invoice Details */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Vendor Invoice #</label>
+              <input type="text" placeholder="INV-2026-0342" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Invoice Date</label>
+              <input type="date" defaultValue="2026-03-15" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Received Date</label>
+              <input type="date" defaultValue="2026-03-15" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
+            </div>
+          </div>
+
+          {/* Products */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4" /> Products Received
+            </h3>
+            <div className="space-y-4">
+              {lineItems.map((item, idx) => {
+                const wf = lineItemsWithFreight[idx];
+                return (
+                  <div key={item.id} className="p-4 bg-muted rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-medium text-foreground">{item.productName}</div>
+                        <div className="text-sm text-muted-foreground">Ordered: {item.orderedQuantity} {item.unit}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-foreground">${item.subtotal.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">@ ${item.unitPrice}/{item.unit.replace(/s$/, '')}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Qty Received</label>
+                        <div className="flex">
+                          <input type="number" defaultValue={item.quantity} step="0.01" className="flex-1 px-3 py-2 border border-border rounded-l-lg bg-background" />
+                          <span className="px-3 py-2 bg-muted border border-l-0 border-border rounded-r-lg text-muted-foreground text-sm">{item.unit}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Unit Price</label>
+                        <div className="flex">
+                          <span className="px-3 py-2 bg-muted border border-r-0 border-border rounded-l-lg text-muted-foreground text-sm">$</span>
+                          <input type="number" defaultValue={item.unitPrice} readOnly className="flex-1 px-3 py-2 border border-border rounded-r-lg bg-muted" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Scale Ticket #</label>
+                        <input type="text" placeholder="4521" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
+                      </div>
+                    </div>
+                    {chargesTotal > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">+ Allocated Freight</span>
+                          <span className="text-foreground">${wf.allocatedFreight.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm font-medium mt-1">
+                          <span className="text-emerald-600">Landed Cost</span>
+                          <span className="text-emerald-600">${wf.landedCost.toFixed(2)}/{item.unit.replace(/s$/, '')}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end mt-3">
+              <span className="text-sm text-muted-foreground">Product Subtotal:</span>
+              <span className="ml-3 text-lg font-semibold text-foreground">${productSubtotal.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Freight */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Truck className="w-4 h-4" /> Freight & Charges
+              </h3>
+              <button className="flex items-center gap-1 text-sm text-emerald-600">
+                <Plus className="w-4 h-4" /> Add Charge
+              </button>
+            </div>
+            <div className="space-y-2">
+              {charges.map(charge => (
+                <div key={charge.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Truck className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-foreground">{charge.description}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-foreground">${charge.amount.toFixed(2)}</span>
+                    <button className="p-1 hover:bg-background rounded"><Trash2 className="w-4 h-4 text-muted-foreground" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-3">
+              <span className="text-sm text-muted-foreground">Charges Total:</span>
+              <span className="ml-3 text-lg font-semibold text-foreground">${chargesTotal.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-border bg-muted">
+          {chargesTotal > 0 && (
+            <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="flex items-center gap-2 text-sm text-emerald-800 mb-2">
+                <Calculator className="w-4 h-4" />
+                <span className="font-medium">Landed Costs (freight allocated by weight)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {lineItemsWithFreight.map(item => (
+                  <div key={item.id} className="flex justify-between">
+                    <span className="text-emerald-700">{item.productName}:</span>
+                    <span className="font-medium text-emerald-800">${item.landedCost.toFixed(2)}/{item.unit.replace(/s$/, '')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">Invoice Total</div>
+              <div className="text-2xl font-bold text-foreground">${invoiceTotal.toLocaleString()}</div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="px-4 py-2 border border-border text-foreground rounded-lg hover:bg-background">Cancel</button>
+              <button className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
+                <CheckCircle className="w-5 h-5" /> Save Invoice & Update Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// PACKAGE PRICING CALCULATOR
+// ============================================================================
+
+const PackagePricingCalculator: React.FC = () => {
+  const [needed, setNeeded] = useState('100');
+  const [expanded, setExpanded] = useState(true);
+  const qty = parseFloat(needed) || 0;
+  const maxPrice = Math.max(...packageTiers.map(t => t.pricePerUnit));
+
+  const tierCosts = packageTiers.map(tier => {
+    if (tier.minQty && qty < tier.minQty) return { tier, packages: 0, totalQty: 0, cost: Infinity, eligible: false };
+    let packages = 0, totalQty = 0;
+    if (tier.packageSize > 0) {
+      packages = Math.ceil(qty / tier.packageSize);
+      totalQty = packages * tier.packageSize;
+    } else {
+      packages = 1; totalQty = qty;
+    }
+    return { tier, packages, totalQty, cost: totalQty * tier.pricePerUnit, eligible: true };
+  }).filter(tc => tc.eligible);
+
+  const best = tierCosts.reduce((b, c) => c.cost < b.cost ? c : b, tierCosts[0]);
+
+  return (
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-muted">
+        <div className="flex items-center gap-3">
+          <Package className="w-6 h-6 text-emerald-600" />
+          <div className="text-left">
+            <div className="font-semibold text-foreground">Humical Package Pricing</div>
+            <div className="text-sm text-muted-foreground">See savings by package size</div>
+          </div>
+        </div>
+        {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+      </button>
+      
+      {expanded && (
+        <div className="p-4 border-t border-border space-y-4">
+          {/* Tiers */}
+          <div className="space-y-2">
+            {packageTiers.map((tier, idx) => {
+              const savings = ((maxPrice - tier.pricePerUnit) / maxPrice) * 100;
+              return (
+                <div key={tier.id} className={`flex items-center justify-between p-3 rounded-lg ${idx === packageTiers.length - 1 ? 'bg-emerald-50 border border-emerald-200' : 'bg-muted'}`}>
+                  <div>
+                    <div className="font-medium text-foreground">{tier.packageType}</div>
+                    {tier.packageSize > 0 && <div className="text-sm text-muted-foreground">{tier.packageSize} gal</div>}
+                    {tier.minQty && <div className="text-xs text-amber-600">Min {tier.minQty} gal</div>}
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-foreground">${tier.pricePerUnit.toFixed(2)}/gal</div>
+                    {savings > 0 && (
+                      <div className="text-sm text-emerald-600 flex items-center gap-1 justify-end">
+                        <TrendingDown className="w-3 h-3" /> Save {savings.toFixed(0)}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Calculator */}
+          <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
+            <div className="text-sm font-medium text-foreground mb-2">How much do you need?</div>
+            <div className="flex gap-2 mb-4">
+              <input type="number" value={needed} onChange={e => setNeeded(e.target.value)} className="flex-1 px-3 py-2 border border-border rounded-lg bg-background" />
+              <span className="px-4 py-2 bg-background rounded-lg text-muted-foreground border border-border">gal</span>
+            </div>
+            
+            {qty > 0 && tierCosts.length > 0 && (
+              <div className="space-y-2">
+                {tierCosts.slice(0, 3).map(({ tier, packages, totalQty, cost }) => {
+                  const isBest = cost === best?.cost;
+                  return (
+                    <div key={tier.id} className={`p-3 rounded-lg ${isBest ? 'bg-emerald-100 border border-emerald-300' : 'bg-background'}`}>
+                      <div className="flex justify-between">
+                        <div>
+                          <span className="font-medium">{tier.packageType}</span>
+                          {isBest && <span className="ml-2 px-2 py-0.5 text-xs bg-emerald-500 text-white rounded-full">Best Value</span>}
+                        </div>
+                        <span className="font-bold">${cost.toFixed(2)}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {tier.packageSize > 0 ? `${packages} × ${tier.packageSize} gal = ${totalQty} gal` : `${totalQty} gal bulk`}
+                        {totalQty > qty && <span className="text-amber-600 ml-1">(+{(totalQty - qty).toFixed(0)} extra)</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN VIEW
+// ============================================================================
+
+export const OrdersView: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'orders' | 'pending' | 'pricing'>('orders');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [invoiceModalOrder, setInvoiceModalOrder] = useState<Order | null>(null);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Tabs */}
+      <div className="bg-card border-b border-border">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex gap-1">
+            {[
+              { id: 'orders' as const, label: 'Orders', icon: FileText },
+              { id: 'pending' as const, label: 'Pending Deliveries', icon: Truck },
+              { id: 'pricing' as const, label: 'Package Pricing', icon: Package },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-emerald-600 text-emerald-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto p-6">
+        {/* Orders Tab */}
+        {activeTab === 'orders' && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Orders</h1>
+                <p className="text-muted-foreground">Track purchases from order to delivery</p>
+              </div>
+              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
+                <Plus className="w-5 h-5" /> New Order
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Total Ordered</div>
+                <div className="text-2xl font-bold text-foreground">$13,935</div>
+              </div>
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">On Order</div>
+                <div className="text-2xl font-bold text-blue-600">$13,935</div>
+              </div>
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Prepaid</div>
+                <div className="text-2xl font-bold text-emerald-600">$12,345</div>
+              </div>
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="text-sm text-muted-foreground mb-1">Awaiting Delivery</div>
+                <div className="text-2xl font-bold text-amber-600">3 orders</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {mockOrders.map(order => {
+                const statusInfo = statusConfig[order.status];
+                const paymentInfo = paymentConfig[order.paymentStatus];
+                const StatusIcon = statusInfo.icon;
+                const isExpanded = expandedOrderId === order.id;
+
+                return (
+                  <div key={order.id} className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="p-4 cursor-pointer hover:bg-muted" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-full ${statusInfo.bg} flex items-center justify-center`}>
+                          <StatusIcon className={`w-5 h-5 ${statusInfo.text}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-foreground">{order.orderNumber}</span>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${paymentInfo.bg} ${paymentInfo.text}`}>{paymentInfo.label}</span>
+                            {order.bidEventId && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700">From Bid</span>}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1"><Building2 className="w-4 h-4" />{order.vendorName}</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />Delivery: {order.scheduledDate ? new Date(order.scheduledDate).toLocaleDateString() : order.deliveryWindow?.month}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-foreground">${order.subtotal.toLocaleString()}</div>
+                        </div>
+                        <ChevronRight className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="border-t border-border bg-muted p-4">
+                        <div className="space-y-2 mb-4">
+                          {order.lineItems.map(item => (
+                            <div key={item.id} className="flex justify-between text-sm">
+                              <span>{item.productName} {item.packageType && `(${item.packageType})`}</span>
+                              <span>{item.orderedQuantity} {item.unit} @ ${item.unitPrice} = ${(item.orderedQuantity * item.unitPrice).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {order.deliveryWindow?.notes && (
+                          <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 mb-4">
+                            <strong>Note:</strong> {order.deliveryWindow.notes}
+                          </div>
+                        )}
+                        <div className="flex gap-3">
+                          {order.status === 'in_transit' ? (
+                            <button onClick={() => setInvoiceModalOrder(order)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
+                              <Receipt className="w-4 h-4" /> Record Invoice
+                            </button>
+                          ) : (
+                            <>
+                              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+                                <Phone className="w-4 h-4" /> Call In Delivery
+                              </button>
+                              <button onClick={() => setInvoiceModalOrder(order)} className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-background rounded-lg text-sm font-medium text-foreground">
+                                <Receipt className="w-4 h-4" /> Record Invoice
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Pending Deliveries Tab */}
+        {activeTab === 'pending' && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Pending Deliveries</h1>
+                <p className="text-muted-foreground">Track orders awaiting delivery</p>
+              </div>
+            </div>
+
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Sun className="w-6 h-6 text-amber-500" />
+                  <div>
+                    <div className="font-medium text-foreground">Good delivery weather this week</div>
+                    <div className="text-sm text-muted-foreground">Clear skies through Friday. Good time to call in pending deliveries.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <Phone className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">2</div>
+                    <div className="text-sm text-muted-foreground">Awaiting Call</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Truck className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">1</div>
+                    <div className="text-sm text-muted-foreground">In Transit</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">$13.9k</div>
+                    <div className="text-sm text-muted-foreground">Total Pending</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {mockOrders.map(order => {
+                const isInTransit = order.status === 'in_transit';
+                return (
+                  <div key={order.id} className="bg-card rounded-xl border border-border p-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full ${isInTransit ? 'bg-amber-100' : 'bg-muted'} flex items-center justify-center`}>
+                        {isInTransit ? <Truck className="w-6 h-6 text-amber-600" /> : <Phone className="w-6 h-6 text-muted-foreground" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-foreground">{order.vendorName}</span>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${isInTransit ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                            {isInTransit ? 'In Transit' : 'Awaiting Call'}
+                          </span>
+                          {order.paymentStatus === 'prepaid' && (
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Prepaid</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {order.lineItems.map(li => li.productName).join(', ')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-foreground">${order.subtotal.toLocaleString()}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {order.scheduledDate ? new Date(order.scheduledDate).toLocaleDateString() : order.deliveryWindow?.month}
+                        </div>
+                      </div>
+                      {isInTransit ? (
+                        <button onClick={() => setInvoiceModalOrder(order)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
+                          Record Invoice
+                        </button>
+                      ) : (
+                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+                          Call to Schedule
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Package Pricing Tab */}
+        {activeTab === 'pricing' && (
+          <>
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-foreground">Package Tier Pricing</h1>
+              <p className="text-muted-foreground">Volume discounts for specialty products</p>
+            </div>
+
+            <div className="max-w-xl">
+              <PackagePricingCalculator />
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+              <div className="flex gap-3 text-sm text-blue-800">
+                <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>How it works:</strong> When creating an order, select your package type. FarmCalc shows the total cost and any overage. 
+                  Larger packages typically offer better per-unit pricing, but you may have leftover product.
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Info Box */}
+        <div className="mt-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+          <div className="flex gap-3 text-sm text-emerald-800">
+            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong>Try it:</strong> Click on an order to expand it, then click "Record Invoice" to see the landed cost calculation with freight allocation.
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Invoice Modal */}
       <RecordInvoiceModal
