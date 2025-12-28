@@ -4,6 +4,7 @@ import {
   CheckCircle, Clock, Building2, Phone, Receipt, X, Calculator,
   Trash2, Info, TrendingDown, ChevronDown, ChevronUp, Sun
 } from 'lucide-react';
+import { PackageTierPreview } from './PackageTierPricing';
 
 // ============================================================================
 // TYPES
@@ -655,26 +656,7 @@ export const OrdersView: React.FC = () => {
 
         {/* Package Pricing Tab */}
         {activeTab === 'pricing' && (
-          <>
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-foreground">Package Tier Pricing</h1>
-              <p className="text-muted-foreground">Volume discounts for specialty products</p>
-            </div>
-
-            <div className="max-w-xl">
-              <PackagePricingCalculator />
-            </div>
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-              <div className="flex gap-3 text-sm text-blue-800">
-                <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <div>
-                  <strong>How it works:</strong> When creating an order, select your package type. FarmCalc shows the total cost and any overage. 
-                  Larger packages typically offer better per-unit pricing, but you may have leftover product.
-                </div>
-              </div>
-            </div>
-          </>
+          <PackageTierPreview />
         )}
 
         {/* Info Box */}
