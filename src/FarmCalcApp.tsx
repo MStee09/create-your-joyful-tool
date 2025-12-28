@@ -136,12 +136,13 @@ const Sidebar: React.FC<{
   const procurementItems = [
     { id: 'procurement', label: 'Demand Rollup' },
     { id: 'orders', label: 'Orders' },
+    { id: 'plan-readiness', label: 'Plan Readiness' },
     { id: 'commodity-specs', label: 'Commodity Specs' },
     { id: 'bid-events', label: 'Bid Events' },
     { id: 'price-book', label: 'Price Book' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'orders' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
+  const isProcurementActive = activeView === 'procurement' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
