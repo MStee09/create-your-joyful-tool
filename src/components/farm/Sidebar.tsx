@@ -1,5 +1,5 @@
 import React from 'react';
-import { Leaf, BarChart3, FlaskConical, Building2, Warehouse, FileSpreadsheet, Settings, User } from 'lucide-react';
+import { Leaf, BarChart3, FlaskConical, Building2, Warehouse, FileSpreadsheet, Settings, User, ClipboardCheck, ShoppingCart, FileText } from 'lucide-react';
 
 interface SidebarProps {
   activeView: string;
@@ -9,12 +9,21 @@ interface SidebarProps {
   onSeasonChange: (id: string) => void;
 }
 
-const navItems = [
+const mainNavItems = [
   { id: 'dashboard', icon: BarChart3, label: 'Dashboard' },
   { id: 'crops', icon: Leaf, label: 'Crop Plans' },
   { id: 'products', icon: FlaskConical, label: 'Products' },
   { id: 'vendors', icon: Building2, label: 'Vendors' },
   { id: 'inventory', icon: Warehouse, label: 'Inventory' },
+];
+
+const procurementNavItems = [
+  { id: 'orders', icon: ShoppingCart, label: 'Orders' },
+  { id: 'plan-readiness', icon: ClipboardCheck, label: 'Plan Readiness' },
+  { id: 'commodity-specs', icon: FileText, label: 'Commodity Specs' },
+];
+
+const bottomNavItems = [
   { id: 'exports', icon: FileSpreadsheet, label: 'Export' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
@@ -55,9 +64,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </select>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map(item => (
+      {/* Main Navigation */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {mainNavItems.map(item => (
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
@@ -71,6 +80,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
+
+        {/* Procurement Section */}
+        <div className="pt-4 mt-4 border-t border-sidebar-border">
+          <p className="px-4 text-xs text-sidebar-foreground/50 uppercase tracking-wider mb-2">Procurement</p>
+          {procurementNavItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                activeView === item.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Bottom Nav Items */}
+        <div className="pt-4 mt-4 border-t border-sidebar-border">
+          {bottomNavItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                activeView === item.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
       </nav>
 
       {/* User */}
