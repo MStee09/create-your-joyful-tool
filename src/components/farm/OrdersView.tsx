@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Package,
   Truck,
@@ -20,7 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Breadcrumb } from './Breadcrumb';
-import { RecordInvoiceModal, Order, OrderLineItem } from './RecordInvoiceModal';
+import { RecordInvoiceModal } from './RecordInvoiceModal';
+import type { Order, OrderLineItem, Invoice, Vendor, ProductMaster } from '@/types';
 
 // Status configuration
 const statusConfig = {
@@ -39,87 +40,111 @@ const paymentConfig = {
   paid: { label: 'Paid', bg: 'bg-emerald-100', text: 'text-emerald-700' },
 };
 
-// Mock data - will be replaced with real data later
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'ORD-2026-001',
-    vendorName: 'Nutrien Ag Solutions',
-    orderDate: '2026-01-15',
-    status: 'ordered',
-    paymentStatus: 'prepaid',
-    deliveryWindow: { month: 'March', notes: 'Call when ground thaws' },
-    lineItems: [
-      { id: 'li-1', productName: 'AMS 21-0-0-24S', orderedQuantity: 15, receivedQuantity: 0, remainingQuantity: 15, unit: 'tons', unitPrice: 415 },
-      { id: 'li-2', productName: 'Urea 46-0-0', orderedQuantity: 12, receivedQuantity: 0, remainingQuantity: 12, unit: 'tons', unitPrice: 510 },
-    ],
-    subtotal: 12345,
-    receivedTotal: 0,
-    invoiceCount: 0,
-    bidEventId: 'bid-1',
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2026-002',
-    vendorName: 'BW Fusion',
-    orderDate: '2026-02-01',
-    status: 'ordered',
-    paymentStatus: 'unpaid',
-    deliveryWindow: { month: 'April' },
-    lineItems: [
-      { id: 'li-3', productName: 'Humical', orderedQuantity: 20, remainingQuantity: 20, unit: 'gal', unitPrice: 42 },
-      { id: 'li-4', productName: 'BW-AmiNo', orderedQuantity: 15, remainingQuantity: 15, unit: 'gal', unitPrice: 45.50 },
-    ],
-    subtotal: 1522.50,
-    receivedTotal: 0,
-    invoiceCount: 0,
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2026-003',
-    vendorName: 'CHS',
-    orderDate: '2026-02-10',
-    status: 'partial',
-    paymentStatus: 'partial',
-    deliveryWindow: { month: 'March' },
-    lineItems: [
-      { id: 'li-5', productName: 'Glyphosate 4.5#', orderedQuantity: 100, remainingQuantity: 50, unit: 'gal', unitPrice: 15 },
-      { id: 'li-6', productName: 'Dicamba DGA', orderedQuantity: 30, remainingQuantity: 30, unit: 'gal', unitPrice: 42 },
-    ],
-    subtotal: 2760,
-    receivedTotal: 750,
-    invoiceCount: 1,
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-2026-004',
-    vendorName: 'Nutrien Ag Solutions',
-    orderDate: '2026-01-20',
-    status: 'complete',
-    paymentStatus: 'paid',
-    lineItems: [
-      { id: 'li-7', productName: 'MAP 11-52-0', orderedQuantity: 8, remainingQuantity: 0, unit: 'tons', unitPrice: 680 },
-    ],
-    subtotal: 5440,
-    receivedTotal: 5612,
-    invoiceCount: 1,
-  },
-];
+// View-friendly order type with denormalized vendor name
+interface OrderViewItem {
+  id: string;
+  orderNumber: string;
+  vendorId: string;
+  vendorName: string;
+  orderDate: string;
+  status: 'draft' | 'ordered' | 'confirmed' | 'partial' | 'complete' | 'cancelled';
+  paymentStatus: 'unpaid' | 'prepaid' | 'partial' | 'paid';
+  deliveryWindow?: { month?: string; notes?: string };
+  lineItems: {
+    id: string;
+    productId: string;
+    productName: string;
+    orderedQuantity: number;
+    receivedQuantity: number;
+    remainingQuantity: number;
+    unit: string;
+    unitPrice: number;
+  }[];
+  subtotal: number;
+  receivedTotal: number;
+  invoiceCount: number;
+  bidEventId?: string;
+}
 
 interface OrdersViewProps {
+  orders: Order[];
+  invoices: Invoice[];
+  vendors: Vendor[];
+  productMasters: ProductMaster[];
+  currentSeasonYear: number;
+  onUpdateOrders: (orders: Order[]) => void;
+  onAddOrder: (order: Order) => void;
+  onAddInvoice: (invoice: Invoice) => void;
   onBack?: () => void;
 }
 
-export const OrdersView: React.FC<OrdersViewProps> = ({ onBack }) => {
+export const OrdersView: React.FC<OrdersViewProps> = ({
+  orders,
+  invoices,
+  vendors,
+  productMasters,
+  currentSeasonYear,
+  onUpdateOrders,
+  onAddOrder,
+  onAddInvoice,
+  onBack,
+}) => {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [invoiceModalOrder, setInvoiceModalOrder] = useState<Order | null>(null);
+  const [invoiceModalOrder, setInvoiceModalOrder] = useState<OrderViewItem | null>(null);
 
-  // Use mock data for now
-  const orders = mockOrders;
+  // Transform orders to view items with vendor names and product names
+  const orderViewItems: OrderViewItem[] = useMemo(() => {
+    const vendorMap = new Map(vendors.map(v => [v.id, v.name]));
+    const productMap = new Map(productMasters.map(p => [p.id, p.name]));
+    
+    return orders
+      .filter(o => o.seasonYear === currentSeasonYear)
+      .map(order => {
+        // Count invoices for this order
+        const orderInvoices = invoices.filter(i => i.orderId === order.id);
+        const receivedTotal = orderInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+        
+        // Map line items with product names and calculate received quantities
+        const lineItems = (order.lineItems || []).map((li: any) => {
+          // Sum received quantities from invoices
+          const receivedQty = orderInvoices.reduce((sum, inv) => {
+            const invLine = (inv.lineItems || []).find((il: any) => il.orderLineItemId === li.id);
+            return sum + (invLine?.quantity || 0);
+          }, 0);
+          
+          return {
+            id: li.id,
+            productId: li.productId,
+            productName: productMap.get(li.productId) || li.productId,
+            orderedQuantity: li.orderedQuantity || 0,
+            receivedQuantity: receivedQty,
+            remainingQuantity: (li.orderedQuantity || 0) - receivedQty,
+            unit: li.unit || 'gal',
+            unitPrice: li.unitPrice || 0,
+          };
+        });
+        
+        return {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          vendorId: order.vendorId,
+          vendorName: vendorMap.get(order.vendorId) || order.vendorId,
+          orderDate: order.orderDate,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          deliveryWindow: order.deliveryWindow,
+          lineItems,
+          subtotal: order.subtotal,
+          receivedTotal,
+          invoiceCount: orderInvoices.length,
+          bidEventId: order.bidEventId,
+        };
+      });
+  }, [orders, invoices, vendors, productMasters, currentSeasonYear]);
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = orderViewItems.filter(order => {
     if (filter === 'pending' && !['ordered', 'confirmed'].includes(order.status)) return false;
     if (filter === 'partial' && order.status !== 'partial') return false;
     if (filter === 'complete' && order.status !== 'complete') return false;
@@ -135,10 +160,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onBack }) => {
     return true;
   });
 
-  const pendingCount = orders.filter(o => ['ordered', 'confirmed'].includes(o.status)).length;
-  const partialCount = orders.filter(o => o.status === 'partial').length;
-  const totalOrdered = orders.reduce((sum, o) => sum + o.subtotal, 0);
-  const totalReceived = orders.reduce((sum, o) => sum + o.receivedTotal, 0);
+  const pendingCount = orderViewItems.filter(o => ['ordered', 'confirmed'].includes(o.status)).length;
+  const partialCount = orderViewItems.filter(o => o.status === 'partial').length;
+  const totalOrdered = orderViewItems.reduce((sum, o) => sum + o.subtotal, 0);
+  const totalReceived = orderViewItems.reduce((sum, o) => sum + o.receivedTotal, 0);
 
   return (
     <div className="p-8">

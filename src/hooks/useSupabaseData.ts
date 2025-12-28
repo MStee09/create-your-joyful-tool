@@ -15,6 +15,8 @@ import type {
   Crop,
   Purchase,
   InventoryTransaction,
+  Order,
+  Invoice,
 } from '@/types';
 import type { PriceHistory } from '@/types/farm';
 
@@ -32,6 +34,8 @@ interface SupabaseDataState {
   purchases: Purchase[];
   inventoryTransactions: InventoryTransaction[];
   priceHistory: PriceHistory[];
+  orders: Order[];
+  invoices: Invoice[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -172,6 +176,8 @@ export function useSupabaseData(user: User | null) {
     purchases: [],
     inventoryTransactions: [],
     priceHistory: [],
+    orders: [],
+    invoices: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -201,6 +207,8 @@ export function useSupabaseData(user: User | null) {
         purchasesRes,
         transactionsRes,
         priceHistoryRes,
+        ordersRes,
+        invoicesRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -215,6 +223,8 @@ export function useSupabaseData(user: User | null) {
         supabase.from('purchases').select('*').order('date', { ascending: false }),
         supabase.from('inventory_transactions').select('*').order('date', { ascending: false }),
         supabase.from('price_history').select('*').order('date', { ascending: false }),
+        supabase.from('orders').select('*').order('order_date', { ascending: false }),
+        supabase.from('invoices').select('*').order('received_date', { ascending: false }),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -276,6 +286,49 @@ export function useSupabaseData(user: User | null) {
       // from the product detail page. The commoditySpecId on ProductMaster is the source
       // of truth for linking products to specs.
 
+      // Map orders
+      const orders: Order[] = (ordersRes.data || []).map((row: any) => ({
+        id: row.id,
+        orderNumber: row.order_number,
+        vendorId: row.vendor_id,
+        seasonYear: row.season_year,
+        orderDate: row.order_date,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        deliveryWindow: row.delivery_window,
+        lineItems: row.line_items || [],
+        subtotal: Number(row.subtotal) || 0,
+        status: row.status || 'draft',
+        paymentStatus: row.payment_status || 'unpaid',
+        prepayment: row.prepayment,
+        bidEventId: row.bid_event_id,
+        notes: row.notes,
+        invoiceIds: [],
+      }));
+
+      // Map invoices
+      const invoices: Invoice[] = (invoicesRes.data || []).map((row: any) => ({
+        id: row.id,
+        invoiceNumber: row.invoice_number,
+        vendorId: row.vendor_id,
+        seasonYear: row.season_year,
+        invoiceDate: row.invoice_date,
+        receivedDate: row.received_date,
+        createdAt: row.created_at,
+        orderId: row.order_id,
+        lineItems: row.line_items || [],
+        productSubtotal: Number(row.product_subtotal) || 0,
+        charges: row.charges || [],
+        chargesTotal: Number(row.charges_total) || 0,
+        totalAmount: Number(row.total_amount) || 0,
+        status: row.status || 'draft',
+        paymentDate: row.payment_date,
+        paymentMethod: row.payment_method,
+        paymentReference: row.payment_reference,
+        scaleTickets: row.scale_tickets,
+        notes: row.notes,
+      }));
+
       // Get saved current season ID or use first season
       const savedSeasonId = localStorage.getItem('farmcalc-current-season');
       const currentSeasonId = seasons.find(s => s.id === savedSeasonId)?.id || seasons[0]?.id || null;
@@ -294,6 +347,8 @@ export function useSupabaseData(user: User | null) {
         purchases,
         inventoryTransactions,
         priceHistory,
+        orders,
+        invoices,
         currentSeasonId,
         loading: false,
         error: null,
@@ -725,6 +780,187 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, priceHistory: [...prev.priceHistory, entry] }));
   }, [user]);
 
+  // Update orders
+  const updateOrders = useCallback(async (orders: Order[]) => {
+    if (!user) return;
+    
+    const currentIds = new Set(state.orders.map(o => o.id));
+    const newIds = new Set(orders.map(o => o.id));
+    
+    const deletedIds = [...currentIds].filter(id => !newIds.has(id));
+    const newOrders = orders.filter(o => !currentIds.has(o.id));
+    const updatedOrders = orders.filter(o => currentIds.has(o.id));
+    
+    for (const id of deletedIds) {
+      await supabase.from('orders').delete().eq('id', id);
+    }
+    
+    for (const order of newOrders) {
+      await supabase.from('orders').insert({
+        id: order.id,
+        user_id: user.id,
+        order_number: order.orderNumber,
+        vendor_id: order.vendorId,
+        season_year: order.seasonYear,
+        order_date: order.orderDate,
+        delivery_window: order.deliveryWindow as any,
+        line_items: order.lineItems as any,
+        subtotal: order.subtotal,
+        status: order.status,
+        payment_status: order.paymentStatus,
+        prepayment: order.prepayment as any,
+        bid_event_id: order.bidEventId,
+        notes: order.notes,
+      });
+    }
+    
+    for (const order of updatedOrders) {
+      await supabase.from('orders').update({
+        order_number: order.orderNumber,
+        vendor_id: order.vendorId,
+        season_year: order.seasonYear,
+        order_date: order.orderDate,
+        delivery_window: order.deliveryWindow as any,
+        line_items: order.lineItems as any,
+        subtotal: order.subtotal,
+        status: order.status,
+        payment_status: order.paymentStatus,
+        prepayment: order.prepayment as any,
+        bid_event_id: order.bidEventId,
+        notes: order.notes,
+      }).eq('id', order.id);
+    }
+    
+    setState(prev => ({ ...prev, orders }));
+  }, [user, state.orders]);
+
+  // Add a single order
+  const addOrder = useCallback(async (order: Order) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('orders').insert({
+      id: order.id,
+      user_id: user.id,
+      order_number: order.orderNumber,
+      vendor_id: order.vendorId,
+      season_year: order.seasonYear,
+      order_date: order.orderDate,
+      delivery_window: order.deliveryWindow as any,
+      line_items: order.lineItems as any,
+      subtotal: order.subtotal,
+      status: order.status,
+      payment_status: order.paymentStatus,
+      prepayment: order.prepayment as any,
+      bid_event_id: order.bidEventId,
+      notes: order.notes,
+    });
+    
+    if (error) {
+      console.error('Error adding order:', error);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, orders: [...prev.orders, order] }));
+  }, [user]);
+
+  // Update invoices
+  const updateInvoices = useCallback(async (invoices: Invoice[]) => {
+    if (!user) return;
+    
+    const currentIds = new Set(state.invoices.map(i => i.id));
+    const newIds = new Set(invoices.map(i => i.id));
+    
+    const deletedIds = [...currentIds].filter(id => !newIds.has(id));
+    const newInvoices = invoices.filter(i => !currentIds.has(i.id));
+    const updatedInvoices = invoices.filter(i => currentIds.has(i.id));
+    
+    for (const id of deletedIds) {
+      await supabase.from('invoices').delete().eq('id', id);
+    }
+    
+    for (const invoice of newInvoices) {
+      await supabase.from('invoices').insert({
+        id: invoice.id,
+        user_id: user.id,
+        invoice_number: invoice.invoiceNumber,
+        vendor_id: invoice.vendorId,
+        season_year: invoice.seasonYear,
+        invoice_date: invoice.invoiceDate,
+        received_date: invoice.receivedDate,
+        order_id: invoice.orderId,
+        line_items: invoice.lineItems as any,
+        product_subtotal: invoice.productSubtotal,
+        charges: invoice.charges as any,
+        charges_total: invoice.chargesTotal,
+        total_amount: invoice.totalAmount,
+        status: invoice.status,
+        payment_date: invoice.paymentDate,
+        payment_method: invoice.paymentMethod,
+        payment_reference: invoice.paymentReference,
+        scale_tickets: invoice.scaleTickets,
+        notes: invoice.notes,
+      });
+    }
+    
+    for (const invoice of updatedInvoices) {
+      await supabase.from('invoices').update({
+        invoice_number: invoice.invoiceNumber,
+        vendor_id: invoice.vendorId,
+        season_year: invoice.seasonYear,
+        invoice_date: invoice.invoiceDate,
+        received_date: invoice.receivedDate,
+        order_id: invoice.orderId,
+        line_items: invoice.lineItems as any,
+        product_subtotal: invoice.productSubtotal,
+        charges: invoice.charges as any,
+        charges_total: invoice.chargesTotal,
+        total_amount: invoice.totalAmount,
+        status: invoice.status,
+        payment_date: invoice.paymentDate,
+        payment_method: invoice.paymentMethod,
+        payment_reference: invoice.paymentReference,
+        scale_tickets: invoice.scaleTickets,
+        notes: invoice.notes,
+      }).eq('id', invoice.id);
+    }
+    
+    setState(prev => ({ ...prev, invoices }));
+  }, [user, state.invoices]);
+
+  // Add a single invoice
+  const addInvoice = useCallback(async (invoice: Invoice) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('invoices').insert({
+      id: invoice.id,
+      user_id: user.id,
+      invoice_number: invoice.invoiceNumber,
+      vendor_id: invoice.vendorId,
+      season_year: invoice.seasonYear,
+      invoice_date: invoice.invoiceDate,
+      received_date: invoice.receivedDate,
+      order_id: invoice.orderId,
+      line_items: invoice.lineItems as any,
+      product_subtotal: invoice.productSubtotal,
+      charges: invoice.charges as any,
+      charges_total: invoice.chargesTotal,
+      total_amount: invoice.totalAmount,
+      status: invoice.status,
+      payment_date: invoice.paymentDate,
+      payment_method: invoice.paymentMethod,
+      payment_reference: invoice.paymentReference,
+      scale_tickets: invoice.scaleTickets,
+      notes: invoice.notes,
+    });
+    
+    if (error) {
+      console.error('Error adding invoice:', error);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, invoices: [...prev.invoices, invoice] }));
+  }, [user]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -743,5 +979,9 @@ export function useSupabaseData(user: User | null) {
     addPurchase,
     addInventoryTransaction,
     addPriceHistory,
+    updateOrders,
+    addOrder,
+    updateInvoices,
+    addInvoice,
   };
 }
