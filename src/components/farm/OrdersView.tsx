@@ -5,6 +5,7 @@ import {
   Trash2, Info, TrendingDown, ChevronDown, ChevronUp, Sun
 } from 'lucide-react';
 import { PackageTierPreview } from './PackageTierPricing';
+import { PendingDeliveriesDashboard } from './PendingDeliveriesDashboard';
 
 // ============================================================================
 // TYPES
@@ -552,106 +553,7 @@ export const OrdersView: React.FC = () => {
 
         {/* Pending Deliveries Tab */}
         {activeTab === 'pending' && (
-          <>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Pending Deliveries</h1>
-                <p className="text-muted-foreground">Track orders awaiting delivery</p>
-              </div>
-            </div>
-
-            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Sun className="w-6 h-6 text-amber-500" />
-                  <div>
-                    <div className="font-medium text-foreground">Good delivery weather this week</div>
-                    <div className="text-sm text-muted-foreground">Clear skies through Friday. Good time to call in pending deliveries.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                    <Phone className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">2</div>
-                    <div className="text-sm text-muted-foreground">Awaiting Call</div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Truck className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">1</div>
-                    <div className="text-sm text-muted-foreground">In Transit</div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">$13.9k</div>
-                    <div className="text-sm text-muted-foreground">Total Pending</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {mockOrders.map(order => {
-                const isInTransit = order.status === 'in_transit';
-                return (
-                  <div key={order.id} className="bg-card rounded-xl border border-border p-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full ${isInTransit ? 'bg-amber-100' : 'bg-muted'} flex items-center justify-center`}>
-                        {isInTransit ? <Truck className="w-6 h-6 text-amber-600" /> : <Phone className="w-6 h-6 text-muted-foreground" />}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-foreground">{order.vendorName}</span>
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${isInTransit ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
-                            {isInTransit ? 'In Transit' : 'Awaiting Call'}
-                          </span>
-                          {order.paymentStatus === 'prepaid' && (
-                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Prepaid</span>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {order.lineItems.map(li => li.productName).join(', ')}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-foreground">${order.subtotal.toLocaleString()}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {order.scheduledDate ? new Date(order.scheduledDate).toLocaleDateString() : order.deliveryWindow?.month}
-                        </div>
-                      </div>
-                      {isInTransit ? (
-                        <button onClick={() => setInvoiceModalOrder(order)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
-                          Record Invoice
-                        </button>
-                      ) : (
-                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-                          Call to Schedule
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+          <PendingDeliveriesDashboard />
         )}
 
         {/* Package Pricing Tab */}
