@@ -406,3 +406,16 @@ export type {
   SeasonPurchaseSummary,
   PriceComparison,
 } from './types/farm';
+
+// Re-export order/invoice types
+export type {
+  Order,
+  OrderLineItem,
+  OrderStatus,
+  PaymentStatus,
+  Invoice,
+  InvoiceLineItem,
+  InvoiceCharge,
+  InvoiceStatus,
+  ChargeType,
+} from './types/orderInvoice';

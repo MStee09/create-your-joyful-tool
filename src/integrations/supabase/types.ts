@@ -256,6 +256,162 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          charges: Json
+          charges_total: number
+          created_at: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          line_items: Json
+          notes: string | null
+          order_id: string | null
+          payment_date: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          product_subtotal: number
+          received_date: string
+          scale_tickets: string[] | null
+          season_year: number
+          status: string
+          total_amount: number
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          charges?: Json
+          charges_total?: number
+          created_at?: string
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          line_items?: Json
+          notes?: string | null
+          order_id?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          product_subtotal?: number
+          received_date?: string
+          scale_tickets?: string[] | null
+          season_year: number
+          status?: string
+          total_amount?: number
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          charges?: Json
+          charges_total?: number
+          created_at?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          line_items?: Json
+          notes?: string | null
+          order_id?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          product_subtotal?: number
+          received_date?: string
+          scale_tickets?: string[] | null
+          season_year?: number
+          status?: string
+          total_amount?: number
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          bid_event_id: string | null
+          created_at: string
+          delivery_window: Json | null
+          id: string
+          line_items: Json
+          notes: string | null
+          order_date: string
+          order_number: string
+          payment_status: string
+          prepayment: Json | null
+          season_year: number
+          status: string
+          subtotal: number
+          updated_at: string
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          bid_event_id?: string | null
+          created_at?: string
+          delivery_window?: Json | null
+          id?: string
+          line_items?: Json
+          notes?: string | null
+          order_date?: string
+          order_number: string
+          payment_status?: string
+          prepayment?: Json | null
+          season_year: number
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          bid_event_id?: string | null
+          created_at?: string
+          delivery_window?: Json | null
+          id?: string
+          line_items?: Json
+          notes?: string | null
+          order_date?: string
+          order_number?: string
+          payment_status?: string
+          prepayment?: Json | null
+          season_year?: number
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_bid_event_id_fkey"
+            columns: ["bid_event_id"]
+            isOneToOne: false
+            referencedRelation: "bid_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_book: {
         Row: {
           commodity_spec_id: string | null
