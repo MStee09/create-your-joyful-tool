@@ -471,7 +471,7 @@ export function useSupabaseData(user: User | null) {
   // Add a single product (faster than updating all)
   const addProductMaster = useCallback(async (product: ProductMaster) => {
     if (!user) return;
-    
+
     const { error } = await supabase.from('product_masters').insert({
       id: product.id,
       user_id: user.id,
@@ -491,13 +491,49 @@ export function useSupabaseData(user: User | null) {
       is_bid_eligible: product.isBidEligible ?? false,
       commodity_spec_id: product.commoditySpecId ?? null,
     });
-    
+
     if (error) {
       console.error('Error adding product:', error);
       return;
     }
-    
+
     setState(prev => ({ ...prev, productMasters: [...prev.productMasters, product] }));
+  }, [user]);
+
+  // Update a single product (prevents re-saving every product on every edit)
+  const updateProductMaster = useCallback(async (product: ProductMaster) => {
+    if (!user) return;
+
+    const { error } = await supabase.from('product_masters').upsert({
+      id: product.id,
+      user_id: user.id,
+      name: product.name,
+      category: product.category,
+      form: product.form,
+      default_unit: product.defaultUnit,
+      density_lbs_per_gal: product.densityLbsPerGal,
+      analysis: product.analysis as any,
+      general_notes: product.generalNotes,
+      mixing_notes: product.mixingNotes,
+      crop_rate_notes: product.cropRateNotes,
+      label_file_name: product.labelFileName,
+      sds_file_name: product.sdsFileName,
+      reorder_point: product.reorderPoint,
+      // Procurement
+      product_type: product.productType ?? null,
+      is_bid_eligible: product.isBidEligible ?? false,
+      commodity_spec_id: product.commoditySpecId ?? null,
+    });
+
+    if (error) {
+      console.error('Error updating product:', error);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      productMasters: prev.productMasters.map(p => (p.id === product.id ? product : p)),
+    }));
   }, [user]);
 
   // Vendor Offerings
@@ -1001,6 +1037,7 @@ export function useSupabaseData(user: User | null) {
     updateVendors,
     updateProductMasters,
     addProductMaster,
+    updateProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,

@@ -286,6 +286,7 @@ const ProductsViewNew: React.FC<{
   currentSeason: Season | null;
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
   onAddProduct: (product: ProductMaster) => void;
+  onUpdateProductMaster: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
@@ -299,23 +300,39 @@ const ProductsViewNew: React.FC<{
   currentSeason,
   onUpdateProductMasters,
   onAddProduct,
+  onUpdateProductMaster,
   onUpdateOfferings,
   onUpdateInventory,
   onUpdateSpecs,
   onNavigateToVendor,
 }) => {
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
+    const saved = sessionStorage.getItem('farmcalc-selected-product');
+    return saved || null;
+  });
+
+  const selectProduct = (id: string | null) => {
+    setSelectedProductId(id);
+    if (id) sessionStorage.setItem('farmcalc-selected-product', id);
+    else sessionStorage.removeItem('farmcalc-selected-product');
+  };
 
   const selectedProduct = selectedProductId 
     ? productMasters.find(p => p.id === selectedProductId) 
     : null;
+
+  // If the product no longer exists (deleted or not yet loaded), clear selection
+  useEffect(() => {
+    if (selectedProductId && !selectedProduct) selectProduct(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productMasters, selectedProductId]);
 
   const handleAddProduct = (product: ProductMaster) => {
     onAddProduct(product);
   };
 
   const handleUpdateProduct = (product: ProductMaster) => {
-    onUpdateProductMasters(productMasters.map(p => p.id === product.id ? product : p));
+    onUpdateProductMaster(product);
   };
 
   const handleDeleteProduct = (productId: string) => {
@@ -323,7 +340,7 @@ const ProductsViewNew: React.FC<{
     // Also remove related offerings and inventory
     onUpdateOfferings(vendorOfferings.filter(o => o.productId !== productId));
     onUpdateInventory(inventory.filter(i => i.productId !== productId));
-    setSelectedProductId(null);
+    selectProduct(null);
   };
 
   if (selectedProduct) {
@@ -339,7 +356,7 @@ const ProductsViewNew: React.FC<{
         onUpdateInventory={onUpdateInventory}
         onUpdateSpecs={onUpdateSpecs}
         onDeleteProduct={handleDeleteProduct}
-        onBack={() => setSelectedProductId(null)}
+        onBack={() => selectProduct(null)}
         onNavigateToVendor={onNavigateToVendor}
       />
     );
@@ -352,12 +369,11 @@ const ProductsViewNew: React.FC<{
       vendors={vendors}
       inventory={inventory}
       currentSeason={currentSeason}
-      onSelectProduct={setSelectedProductId}
+      onSelectProduct={selectProduct}
       onAddProduct={handleAddProduct}
     />
   );
 };
-
 // ============================================================================
 // VENDORS VIEW (Simplified)
 // ============================================================================
@@ -850,6 +866,7 @@ const AppContent: React.FC = () => {
     updateVendors,
     updateProductMasters,
     addProductMaster,
+    updateProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,
@@ -1076,6 +1093,10 @@ const AppContent: React.FC = () => {
     await addProductMaster(product);
   };
 
+  const handleUpdateProductMaster = async (product: ProductMaster) => {
+    await updateProductMaster(product);
+  };
+
   const handleUpdateVendorOfferings = async (newOfferings: VendorOffering[]) => {
     await updateVendorOfferings(newOfferings);
   };
@@ -1145,6 +1166,7 @@ const AppContent: React.FC = () => {
             currentSeason={currentSeason}
             onUpdateProductMasters={handleUpdateProductMasters}
             onAddProduct={handleAddProduct}
+            onUpdateProductMaster={handleUpdateProductMaster}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
