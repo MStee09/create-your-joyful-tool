@@ -159,7 +159,8 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     onAddProduct(product);
     setShowAddModal(false);
     setNewProduct({ form: 'liquid', category: 'other', defaultUnit: 'gal' });
-    onSelectProduct(product.id);
+    // Note: Don't auto-navigate - let state update complete first
+    // User can click on the product after it appears in the list
   };
 
   const activeFiltersCount = [filterCategory, filterForm, filterVendor, filterStock].filter(Boolean).length;
