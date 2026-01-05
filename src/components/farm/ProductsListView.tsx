@@ -84,9 +84,10 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     return ids;
   }, [currentSeason]);
 
-  // Filter and enrich products
+  // Filter and enrich products (sorted alphabetically)
   const filteredProducts = useMemo(() => {
-    return productMasters
+    return [...productMasters]
+      .sort((a, b) => a.name.localeCompare(b.name))
       .map(product => {
         const offerings = vendorOfferings.filter(o => o.productId === product.id);
         const preferredOffering = offerings.find(o => o.isPreferred) || offerings[0];

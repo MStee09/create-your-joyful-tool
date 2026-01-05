@@ -468,6 +468,38 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, productMasters }));
   }, [user, state.productMasters]);
 
+  // Add a single product (faster than updating all)
+  const addProductMaster = useCallback(async (product: ProductMaster) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('product_masters').insert({
+      id: product.id,
+      user_id: user.id,
+      name: product.name,
+      category: product.category,
+      form: product.form,
+      default_unit: product.defaultUnit,
+      density_lbs_per_gal: product.densityLbsPerGal,
+      analysis: product.analysis as any,
+      general_notes: product.generalNotes,
+      mixing_notes: product.mixingNotes,
+      crop_rate_notes: product.cropRateNotes,
+      label_file_name: product.labelFileName,
+      sds_file_name: product.sdsFileName,
+      reorder_point: product.reorderPoint,
+      product_type: product.productType ?? null,
+      is_bid_eligible: product.isBidEligible ?? false,
+      commodity_spec_id: product.commoditySpecId ?? null,
+    });
+    
+    if (error) {
+      console.error('Error adding product:', error);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, productMasters: [...prev.productMasters, product] }));
+  }, [user]);
+
   // Vendor Offerings
   const updateVendorOfferings = useCallback(async (vendorOfferings: VendorOffering[]) => {
     if (!user) return;
@@ -968,6 +1000,7 @@ export function useSupabaseData(user: User | null) {
     updateSeasons,
     updateVendors,
     updateProductMasters,
+    addProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,
