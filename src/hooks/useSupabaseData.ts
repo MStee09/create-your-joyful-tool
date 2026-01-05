@@ -86,6 +86,8 @@ const dbVendorOfferingToVendorOffering = (row: any): VendorOffering => ({
   lastQuotedDate: row.last_quoted_date,
   isPreferred: row.is_preferred || false,
   packagingOptions: row.packaging_options || [],
+  containerSize: row.container_size ? Number(row.container_size) : undefined,
+  containerUnit: row.container_unit || undefined,
 });
 
 const dbSeasonToSeason = (row: any): Season => ({
@@ -562,6 +564,8 @@ export function useSupabaseData(user: User | null) {
         last_quoted_date: offering.lastQuotedDate,
         is_preferred: offering.isPreferred,
         packaging_options: offering.packagingOptions as any,
+        container_size: offering.containerSize ?? null,
+        container_unit: offering.containerUnit ?? null,
       });
       if (error) console.error('Error upserting offering:', error);
     }
