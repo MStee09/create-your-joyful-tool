@@ -736,6 +736,8 @@ export type Database = {
       }
       vendor_offerings: {
         Row: {
+          container_size: number | null
+          container_unit: string | null
           created_at: string
           freight_terms: string | null
           id: string
@@ -752,6 +754,8 @@ export type Database = {
           vendor_id: string
         }
         Insert: {
+          container_size?: number | null
+          container_unit?: string | null
           created_at?: string
           freight_terms?: string | null
           id?: string
@@ -768,6 +772,8 @@ export type Database = {
           vendor_id: string
         }
         Update: {
+          container_size?: number | null
+          container_unit?: string | null
           created_at?: string
           freight_terms?: string | null
           id?: string
