@@ -143,6 +143,10 @@ export interface ProductMaster {
   productType?: ProductType;  // commodity | specialty
   isBidEligible?: boolean;
   commoditySpecId?: string;   // Link to commodity spec if commodity
+  
+  // Estimated pricing for non-bid products
+  estimatedPrice?: number;
+  estimatedPriceUnit?: 'gal' | 'lbs' | 'ton';
 }
 
 // LEGACY: Old Product interface for migration

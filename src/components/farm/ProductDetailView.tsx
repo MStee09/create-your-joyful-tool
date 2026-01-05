@@ -85,6 +85,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [densityValue, setDensityValue] = useState(product.densityLbsPerGal || 0);
   const [editingReorder, setEditingReorder] = useState(false);
   const [reorderValue, setReorderValue] = useState(product.reorderPoint || 0);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceValue, setPriceValue] = useState(product.estimatedPrice || 0);
   const [isSuggestingRoles, setIsSuggestingRoles] = useState(false);
   
   // Inline name editing
