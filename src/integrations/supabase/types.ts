@@ -556,6 +556,8 @@ export type Database = {
           crop_rate_notes: string | null
           default_unit: string | null
           density_lbs_per_gal: number | null
+          estimated_price: number | null
+          estimated_price_unit: string | null
           form: string
           general_notes: string | null
           id: string
@@ -577,6 +579,8 @@ export type Database = {
           crop_rate_notes?: string | null
           default_unit?: string | null
           density_lbs_per_gal?: number | null
+          estimated_price?: number | null
+          estimated_price_unit?: string | null
           form?: string
           general_notes?: string | null
           id?: string
@@ -598,6 +602,8 @@ export type Database = {
           crop_rate_notes?: string | null
           default_unit?: string | null
           density_lbs_per_gal?: number | null
+          estimated_price?: number | null
+          estimated_price_unit?: string | null
           form?: string
           general_notes?: string | null
           id?: string
