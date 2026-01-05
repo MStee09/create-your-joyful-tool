@@ -113,15 +113,16 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       )}
 
       {productOfferings.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border border-border rounded-lg overflow-x-auto">
+          <table className="w-full text-sm min-w-[800px]">
             <thead>
               <tr className="bg-muted/50">
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Vendor</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground">Price</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Contents</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Packaging</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">SKU</th>
-                <th className="text-right px-3 py-2 font-medium text-muted-foreground">$/lb</th>
+                <th className="text-right px-3 py-2 font-medium text-muted-foreground">$/unit</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Min Order</th>
                 <th className="text-center px-3 py-2 font-medium text-muted-foreground">Quoted</th>
                 <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">Pref</th>
@@ -196,6 +197,44 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                         </div>
                       ) : (
                         <span>{formatCurrency(offering.price)}/{offering.priceUnit}</span>
+                      )}
+                    </td>
+                    {/* Contents - for container-based pricing */}
+                    <td className="px-3 py-2">
+                      {isEditing && ['jug', 'bag', 'case', 'tote'].includes(formData.priceUnit || offering.priceUnit || '') ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={formData.containerSize ?? offering.containerSize ?? ''}
+                            onChange={(e) => setFormData({ ...formData, containerSize: e.target.value === '' ? undefined : Number(e.target.value) })}
+                            placeholder="e.g., 1800"
+                            className="w-20 px-2 py-1 border border-input rounded text-sm bg-background"
+                          />
+                          <select
+                            value={formData.containerUnit || offering.containerUnit || (product.form === 'dry' ? 'g' : 'gal')}
+                            onChange={(e) => setFormData({ ...formData, containerUnit: e.target.value as VendorOffering['containerUnit'] })}
+                            className="px-1 py-1 border border-input rounded text-sm bg-background"
+                          >
+                            {product.form === 'dry' ? (
+                              <>
+                                <option value="g">g</option>
+                                <option value="lbs">lbs</option>
+                                <option value="oz">oz</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="gal">gal</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {offering.containerSize && offering.containerUnit 
+                            ? `${offering.containerSize} ${offering.containerUnit}` 
+                            : '-'}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2">

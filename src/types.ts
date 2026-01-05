@@ -159,13 +159,16 @@ export interface Product {
   vendorId: string;
   name: string;
   price: number;
-  priceUnit: 'gal' | 'lbs' | 'ton';
+  priceUnit: 'gal' | 'lbs' | 'ton' | 'jug' | 'bag' | 'case' | 'g';
   form: ProductForm;
   analysis?: NutrientAnalysis;
   densityLbsPerGal?: number;
   notes?: string;
   labelData?: string;
   labelFileName?: string;
+  // Container-based pricing
+  containerSize?: number;      // e.g., 1800 (grams per jug)
+  containerUnit?: 'g' | 'lbs' | 'gal' | 'oz';  // Unit of contents
 }
 
 export interface Tier {

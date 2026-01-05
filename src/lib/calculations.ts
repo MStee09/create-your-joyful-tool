@@ -51,6 +51,53 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
   }).format(value);
 };
 
+// Calculate price per unit (e.g., per gram or per gallon) from offering
+export const calculatePricePerUnit = (
+  offering: VendorOffering,
+  product: ProductMaster
+): { pricePerGram?: number; pricePerPound?: number; pricePerGallon?: number } => {
+  const result: { pricePerGram?: number; pricePerPound?: number; pricePerGallon?: number } = {};
+
+  // Container-based pricing (e.g., $900/jug with 1800g per jug)
+  if (offering.containerSize && offering.containerUnit && ['jug', 'bag', 'case', 'tote'].includes(offering.priceUnit || '')) {
+    const containerPrice = offering.price;
+    const containerQuantity = offering.containerSize;
+    
+    if (offering.containerUnit === 'g') {
+      result.pricePerGram = containerPrice / containerQuantity;
+      result.pricePerPound = result.pricePerGram * 453.592;
+    } else if (offering.containerUnit === 'lbs') {
+      result.pricePerPound = containerPrice / containerQuantity;
+      result.pricePerGram = result.pricePerPound / 453.592;
+    } else if (offering.containerUnit === 'oz') {
+      result.pricePerPound = (containerPrice / containerQuantity) * 16;
+      result.pricePerGram = result.pricePerPound / 453.592;
+    } else if (offering.containerUnit === 'gal') {
+      result.pricePerGallon = containerPrice / containerQuantity;
+    }
+    return result;
+  }
+  
+  // Standard per-unit pricing
+  if (offering.priceUnit === 'g') {
+    result.pricePerGram = offering.price;
+    result.pricePerPound = offering.price * 453.592;
+  } else if (offering.priceUnit === 'lbs') {
+    result.pricePerPound = offering.price;
+    result.pricePerGram = offering.price / 453.592;
+  } else if (offering.priceUnit === 'ton') {
+    result.pricePerPound = offering.price / 2000;
+    result.pricePerGram = result.pricePerPound / 453.592;
+  } else if (offering.priceUnit === 'gal') {
+    result.pricePerGallon = offering.price;
+    if (product.densityLbsPerGal) {
+      result.pricePerPound = offering.price / product.densityLbsPerGal;
+    }
+  }
+  
+  return result;
+};
+
 // Calculate crop costs using ProductMaster + VendorOfferings
 export const calculateCropCostsNew = (
   crop: Crop, 
@@ -76,14 +123,20 @@ export const calculateCropCostsNew = (
 
     const tierAcres = crop.totalAcres * (tier.percentage / 100);
     let costPerAcre = 0;
+    
+    const prices = calculatePricePerUnit(offering, product);
 
     if (product.form === 'liquid') {
       const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-      costPerAcre = gallonsPerAcre * offering.price;
+      costPerAcre = gallonsPerAcre * (prices.pricePerGallon ?? offering.price);
     } else {
-      const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-      const pricePerPound = offering.priceUnit === 'ton' ? offering.price / 2000 : offering.price;
-      costPerAcre = poundsPerAcre * pricePerPound;
+      // Convert rate to grams for calculation
+      if (app.rateUnit === 'g' && prices.pricePerGram !== undefined) {
+        costPerAcre = app.rate * prices.pricePerGram;
+      } else {
+        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+        costPerAcre = poundsPerAcre * (prices.pricePerPound ?? offering.price);
+      }
     }
 
     const tierCost = costPerAcre * tierAcres;
@@ -274,6 +327,27 @@ export const downloadCSV = (content: string, filename: string) => {
 
 // NEW: Conversion helpers
 export const calculateCostPerPound = (offering: VendorOffering, product: ProductMaster): number | null => {
+  // Handle container-based pricing
+  if (offering.containerSize && offering.containerUnit && ['jug', 'bag', 'case', 'tote'].includes(offering.priceUnit || '')) {
+    const containerPrice = offering.price;
+    const containerQuantity = offering.containerSize;
+    
+    if (offering.containerUnit === 'g') {
+      // Convert price per gram to price per pound
+      const pricePerGram = containerPrice / containerQuantity;
+      return pricePerGram * 453.592;
+    } else if (offering.containerUnit === 'lbs') {
+      return containerPrice / containerQuantity;
+    } else if (offering.containerUnit === 'oz') {
+      return (containerPrice / containerQuantity) * 16;
+    }
+  }
+  
+  // Handle per-gram pricing
+  if (offering.priceUnit === 'g') {
+    return offering.price * 453.592;
+  }
+  
   if (product.form === 'liquid' && product.densityLbsPerGal) {
     if (offering.priceUnit === 'gal') {
       return offering.price / product.densityLbsPerGal;

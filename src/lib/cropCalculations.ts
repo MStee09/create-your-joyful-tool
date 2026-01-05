@@ -89,6 +89,43 @@ export const calculateApplicationCostPerAcre = (
 ): number => {
   if (!product) return 0;
 
+  // Handle container-based pricing (e.g., $900/jug with 1800g per jug)
+  if (product.containerSize && product.containerUnit && ['jug', 'bag', 'case'].includes(product.priceUnit || '')) {
+    const containerPrice = product.price;
+    const containerQuantity = product.containerSize;
+    
+    // Calculate price per gram
+    let pricePerGram = 0;
+    if (product.containerUnit === 'g') {
+      pricePerGram = containerPrice / containerQuantity;
+    } else if (product.containerUnit === 'lbs') {
+      pricePerGram = containerPrice / (containerQuantity * 453.592);
+    } else if (product.containerUnit === 'oz') {
+      pricePerGram = containerPrice / (containerQuantity * 28.3495);
+    }
+    
+    // If rate is in grams, use directly
+    if (app.rateUnit === 'g') {
+      return app.rate * pricePerGram;
+    }
+    
+    // Convert to pounds and calculate
+    const pricePerPound = pricePerGram * 453.592;
+    const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+    return poundsPerAcre * pricePerPound;
+  }
+  
+  // Handle per-gram pricing
+  if (product.priceUnit === 'g') {
+    if (app.rateUnit === 'g') {
+      return app.rate * product.price;
+    }
+    // Convert rate to grams and calculate
+    const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+    const gramsPerAcre = poundsPerAcre * 453.592;
+    return gramsPerAcre * product.price;
+  }
+
   if (product.form === 'liquid') {
     const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
     return gallonsPerAcre * product.price;
