@@ -25,22 +25,30 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const productOfferings = offerings.filter(o => o.productId === product.id);
 
   const handleAdd = () => {
-    console.log('AddOffering clicked', formData);
-    if (!formData.vendorId) {
-      console.log('AddOffering validation failed: missing vendor');
-      return;
-    }
+    if (!formData.vendorId) return;
 
     const price = formData.price ?? 0;
-    
+    const priceUnit = formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal');
+    const isContainerPriced = ['jug', 'bag', 'case', 'tote'].includes(priceUnit);
+
+    const containerSize = isContainerPriced
+      ? (formData.containerSize !== undefined && formData.containerSize !== null
+          ? Number(formData.containerSize)
+          : undefined)
+      : undefined;
+
+    const containerUnit = isContainerPriced
+      ? (formData.containerUnit || (product.form === 'dry' ? 'g' : 'gal'))
+      : undefined;
+
     const newOffering: VendorOffering = {
       id: generateId(),
       productId: product.id,
       vendorId: formData.vendorId,
       price,
-      priceUnit: formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal'),
-      containerSize: formData.containerSize,
-      containerUnit: formData.containerUnit,
+      priceUnit,
+      containerSize,
+      containerUnit,
       packaging: formData.packaging,
       sku: formData.sku,
       minOrder: formData.minOrder,
@@ -48,17 +56,39 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       lastQuotedDate: formData.lastQuotedDate || new Date().toISOString().split('T')[0],
       isPreferred: productOfferings.length === 0, // First one is preferred
     };
-    
-    console.log('AddOffering creating new offering', newOffering);
+
     onUpdateOfferings([...offerings, newOffering]);
     setShowAddForm(false);
     setFormData({});
   };
 
   const handleUpdate = (id: string) => {
-    onUpdateOfferings(offerings.map(o => 
-      o.id === id ? { ...o, ...formData } as VendorOffering : o
-    ));
+    onUpdateOfferings(
+      offerings.map(o => {
+        if (o.id !== id) return o;
+
+        const next = { ...o, ...formData } as VendorOffering;
+        const priceUnit = next.priceUnit || o.priceUnit;
+        const isContainerPriced = ['jug', 'bag', 'case', 'tote'].includes(priceUnit || '');
+
+        // If user typed a container size but didn't touch the unit dropdown, default it.
+        if (isContainerPriced) {
+          const nextContainerSize =
+            next.containerSize !== undefined && next.containerSize !== null && next.containerSize !== ('' as any)
+              ? Number(next.containerSize)
+              : undefined;
+
+          return {
+            ...next,
+            containerSize: nextContainerSize,
+            containerUnit: next.containerUnit || o.containerUnit || (product.form === 'dry' ? 'g' : 'gal'),
+          };
+        }
+
+        // Not container priced -> clear container fields so saving never "drops" edits.
+        return { ...next, containerSize: undefined, containerUnit: undefined };
+      })
+    );
     setEditingId(null);
     setFormData({});
   };
@@ -206,8 +236,19 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                           <input
                             type="number"
                             step="0.1"
+                            min={0}
                             value={formData.containerSize ?? offering.containerSize ?? ''}
-                            onChange={(e) => setFormData({ ...formData, containerSize: e.target.value === '' ? undefined : Number(e.target.value) })}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                containerSize: e.target.value === '' ? undefined : Number(e.target.value),
+                                // ensure unit is present even if user never opens the dropdown
+                                containerUnit:
+                                  formData.containerUnit ||
+                                  offering.containerUnit ||
+                                  (product.form === 'dry' ? 'g' : 'gal'),
+                              })
+                            }
                             placeholder="e.g., 1800"
                             className="w-20 px-2 py-1 border border-input rounded text-sm bg-background"
                           />
