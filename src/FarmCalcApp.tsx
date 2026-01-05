@@ -285,6 +285,7 @@ const ProductsViewNew: React.FC<{
   commoditySpecs: CommoditySpec[];
   currentSeason: Season | null;
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
+  onAddProduct: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
@@ -296,7 +297,8 @@ const ProductsViewNew: React.FC<{
   inventory,
   commoditySpecs,
   currentSeason,
-  onUpdateProductMasters, 
+  onUpdateProductMasters,
+  onAddProduct,
   onUpdateOfferings,
   onUpdateInventory,
   onUpdateSpecs,
@@ -309,7 +311,7 @@ const ProductsViewNew: React.FC<{
     : null;
 
   const handleAddProduct = (product: ProductMaster) => {
-    onUpdateProductMasters([...productMasters, product]);
+    onAddProduct(product);
   };
 
   const handleUpdateProduct = (product: ProductMaster) => {
@@ -847,6 +849,7 @@ const AppContent: React.FC = () => {
     updateSeasons,
     updateVendors,
     updateProductMasters,
+    addProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,
@@ -1069,6 +1072,10 @@ const AppContent: React.FC = () => {
     await updateProductMasters(newProductMasters);
   };
 
+  const handleAddProduct = async (product: ProductMaster) => {
+    await addProductMaster(product);
+  };
+
   const handleUpdateVendorOfferings = async (newOfferings: VendorOffering[]) => {
     await updateVendorOfferings(newOfferings);
   };
@@ -1137,6 +1144,7 @@ const AppContent: React.FC = () => {
             commoditySpecs={state.commoditySpecs || []}
             currentSeason={currentSeason}
             onUpdateProductMasters={handleUpdateProductMasters}
+            onAddProduct={handleAddProduct}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
