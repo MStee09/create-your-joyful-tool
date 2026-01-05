@@ -105,13 +105,16 @@ export const createProductFromMaster = (
     vendorId: preferredOffering?.vendorId || '',
     name: productMaster.name,
     price: preferredOffering?.price || 0,
-    priceUnit: (preferredOffering?.priceUnit as 'gal' | 'lbs' | 'ton') || 'gal',
+    priceUnit: (preferredOffering?.priceUnit as Product['priceUnit']) || 'gal',
     form: productMaster.form,
     analysis: productMaster.analysis,
     densityLbsPerGal: productMaster.densityLbsPerGal,
     notes: productMaster.generalNotes,
     labelData: productMaster.labelData,
     labelFileName: productMaster.labelFileName,
+    // Container-based pricing from vendor offering
+    containerSize: preferredOffering?.containerSize,
+    containerUnit: preferredOffering?.containerUnit,
   };
 };
 
