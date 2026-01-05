@@ -94,7 +94,41 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
 
   // Calculate costs - treated (intensity) and field (budget)
   let treatedCostPerAcre = 0;
-  if (product.form === 'liquid') {
+  
+  // Handle container-based pricing (e.g., $900/jug with 1800g per jug)
+  if (product.containerSize && product.containerUnit && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '')) {
+    const containerPrice = product.price;
+    const containerQuantity = product.containerSize;
+    
+    // Calculate price per gram
+    let pricePerGram = 0;
+    if (product.containerUnit === 'g') {
+      pricePerGram = containerPrice / containerQuantity;
+    } else if (product.containerUnit === 'lbs') {
+      pricePerGram = containerPrice / (containerQuantity * 453.592);
+    } else if (product.containerUnit === 'oz') {
+      pricePerGram = containerPrice / (containerQuantity * 28.3495);
+    }
+    
+    // If rate is in grams, use directly
+    if (application.rateUnit === 'g') {
+      treatedCostPerAcre = application.rate * pricePerGram;
+    } else {
+      // Convert to pounds and calculate
+      const pricePerPound = pricePerGram * 453.592;
+      const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
+      treatedCostPerAcre = poundsPerAcre * pricePerPound;
+    }
+  } else if (product.priceUnit === 'g') {
+    // Handle per-gram pricing
+    if (application.rateUnit === 'g') {
+      treatedCostPerAcre = application.rate * product.price;
+    } else {
+      const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
+      const gramsPerAcre = poundsPerAcre * 453.592;
+      treatedCostPerAcre = gramsPerAcre * product.price;
+    }
+  } else if (product.form === 'liquid') {
     const gallonsPerAcre = convertToGallons(application.rate, application.rateUnit as LiquidUnit);
     treatedCostPerAcre = gallonsPerAcre * product.price;
   } else {

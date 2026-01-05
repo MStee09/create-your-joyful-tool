@@ -159,7 +159,7 @@ export interface Product {
   vendorId: string;
   name: string;
   price: number;
-  priceUnit: 'gal' | 'lbs' | 'ton' | 'jug' | 'bag' | 'case' | 'g';
+  priceUnit: 'gal' | 'lbs' | 'ton' | 'jug' | 'bag' | 'case' | 'tote' | 'g';
   form: ProductForm;
   analysis?: NutrientAnalysis;
   densityLbsPerGal?: number;

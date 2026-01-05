@@ -90,7 +90,7 @@ export const calculateApplicationCostPerAcre = (
   if (!product) return 0;
 
   // Handle container-based pricing (e.g., $900/jug with 1800g per jug)
-  if (product.containerSize && product.containerUnit && ['jug', 'bag', 'case'].includes(product.priceUnit || '')) {
+  if (product.containerSize && product.containerUnit && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '')) {
     const containerPrice = product.price;
     const containerQuantity = product.containerSize;
     
