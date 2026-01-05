@@ -1019,9 +1019,59 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               ) : (
                 <div className="col-span-2">
                   <label className="block text-sm text-muted-foreground mb-1">Pricing</label>
-                  <p className="text-sm text-muted-foreground">
-                    Add a vendor offering below to see pricing calculations
-                  </p>
+                  {editingPrice ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={priceValue}
+                        onChange={(e) => setPriceValue(Number(e.target.value))}
+                        className="w-24 px-2 py-1 border border-input rounded text-sm bg-background"
+                        autoFocus
+                      />
+                      <span className="text-muted-foreground">/</span>
+                      <select
+                        value={product.estimatedPriceUnit || product.defaultUnit}
+                        onChange={(e) => onUpdateProduct({ ...product, estimatedPriceUnit: e.target.value as 'gal' | 'lbs' | 'ton' })}
+                        className="px-2 py-1 border border-input rounded text-sm bg-background"
+                      >
+                        <option value="gal">gal</option>
+                        <option value="lbs">lbs</option>
+                        <option value="ton">ton</option>
+                      </select>
+                      <button 
+                        onClick={() => {
+                          onUpdateProduct({ ...product, estimatedPrice: priceValue || undefined });
+                          setEditingPrice(false);
+                        }} 
+                        className="p-1 text-primary hover:bg-primary/10 rounded"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditingPrice(false)} className="p-1 text-muted-foreground hover:bg-muted rounded">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : product.estimatedPrice ? (
+                    <button 
+                      onClick={() => { setEditingPrice(true); setPriceValue(product.estimatedPrice || 0); }}
+                      className="flex items-center gap-2 text-foreground hover:text-primary group"
+                    >
+                      <span className="text-lg font-semibold text-primary">
+                        {formatCurrency(product.estimatedPrice)}/{product.estimatedPriceUnit || product.defaultUnit}
+                      </span>
+                      <Edit2 className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                      <span className="text-xs text-muted-foreground">(estimated)</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => { setEditingPrice(true); setPriceValue(0); }}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      + Add estimated price
+                    </button>
+                  )}
                 </div>
               )}
             </div>
