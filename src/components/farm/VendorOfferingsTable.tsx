@@ -38,7 +38,9 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       productId: product.id,
       vendorId: formData.vendorId,
       price,
-      priceUnit: formData.priceUnit || 'gal',
+      priceUnit: formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal'),
+      containerSize: formData.containerSize,
+      containerUnit: formData.containerUnit,
       packaging: formData.packaging,
       sku: formData.sku,
       minOrder: formData.minOrder,
@@ -175,11 +177,21 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                             onChange={(e) => setFormData({ ...formData, priceUnit: e.target.value as VendorOffering['priceUnit'] })}
                             className="px-1 py-1 border border-input rounded text-sm bg-background"
                           >
-                            <option value="gal">/gal</option>
-                            <option value="lbs">/lb</option>
-                            <option value="ton">/ton</option>
+                            {product.form === 'liquid' ? (
+                              <>
+                                <option value="gal">/gal</option>
+                                <option value="tote">/tote</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="lbs">/lb</option>
+                                <option value="g">/g</option>
+                                <option value="ton">/ton</option>
+                                <option value="bag">/bag</option>
+                              </>
+                            )}
+                            <option value="jug">/jug</option>
                             <option value="case">/case</option>
-                            <option value="tote">/tote</option>
                           </select>
                         </div>
                       ) : (
@@ -328,18 +340,67 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                   className="flex-1 px-3 py-2 border border-input rounded-lg text-sm bg-background"
                 />
                 <select
-                  value={formData.priceUnit || 'gal'}
+                  value={formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal')}
                   onChange={(e) => setFormData({ ...formData, priceUnit: e.target.value as VendorOffering['priceUnit'] })}
                   className="px-2 py-2 border border-input rounded-lg text-sm bg-background"
                 >
-                  <option value="gal">/gal</option>
-                  <option value="lbs">/lb</option>
-                  <option value="ton">/ton</option>
+                  {product.form === 'liquid' ? (
+                    <>
+                      <option value="gal">/gal</option>
+                      <option value="tote">/tote</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="lbs">/lb</option>
+                      <option value="g">/g</option>
+                      <option value="ton">/ton</option>
+                      <option value="bag">/bag</option>
+                    </>
+                  )}
+                  <option value="jug">/jug</option>
                   <option value="case">/case</option>
-                  <option value="tote">/tote</option>
                 </select>
               </div>
             </div>
+            {/* Container size - show when price is per container */}
+            {['jug', 'bag', 'case', 'tote'].includes(formData.priceUnit || '') && (
+              <div>
+                <label className="block text-xs font-medium mb-1 text-muted-foreground">Contents per {formData.priceUnit}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.containerSize ?? ''}
+                    onChange={(e) => setFormData({ ...formData, containerSize: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    placeholder="e.g., 500"
+                    className="flex-1 px-3 py-2 border border-input rounded-lg text-sm bg-background"
+                  />
+                  <select
+                    value={formData.containerUnit || (product.form === 'dry' ? 'g' : 'gal')}
+                    onChange={(e) => setFormData({ ...formData, containerUnit: e.target.value as VendorOffering['containerUnit'] })}
+                    className="px-2 py-2 border border-input rounded-lg text-sm bg-background"
+                  >
+                    {product.form === 'dry' ? (
+                      <>
+                        <option value="g">grams</option>
+                        <option value="lbs">lbs</option>
+                        <option value="oz">oz</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="gal">gal</option>
+                        <option value="oz">oz</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                {formData.containerSize && formData.price && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    = ${(formData.price / formData.containerSize).toFixed(4)}/{formData.containerUnit || 'g'}
+                  </p>
+                )}
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium mb-1 text-muted-foreground">Packaging</label>
               <input

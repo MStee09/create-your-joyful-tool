@@ -92,7 +92,11 @@ export interface VendorOffering {
   
   // Pricing
   price: number;
-  priceUnit: 'gal' | 'lbs' | 'ton' | 'case' | 'tote';
+  priceUnit: 'gal' | 'lbs' | 'ton' | 'case' | 'tote' | 'jug' | 'g' | 'bag';
+  
+  // Container-based pricing (for products sold by container)
+  containerSize?: number;      // e.g., 500 (grams per jug)
+  containerUnit?: 'g' | 'lbs' | 'gal' | 'oz';  // Unit of contents
   
   // Packaging info
   packaging?: string;  // "2.5 gal jug", "275 gal tote", "50 lb bag"
