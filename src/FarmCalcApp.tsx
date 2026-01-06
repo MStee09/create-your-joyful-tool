@@ -65,6 +65,7 @@ import { PriceBookView } from './components/farm/PriceBookView';
 import { SettingsView } from './components/farm/SettingsView';
 import { OrdersView } from './components/farm/OrdersView';
 import { PlanReadinessView } from './components/farm/PlanReadinessView';
+import { VendorSpendView } from './components/farm/VendorSpendView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -135,6 +136,7 @@ const Sidebar: React.FC<{
   
   const procurementItems = [
     { id: 'procurement', label: 'Demand Rollup' },
+    { id: 'vendor-spend', label: 'Vendor Spend' },
     { id: 'orders', label: 'Orders' },
     { id: 'plan-readiness', label: 'Plan Readiness' },
     { id: 'commodity-specs', label: 'Commodity Specs' },
@@ -142,7 +144,7 @@ const Sidebar: React.FC<{
     { id: 'price-book', label: 'Price Book' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
+  const isProcurementActive = activeView === 'procurement' || activeView === 'vendor-spend' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -1202,6 +1204,15 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             commoditySpecs={state.commoditySpecs || []}
             onNavigateToSpecs={() => setActiveView('commodity-specs')}
+          />
+        );
+      case 'vendor-spend':
+        return (
+          <VendorSpendView
+            season={currentSeason}
+            products={legacyProducts}
+            vendorOfferings={state.vendorOfferings || []}
+            vendors={state.vendors}
           />
         );
       case 'orders':
