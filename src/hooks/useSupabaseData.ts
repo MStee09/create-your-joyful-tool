@@ -120,17 +120,43 @@ const dbCommoditySpecToCommoditySpec = (row: any): CommoditySpec => ({
   category: row.category,
 });
 
-const dbBidEventToBidEvent = (row: any): BidEvent => ({
-  id: row.id,
-  name: row.name,
-  seasonId: row.season_id,
-  status: row.status || 'draft',
-  dueDate: row.due_date,
-  invitedVendorIds: row.invited_vendor_ids || [],
-  vendorInvitations: row.vendor_invitations || {},
-  notes: row.notes,
-  createdAt: new Date(row.created_at),
-});
+const dbBidEventToBidEvent = (row: any): BidEvent => {
+  const raw = row.vendor_invitations;
+
+  // vendor_invitations is jsonb in DB and has been stored as:
+  // - [] (preferred)
+  // - {} (default/empty)
+  // - { [vendorId]: {status,...} } (older shape)
+  const vendorInvitations = (() => {
+    if (Array.isArray(raw)) return raw;
+    if (!raw) return [];
+    if (typeof raw === 'object') {
+      // convert map -> array
+      return Object.entries(raw).map(([vendorId, v]: any) => ({
+        vendorId,
+        status: v?.status || 'pending',
+        sentDate: v?.sentDate,
+        responseDate: v?.responseDate,
+        notes: v?.notes,
+      }));
+    }
+    return [];
+  })();
+
+  return {
+    id: row.id,
+    name: row.name,
+    seasonId: row.season_id,
+    seasonYear: row.season_year,
+    eventType: row.event_type,
+    status: row.status || 'draft',
+    dueDate: row.due_date,
+    invitedVendorIds: row.invited_vendor_ids || [],
+    vendorInvitations,
+    notes: row.notes,
+    createdAt: new Date(row.created_at),
+  };
+};
 
 const dbVendorQuoteToVendorQuote = (row: any): VendorQuote => ({
   id: row.id,
@@ -652,7 +678,7 @@ export function useSupabaseData(user: User | null) {
         status: event.status,
         due_date: event.dueDate,
         invited_vendor_ids: event.invitedVendorIds,
-        vendor_invitations: event.vendorInvitations as any,
+        vendor_invitations: (Array.isArray(event.vendorInvitations) ? event.vendorInvitations : []) as any,
         notes: event.notes,
       });
       if (error) console.error('Error upserting bid event:', error);
