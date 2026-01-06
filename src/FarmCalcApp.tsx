@@ -66,6 +66,7 @@ import { SettingsView } from './components/farm/SettingsView';
 import { OrdersView } from './components/farm/OrdersView';
 import { PlanReadinessView } from './components/farm/PlanReadinessView';
 import { VendorSpendView } from './components/farm/VendorSpendView';
+import { BuyWorkflowView } from './components/farm/BuyWorkflowView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -135,6 +136,7 @@ const Sidebar: React.FC<{
   ];
   
   const procurementItems = [
+    { id: 'buy-workflow', label: 'Buy Workflow' },
     { id: 'procurement', label: 'Demand Rollup' },
     { id: 'vendor-spend', label: 'Vendor Spend' },
     { id: 'orders', label: 'Orders' },
@@ -144,7 +146,7 @@ const Sidebar: React.FC<{
     { id: 'price-book', label: 'Price Book' },
   ];
   
-  const isProcurementActive = activeView === 'procurement' || activeView === 'vendor-spend' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
+  const isProcurementActive = activeView === 'buy-workflow' || activeView === 'procurement' || activeView === 'vendor-spend' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -1196,6 +1198,18 @@ const AppContent: React.FC = () => {
             vendors={state.vendors}
             season={currentSeason}
             onUpdateInventory={handleUpdateInventory}
+          />
+        );
+      case 'buy-workflow':
+        return (
+          <BuyWorkflowView
+            season={currentSeason}
+            products={legacyProducts}
+            vendors={state.vendors}
+            inventory={state.inventory}
+            orders={state.orders}
+            onAddOrder={addOrder}
+            onNavigate={(viewId) => setActiveView(viewId)}
           />
         );
       case 'procurement':
