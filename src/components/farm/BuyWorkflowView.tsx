@@ -1,13 +1,17 @@
 // ============================================================================
-// BuyWorkflowView - Guided Buy Workflow: Demand → Quotes → Award → Orders
+// PHASE 2.1D: Replace src/components/farm/BuyWorkflowView.tsx
+// ============================================================================
+// This adds "Create Quote Request" button that creates a scoped Bid Event
 // ============================================================================
 
 import React, { useMemo, useState } from 'react';
 import { CheckCircle, ClipboardList, ShoppingCart, Truck, AlertTriangle, ArrowRight } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem } from '@/types/farm';
+import type { ProductMaster, CommoditySpec, BidEvent } from '@/types';
 import type { Order, OrderLineItem } from '@/types/orderInvoice';
-import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
+import { calculatePlannedUsage, type PlannedUsageItem, generateId } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessItem } from '@/lib/readinessEngine';
+import { encodeBidEventScope } from '@/lib/bidEventScope';
 
 type Step = 'demand' | 'quotes' | 'award' | 'orders';
 
@@ -42,6 +46,12 @@ interface BuyWorkflowViewProps {
   orders: Order[];
   onAddOrder: (order: Order) => Promise<void> | void;
   onNavigate: (viewId: string) => void;
+  // Phase 2.1 additions
+  productMasters: ProductMaster[];
+  commoditySpecs: CommoditySpec[];
+  bidEvents: BidEvent[];
+  onUpdateBidEvents: (events: BidEvent[]) => Promise<void> | void;
+  currentSeasonYear: number;
 }
 
 export const BuyWorkflowView: React.FC<BuyWorkflowViewProps> = ({
@@ -52,11 +62,17 @@ export const BuyWorkflowView: React.FC<BuyWorkflowViewProps> = ({
   orders,
   onAddOrder,
   onNavigate,
+  productMasters,
+  commoditySpecs,
+  bidEvents,
+  onUpdateBidEvents,
+  currentSeasonYear,
 }) => {
   const [step, setStep] = useState<Step>('demand');
   const [onlyBlocking, setOnlyBlocking] = useState(true);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingQuote, setIsCreatingQuote] = useState(false);
 
   const plannedUsage = useMemo(() => calculatePlannedUsage(season, products), [season, products]);
 
@@ -190,6 +206,53 @@ export const BuyWorkflowView: React.FC<BuyWorkflowViewProps> = ({
     }
   }
 
+  // Create Quote Request (Bid Event) from selected items
+  async function createQuoteRequestFromSelection() {
+    setIsCreatingQuote(true);
+    try {
+      const selectedItems = demandItems.filter(i => selected[i.productId]);
+      if (selectedItems.length === 0) return;
+
+      // Convert productId -> rollupKey (commoditySpecId if present, else productId)
+      const rollupKeys = Array.from(new Set(
+        selectedItems.map(it => {
+          const pm = productMasters.find(p => p.id === it.productId);
+          return pm?.commoditySpecId || it.productId;
+        })
+      ));
+
+      // Invite all vendors for now (simple approach)
+      const invitedVendorIds = vendors.map(v => v.id);
+
+      const newEventId = generateId();
+      const scopeNotes = encodeBidEventScope({
+        source: 'buy-workflow',
+        includedRollupKeys: rollupKeys,
+      });
+
+      const newEvent: BidEvent = {
+        id: newEventId,
+        seasonYear: currentSeasonYear,
+        eventType: 'CUSTOM',
+        name: `${currentSeasonYear} Quote Request (${rollupKeys.length} item${rollupKeys.length !== 1 ? 's' : ''})`,
+        status: 'draft',
+        invitedVendorIds,
+        vendorInvitations: [],
+        notes: scopeNotes,
+        createdAt: new Date().toISOString(),
+      };
+
+      const next = [...(bidEvents || []), newEvent];
+      await onUpdateBidEvents(next);
+
+      setSelected({});
+      // Jump directly to the new bid event
+      onNavigate(`bid-event-${newEventId}`);
+    } finally {
+      setIsCreatingQuote(false);
+    }
+  }
+
   const StepButton = ({ id, label, icon: Icon }: { id: Step; label: string; icon: React.ElementType }) => {
     const active = step === id;
     return (
@@ -269,7 +332,15 @@ export const BuyWorkflowView: React.FC<BuyWorkflowViewProps> = ({
                 }}
                 className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-stone-50"
               >
-                Select all shortfalls
+              Select all shortfalls
+              </button>
+
+              <button
+                disabled={selectedCount === 0 || isCreatingQuote}
+                onClick={createQuoteRequestFromSelection}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingQuote ? 'Creating…' : `Create Quote Request (${selectedCount})`}
               </button>
 
               <button
