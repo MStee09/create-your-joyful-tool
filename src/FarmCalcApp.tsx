@@ -1280,7 +1280,17 @@ const AppContent: React.FC = () => {
           />
         );
       case 'orders':
-        return <OrdersView />;
+        return (
+          <OrdersView
+            orders={state.orders}
+            vendors={state.vendors}
+            products={legacyProducts}
+            inventory={state.inventory}
+            seasonYear={currentSeason?.year || new Date().getFullYear()}
+            onUpdateOrders={updateOrders}
+            onUpdateInventory={handleUpdateInventory}
+          />
+        );
       case 'plan-readiness':
         return (
           <PlanReadinessView
