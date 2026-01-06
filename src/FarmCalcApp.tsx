@@ -1377,6 +1377,12 @@ const AppContent: React.FC = () => {
                 awards={state.awards || []}
                 priceBook={state.priceBook || []}
                 season={currentSeason}
+                orders={state.orders || []}
+                onAddOrder={async (order) => {
+                  const newOrders = [...(state.orders || []), order];
+                  await updateOrders(newOrders);
+                }}
+                onNavigate={setActiveView}
                 onUpdateEvent={async (updatedEvent) => {
                   const newEvents = bidEvents.map(e => 
                     e.id === updatedEvent.id ? updatedEvent : e
