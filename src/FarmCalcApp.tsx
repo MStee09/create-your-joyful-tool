@@ -29,6 +29,10 @@ import {
   FileText,
   Upload,
   StickyNote,
+  ClipboardList,
+  ClipboardCheck,
+  ShoppingCart,
+  Truck,
 } from 'lucide-react';
 
 // Import types
@@ -125,28 +129,60 @@ const Sidebar: React.FC<{
   userEmail,
   onSignOut,
 }) => {
-  const navItems = [
-    { id: 'dashboard', icon: BarChart3, label: 'Dashboard' },
-    { id: 'crops', icon: Leaf, label: 'Crop Plans' },
-    { id: 'products', icon: FlaskConical, label: 'Products' },
-    { id: 'vendors', icon: Building2, label: 'Vendors' },
-    { id: 'inventory', icon: Warehouse, label: 'Inventory' },
-    { id: 'exports', icon: FileSpreadsheet, label: 'Export' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
-  ];
-  
-  const procurementItems = [
-    { id: 'buy-workflow', label: 'Buy Workflow' },
-    { id: 'procurement', label: 'Demand Rollup' },
-    { id: 'vendor-spend', label: 'Vendor Spend' },
-    { id: 'orders', label: 'Orders' },
-    { id: 'plan-readiness', label: 'Plan Readiness' },
-    { id: 'commodity-specs', label: 'Commodity Specs' },
-    { id: 'bid-events', label: 'Bid Events' },
-    { id: 'price-book', label: 'Price Book' },
-  ];
-  
-  const isProcurementActive = activeView === 'buy-workflow' || activeView === 'procurement' || activeView === 'vendor-spend' || activeView === 'orders' || activeView === 'plan-readiness' || activeView === 'commodity-specs' || activeView === 'bid-events' || activeView === 'price-book' || activeView.startsWith('bid-event-');
+  type Mode = 'plan' | 'buy' | 'inventory' | 'review';
+
+  const viewToMode = (view: string): Mode => {
+    if (['dashboard', 'crops'].includes(view)) return 'plan';
+
+    if (
+      view === 'buy-workflow' ||
+      view === 'procurement' ||
+      view === 'vendor-spend' ||
+      view === 'orders' ||
+      view === 'plan-readiness' ||
+      view === 'commodity-specs' ||
+      view === 'bid-events' ||
+      view === 'price-book' ||
+      view.startsWith('bid-event-')
+    ) return 'buy';
+
+    if (['products', 'vendors', 'inventory'].includes(view)) return 'inventory';
+    return 'review';
+  };
+
+  const mode = viewToMode(activeView);
+
+  const ModeButton = ({ id, label, icon: Icon, defaultView }: { id: Mode; label: string; icon: React.ElementType; defaultView: string }) => {
+    const active = mode === id;
+    return (
+      <button
+        onClick={() => onViewChange(defaultView)}
+        className={
+          'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ' +
+          (active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white')
+        }
+      >
+        <Icon className="w-5 h-5" />
+        <span className="font-semibold">{label}</span>
+      </button>
+    );
+  };
+
+  const SubButton = ({ id, label, icon: Icon }: { id: string; label: string; icon: React.ElementType }) => {
+    const active = activeView === id;
+    return (
+      <button
+        onClick={() => onViewChange(id)}
+        className={
+          'w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm ' +
+          (active ? 'bg-stone-800 text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white')
+        }
+      >
+        <Icon className="w-4 h-4" />
+        <span className="font-medium">{label}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
@@ -158,7 +194,7 @@ const Sidebar: React.FC<{
           </div>
           <div>
             <h1 className="font-bold text-lg tracking-tight">FarmCalc</h1>
-            <p className="text-xs text-stone-400">In-Furrow Planner</p>
+            <p className="text-xs text-stone-400">Inputs Command Center</p>
           </div>
         </div>
       </div>
@@ -202,46 +238,59 @@ const Sidebar: React.FC<{
         </select>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              activeView === item.id
-                ? 'bg-emerald-600 text-white'
-                : 'text-stone-300 hover:bg-stone-800 hover:text-white'
-            }`}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="font-medium">{item.label}</span>
-          </button>
-        ))}
-        
-        {/* Procurement Section with Sub-items */}
-        <div className="pt-2">
-          <div className={`flex items-center gap-3 px-4 py-2 rounded-lg ${
-            isProcurementActive ? 'bg-stone-800' : ''
-          }`}>
-            <Package className="w-5 h-5 text-stone-400" />
-            <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Procurement</span>
-          </div>
-          <div className="ml-4 mt-1 space-y-1">
-            {procurementItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => onViewChange(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm ${
-                  activeView === item.id
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-stone-400 hover:bg-stone-800 hover:text-white'
-                }`}
-              >
-                <span className="font-medium">{item.label}</span>
-              </button>
-            ))}
-          </div>
+      {/* Mode Buttons */}
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <div className="space-y-1">
+          <ModeButton id="plan" label="Plan" icon={ClipboardList} defaultView="dashboard" />
+          <ModeButton id="buy" label="Buy" icon={ShoppingCart} defaultView="buy-workflow" />
+          <ModeButton id="inventory" label="Inventory" icon={Warehouse} defaultView="inventory" />
+          <ModeButton id="review" label="Review" icon={BarChart3} defaultView="exports" />
+        </div>
+
+        {/* Sub navigation based on mode */}
+        <div className="pt-4 border-t border-stone-700 space-y-1">
+          {mode === 'plan' && (
+            <>
+              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Plan</div>
+              <SubButton id="dashboard" label="Dashboard" icon={BarChart3} />
+              <SubButton id="crops" label="Crop Plans" icon={Leaf} />
+            </>
+          )}
+
+          {mode === 'buy' && (
+            <>
+              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Buy</div>
+              <SubButton id="buy-workflow" label="Buy Workflow" icon={ShoppingCart} />
+              <SubButton id="plan-readiness" label="Plan Readiness" icon={ClipboardCheck} />
+              <SubButton id="orders" label="Orders" icon={Truck} />
+
+              <div className="pt-3 mt-3 border-t border-stone-700">
+                <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Advanced</div>
+                <SubButton id="procurement" label="Demand Rollup" icon={ClipboardList} />
+                <SubButton id="bid-events" label="Bid Events" icon={FileText} />
+                <SubButton id="price-book" label="Price Book" icon={FlaskConical} />
+                <SubButton id="vendor-spend" label="Vendor Spend" icon={BarChart3} />
+                <SubButton id="commodity-specs" label="Commodity Specs" icon={FileText} />
+              </div>
+            </>
+          )}
+
+          {mode === 'inventory' && (
+            <>
+              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Inventory</div>
+              <SubButton id="inventory" label="Inventory" icon={Warehouse} />
+              <SubButton id="products" label="Products" icon={FlaskConical} />
+              <SubButton id="vendors" label="Vendors" icon={Building2} />
+            </>
+          )}
+
+          {mode === 'review' && (
+            <>
+              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
+              <SubButton id="exports" label="Export" icon={FileSpreadsheet} />
+              <SubButton id="settings" label="Settings" icon={Settings} />
+            </>
+          )}
         </div>
       </nav>
 
@@ -256,7 +305,7 @@ const Sidebar: React.FC<{
               {userEmail ? userEmail.split('@')[0] : 'Local User'}
             </p>
             <p className="text-xs text-stone-400 truncate">
-              {userEmail || 'No account'}
+              {isCloudSync ? 'Cloud Sync' : 'Local Only'}
             </p>
           </div>
           {onSignOut && (
