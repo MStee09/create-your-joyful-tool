@@ -38,6 +38,7 @@ import type {
 } from '@/types';
 import { generateId, formatCurrency, formatNumber, downloadCSV } from '@/lib/calculations';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
+import { decodeBidEventScope } from '@/lib/bidEventScope';
 import { updatePriceBookFromAwards } from '@/lib/priceBookUtils';
 import { Breadcrumb } from './Breadcrumb';
 import {
@@ -100,10 +101,17 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   const invitedVendors = vendors.filter(v => event.invitedVendorIds.includes(v.id));
   
   // Get demand rollup for bid-eligible products
-  const demandRollup = useMemo(() => 
-    calculateDemandRollup(season, productMasters, commoditySpecs),
-    [season, productMasters, commoditySpecs]
-  );
+  const demandRollup = useMemo(() => {
+    const all = calculateDemandRollup(season, productMasters, commoditySpecs);
+
+    // If this bid event was created from Buy Workflow with a scope, filter to only included items
+    const scope = decodeBidEventScope(event.notes);
+    if (!scope) return all;
+
+    const allowed = new Set(scope.includedRollupKeys);
+    // rollupKey is specId if available; otherwise productId
+    return all.filter(r => allowed.has(r.specId || r.productId));
+  }, [season, productMasters, commoditySpecs, event.notes]);
   
   // Get quotes for this event
   const eventQuotes = vendorQuotes.filter(q => q.bidEventId === event.id);
