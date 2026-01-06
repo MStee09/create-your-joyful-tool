@@ -1,215 +1,226 @@
 /**
- * Readiness Engine - Calculates inventory readiness for planned usage
+ * TRUST LAYER: canonical readiness math
+ *
+ * Fixes the common bug: inventory has multiple rows per product (lots/bins/partial deliveries)
+ * but UI code accidentally uses .find() and only counts the first row.
+ *
+ * This engine:
+ * - Builds canonical indexes for On Hand and On Order
+ * - Computes readiness per planned usage item
+ * - Returns explainable breakdown data you can show in the UI
  */
 
-export type ReadinessStatus = 'READY' | 'ON_ORDER' | 'BLOCKING';
+export type Unit = "lb" | "gal" | "ton" | "oz" | "qt" | "pt" | "each" | "bag" | "jug" | "case" | "tote" | string;
 
-export interface PlannedUsage {
+export type ReadinessStatus = "READY" | "ON_ORDER" | "BLOCKING";
+
+export type InventoryRow = any;
+
+export type OrderRow = any;
+
+export type PlannedUsage = {
   id: string;
   label: string;
   productId: string;
   requiredQty: number;
-  plannedUnit: string;
+  plannedUnit: Unit;
   crop?: string;
   passName?: string;
   when?: string;
-}
+};
 
-export interface ReadinessItem {
-  id: string;
-  label: string;
+export type ReadinessExplain = {
   productId: string;
+  plannedUnit: Unit;
   requiredQty: number;
-  plannedUnit: string;
-  crop?: string;
-  passName?: string;
-  when?: string;
+  onHandQty: number;
+  onOrderQty: number;
+  shortQty: number;
+  inventoryRows: InventoryRow[];
+  orderLines: Array<{
+    orderId: string;
+    vendorName?: string;
+    status?: string;
+    remainingQty: number;
+    unit?: Unit;
+  }>;
+};
+
+export type ReadinessItem = PlannedUsage & {
   status: ReadinessStatus;
   onHandQty: number;
   onOrderQty: number;
-  shortfall: number;
-  explain: ReadinessExplanation;
-}
+  shortQty: number;
+  explain: ReadinessExplain;
+};
 
-export interface ReadinessExplanation {
-  requiredQty: number;
-  unit: string;
-  inventoryRows: any[];
-  inventoryTotal: number;
-  orderRows: any[];
-  orderTotal: number;
-  shortfall: number;
-  status: ReadinessStatus;
-  calculation: string;
-}
-
-export interface ReadinessSummary {
-  totalCount: number;
+export type ReadinessSummary = {
   readyCount: number;
   onOrderCount: number;
   blockingCount: number;
-  readyPct: number;
-  onOrderPct: number;
-  blockingPct: number;
+  totalCount: number;
   items: ReadinessItem[];
-}
+};
 
-export interface InventoryAccessors<T> {
+type Accessors<T> = {
   getProductId: (row: T) => string;
-  getQty: (row: T) => number;
-  getContainerCount?: (row: T) => number | undefined;
-}
+  getQty: (row: T) => number | null | undefined;
+  getContainerCount?: (row: T) => number | null | undefined;
+  getUnit?: (row: T) => Unit | null | undefined;
+};
 
-export interface OrderAccessors<O, L> {
-  orders: O[];
-  getOrderId: (order: O) => string;
-  getOrderStatus: (order: O) => string;
-  getVendorName: (order: O) => string;
-  getLines: (order: O) => L[];
-  getLineProductId: (line: L) => string;
-  getLineRemainingQty: (line: L) => number;
-  getLineUnit: (line: L) => string;
-}
+export function indexOnHandByProduct<T = InventoryRow>(
+  inventoryRows: T[],
+  accessors: Accessors<T>
+): Map<string, { qtySum: number; rows: T[] }> {
+  const map = new Map<string, { qtySum: number; rows: T[] }>();
 
-export interface ComputeReadinessParams<I, O, L> {
-  planned: PlannedUsage[];
-  inventory: I[];
-  orders?: O[];
-  inventoryAccessors: InventoryAccessors<I>;
-  orderAccessors?: OrderAccessors<O, L>;
-}
+  for (const row of inventoryRows || []) {
+    const productId = accessors.getProductId(row);
+    if (!productId) continue;
 
-export function computeReadiness<I, O, L>(
-  params: ComputeReadinessParams<I, O, L>
-): ReadinessSummary {
-  const { planned, inventory, inventoryAccessors, orderAccessors } = params;
+    const rawQty = accessors.getQty(row);
+    const containerCount = accessors.getContainerCount?.(row);
 
-  const items: ReadinessItem[] = planned.map((usage) => {
-    // Find matching inventory rows
-    const inventoryRows = inventory.filter(
-      (row) => inventoryAccessors.getProductId(row) === usage.productId
-    );
-    const inventoryTotal = inventoryRows.reduce(
-      (sum, row) => sum + (inventoryAccessors.getQty(row) || 0),
-      0
-    );
+    const qty = Number.isFinite(rawQty as number)
+      ? Number(rawQty)
+      : Number.isFinite(containerCount as number)
+        ? Number(containerCount)
+        : 0;
 
-    // Find matching order lines
-    let orderRows: { order: O; line: L; vendorName: string }[] = [];
-    let orderTotal = 0;
-
-    if (orderAccessors) {
-      orderAccessors.orders.forEach((order) => {
-        const status = orderAccessors.getOrderStatus(order);
-        // Only count orders that are pending/confirmed, not delivered
-        if (status === 'delivered' || status === 'cancelled') return;
-
-        const lines = orderAccessors.getLines(order);
-        lines.forEach((line) => {
-          if (orderAccessors.getLineProductId(line) === usage.productId) {
-            const remainingQty = orderAccessors.getLineRemainingQty(line) || 0;
-            if (remainingQty > 0) {
-              orderRows.push({
-                order,
-                line,
-                vendorName: orderAccessors.getVendorName(order),
-              });
-              orderTotal += remainingQty;
-            }
-          }
-        });
-      });
-    }
-
-    // Calculate status
-    const totalAvailable = inventoryTotal + orderTotal;
-    const shortfall = Math.max(0, usage.requiredQty - totalAvailable);
-
-    let status: ReadinessStatus;
-    if (inventoryTotal >= usage.requiredQty) {
-      status = 'READY';
-    } else if (totalAvailable >= usage.requiredQty) {
-      status = 'ON_ORDER';
+    const current = map.get(productId);
+    if (!current) {
+      map.set(productId, { qtySum: qty, rows: [row] });
     } else {
-      status = 'BLOCKING';
+      current.qtySum += qty;
+      current.rows.push(row);
     }
+  }
 
-    // Build explanation
-    const explain: ReadinessExplanation = {
-      requiredQty: usage.requiredQty,
-      unit: usage.plannedUnit,
-      inventoryRows,
-      inventoryTotal,
-      orderRows,
-      orderTotal,
-      shortfall,
-      status,
-      calculation: buildCalculationString(
-        usage.requiredQty,
-        inventoryTotal,
-        orderTotal,
-        usage.plannedUnit
-      ),
+  return map;
+}
+
+export function indexOnOrderByProduct<T = OrderRow>(opts: {
+  orders: T[];
+  getOrderId: (order: T) => string;
+  getOrderStatus?: (order: T) => string | null | undefined;
+  isOrderOpen?: (order: T) => boolean;
+  getVendorName?: (order: T) => string | null | undefined;
+  getLines: (order: T) => any[];
+  getLineProductId: (line: any) => string;
+  getLineRemainingQty: (line: any) => number | null | undefined;
+  getLineUnit?: (line: any) => Unit | null | undefined;
+}): Map<string, { qtySum: number; lines: ReadinessExplain["orderLines"] }> {
+  const {
+    orders,
+    getOrderId,
+    getOrderStatus,
+    isOrderOpen,
+    getVendorName,
+    getLines,
+    getLineProductId,
+    getLineRemainingQty,
+    getLineUnit,
+  } = opts;
+
+  const map = new Map<string, { qtySum: number; lines: ReadinessExplain["orderLines"] }>();
+
+  for (const order of orders || []) {
+    const open =
+      typeof isOrderOpen === "function"
+        ? isOrderOpen(order)
+        : (() => {
+            const s = (getOrderStatus?.(order) || "").toUpperCase();
+            return !["CLOSED", "CANCELLED", "CANCELED", "RECEIVED", "COMPLETE", "COMPLETED", "DELIVERED"].includes(s);
+          })();
+
+    if (!open) continue;
+
+    const orderId = getOrderId(order);
+    const vendorName = getVendorName?.(order) || undefined;
+    const status = getOrderStatus?.(order) || undefined;
+    const lines = getLines(order) || [];
+
+    for (const line of lines) {
+      const productId = getLineProductId(line);
+      if (!productId) continue;
+
+      const remRaw = getLineRemainingQty(line);
+      const remainingQty = Number.isFinite(remRaw as number) ? Number(remRaw) : 0;
+      if (remainingQty <= 0) continue;
+
+      const unit = getLineUnit?.(line) || undefined;
+
+      const entry = map.get(productId) || { qtySum: 0, lines: [] as ReadinessExplain["orderLines"] };
+      entry.qtySum += remainingQty;
+      entry.lines.push({ orderId, vendorName, status, remainingQty, unit });
+      map.set(productId, entry);
+    }
+  }
+
+  return map;
+}
+
+export function computeReadiness(params: {
+  planned: PlannedUsage[];
+  inventory: InventoryRow[];
+  orders?: OrderRow[];
+  inventoryAccessors: Accessors<InventoryRow>;
+  orderAccessors?: Parameters<typeof indexOnOrderByProduct<OrderRow>>[0];
+}): ReadinessSummary {
+  const { planned, inventory, orders, inventoryAccessors, orderAccessors } = params;
+
+  const onHandIndex = indexOnHandByProduct(inventory || [], inventoryAccessors);
+
+  const onOrderIndex =
+    orders && orderAccessors
+      ? indexOnOrderByProduct({ ...orderAccessors, orders })
+      : new Map<string, { qtySum: number; lines: ReadinessExplain["orderLines"] }>();
+
+  const items: ReadinessItem[] = (planned || []).map((p) => {
+    const onHand = onHandIndex.get(p.productId)?.qtySum ?? 0;
+    const invRows = onHandIndex.get(p.productId)?.rows ?? [];
+    const onOrder = onOrderIndex.get(p.productId)?.qtySum ?? 0;
+    const orderLines = onOrderIndex.get(p.productId)?.lines ?? [];
+
+    const required = Number.isFinite(p.requiredQty) ? p.requiredQty : 0;
+
+    let status: ReadinessStatus = "BLOCKING";
+    if (onHand >= required) status = "READY";
+    else if (onHand + onOrder >= required) status = "ON_ORDER";
+
+    const shortQty = Math.max(0, required - (onHand + onOrder));
+
+    const explain: ReadinessExplain = {
+      productId: p.productId,
+      plannedUnit: p.plannedUnit,
+      requiredQty: required,
+      onHandQty: onHand,
+      onOrderQty: onOrder,
+      shortQty,
+      inventoryRows: invRows,
+      orderLines,
     };
 
     return {
-      id: usage.id,
-      label: usage.label,
-      productId: usage.productId,
-      requiredQty: usage.requiredQty,
-      plannedUnit: usage.plannedUnit,
-      crop: usage.crop,
-      passName: usage.passName,
-      when: usage.when,
+      ...p,
       status,
-      onHandQty: inventoryTotal,
-      onOrderQty: orderTotal,
-      shortfall,
+      onHandQty: onHand,
+      onOrderQty: onOrder,
+      shortQty,
       explain,
     };
   });
 
-  // Calculate counts
-  const readyCount = items.filter((i) => i.status === 'READY').length;
-  const onOrderCount = items.filter((i) => i.status === 'ON_ORDER').length;
-  const blockingCount = items.filter((i) => i.status === 'BLOCKING').length;
-  const totalCount = items.length;
-  const total = totalCount || 1;
+  const readyCount = items.filter((i) => i.status === "READY").length;
+  const onOrderCount = items.filter((i) => i.status === "ON_ORDER").length;
+  const blockingCount = items.filter((i) => i.status === "BLOCKING").length;
 
   return {
-    totalCount,
     readyCount,
     onOrderCount,
     blockingCount,
-    readyPct: (readyCount / total) * 100,
-    onOrderPct: (onOrderCount / total) * 100,
-    blockingPct: (blockingCount / total) * 100,
+    totalCount: items.length,
     items,
   };
-}
-
-function buildCalculationString(
-  required: number,
-  onHand: number,
-  onOrder: number,
-  unit: string
-): string {
-  const total = onHand + onOrder;
-  const diff = total - required;
-
-  if (diff >= 0) {
-    return `Need ${fmt(required)} ${unit}. Have ${fmt(onHand)} on hand${
-      onOrder > 0 ? ` + ${fmt(onOrder)} on order` : ''
-    } = ${fmt(total)} ${unit}. ✓ Covered by ${fmt(diff)} ${unit}`;
-  } else {
-    return `Need ${fmt(required)} ${unit}. Have ${fmt(onHand)} on hand${
-      onOrder > 0 ? ` + ${fmt(onOrder)} on order` : ''
-    } = ${fmt(total)} ${unit}. ✗ Short ${fmt(Math.abs(diff))} ${unit}`;
-  }
-}
-
-function fmt(n: number): string {
-  if (!Number.isFinite(n)) return '0';
-  const r = Math.round(n * 100) / 100;
-  return r.toLocaleString();
 }

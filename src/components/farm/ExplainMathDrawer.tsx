@@ -1,14 +1,15 @@
 import React from 'react';
 import { X, Package, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
-import type { ReadinessExplanation } from '@/lib/readinessEngine';
+import type { ReadinessExplain, ReadinessStatus } from '@/lib/readinessEngine';
 
 interface ExplainMathDrawerProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  explain: ReadinessExplanation | null;
+  explain: ReadinessExplain | null;
+  status?: ReadinessStatus;
   renderInventoryRow?: (row: any) => React.ReactNode;
-  renderOrderRow?: (row: { order: any; line: any; vendorName: string }) => React.ReactNode;
+  renderOrderRow?: (row: { orderId: string; vendorName?: string; status?: string; remainingQty: number; unit?: string }) => React.ReactNode;
 }
 
 export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
@@ -16,10 +17,17 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
   onClose,
   title,
   explain,
+  status,
   renderInventoryRow,
   renderOrderRow,
 }) => {
   if (!open || !explain) return null;
+
+  // Derive status from explain data if not passed
+  const derivedStatus: ReadinessStatus = status ?? (
+    explain.onHandQty >= explain.requiredQty ? 'READY' :
+    explain.onHandQty + explain.onOrderQty >= explain.requiredQty ? 'ON_ORDER' : 'BLOCKING'
+  );
 
   const statusColors = {
     READY: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: CheckCircle },
@@ -27,8 +35,15 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
     BLOCKING: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', icon: AlertTriangle },
   };
 
-  const colors = statusColors[explain.status];
+  const colors = statusColors[derivedStatus];
   const StatusIcon = colors.icon;
+
+  const calculationText = buildCalculationString(
+    explain.requiredQty,
+    explain.onHandQty,
+    explain.onOrderQty,
+    explain.plannedUnit
+  );
 
   return (
     <>
@@ -59,11 +74,11 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
               <StatusIcon className={`w-5 h-5 ${colors.text}`} />
               <div>
                 <p className={`font-semibold ${colors.text}`}>
-                  {explain.status === 'READY' && 'Ready to Execute'}
-                  {explain.status === 'ON_ORDER' && 'Covered by On-Order'}
-                  {explain.status === 'BLOCKING' && 'Blocking - Action Required'}
+                  {derivedStatus === 'READY' && 'Ready to Execute'}
+                  {derivedStatus === 'ON_ORDER' && 'Covered by On-Order'}
+                  {derivedStatus === 'BLOCKING' && 'Blocking - Action Required'}
                 </p>
-                <p className="text-sm text-stone-600 mt-1">{explain.calculation}</p>
+                <p className="text-sm text-stone-600 mt-1">{calculationText}</p>
               </div>
             </div>
           </div>
@@ -77,7 +92,7 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-stone-600">Planned Usage</span>
                 <span className="font-semibold text-stone-800">
-                  {fmt(explain.requiredQty)} {explain.unit}
+                  {fmt(explain.requiredQty)} {explain.plannedUnit}
                 </span>
               </div>
             </div>
@@ -87,7 +102,7 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
           <div>
             <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2">
               <Package className="w-4 h-4" />
-              On Hand ({fmt(explain.inventoryTotal)} {explain.unit})
+              On Hand ({fmt(explain.onHandQty)} {explain.plannedUnit})
             </h3>
             {explain.inventoryRows.length > 0 ? (
               <div className="space-y-2">
@@ -99,7 +114,7 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-stone-600">Inventory #{idx + 1}</span>
                         <span className="font-semibold">
-                          {fmt(row.quantity ?? row.qty ?? row.on_hand_qty ?? 0)} {explain.unit}
+                          {fmt(row.quantity ?? row.qty ?? row.on_hand_qty ?? 0)} {explain.plannedUnit}
                         </span>
                       </div>
                     )}
@@ -117,22 +132,22 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
           <div>
             <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2">
               <Truck className="w-4 h-4" />
-              On Order ({fmt(explain.orderTotal)} {explain.unit})
+              On Order ({fmt(explain.onOrderQty)} {explain.plannedUnit})
             </h3>
-            {explain.orderRows.length > 0 ? (
+            {explain.orderLines.length > 0 ? (
               <div className="space-y-2">
-                {explain.orderRows.map((row: any, idx) => (
+                {explain.orderLines.map((line, idx) => (
                   <div key={idx} className="bg-white rounded-xl border border-stone-200 p-4">
                     {renderOrderRow ? (
-                      renderOrderRow(row)
+                      renderOrderRow(line)
                     ) : (
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium text-stone-800">{row.vendorName}</div>
-                          <div className="text-xs text-stone-500">Order pending</div>
+                          <div className="font-medium text-stone-800">{line.vendorName || 'Unknown Vendor'}</div>
+                          <div className="text-xs text-stone-500">{line.status || 'Pending'}</div>
                         </div>
                         <span className="font-semibold">
-                          {fmt(row.line?.remainingQty ?? row.line?.remaining_qty ?? row.line?.quantity ?? 0)} {explain.unit}
+                          {fmt(line.remainingQty)} {line.unit || explain.plannedUnit}
                         </span>
                       </div>
                     )}
@@ -147,12 +162,12 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
           </div>
 
           {/* Summary */}
-          {explain.shortfall > 0 && (
+          {explain.shortQty > 0 && (
             <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <span className="text-rose-700 font-medium">Shortfall</span>
                 <span className="font-bold text-rose-700">
-                  {fmt(explain.shortfall)} {explain.unit}
+                  {fmt(explain.shortQty)} {explain.plannedUnit}
                 </span>
               </div>
             </div>
@@ -162,6 +177,26 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
     </>
   );
 };
+
+function buildCalculationString(
+  required: number,
+  onHand: number,
+  onOrder: number,
+  unit: string
+): string {
+  const total = onHand + onOrder;
+  const diff = total - required;
+
+  if (diff >= 0) {
+    return `Need ${fmt(required)} ${unit}. Have ${fmt(onHand)} on hand${
+      onOrder > 0 ? ` + ${fmt(onOrder)} on order` : ''
+    } = ${fmt(total)} ${unit}. ✓ Covered by ${fmt(diff)} ${unit}`;
+  } else {
+    return `Need ${fmt(required)} ${unit}. Have ${fmt(onHand)} on hand${
+      onOrder > 0 ? ` + ${fmt(onOrder)} on order` : ''
+    } = ${fmt(total)} ${unit}. ✗ Short ${fmt(Math.abs(diff))} ${unit}`;
+  }
+}
 
 function fmt(n: number): string {
   if (!Number.isFinite(n)) return '0';
