@@ -44,9 +44,10 @@ export const calculateVendorSpending = (
     const product = products.find(p => p.id === usage.productId);
     if (!product) return;
     
-    // Find preferred offering for this product
+    // Only use explicitly preferred offerings - commodities without a preferred vendor should be unassigned
     const offerings = vendorOfferings.filter(o => o.productId === usage.productId);
-    const preferredOffering = offerings.find(o => o.isPreferred) || offerings[0];
+    // Only use preferred offerings - non-preferred offerings (like commodities) should go to unassigned
+    const preferredOffering = offerings.find(o => o.isPreferred);
     
     // Calculate extended cost
     let extendedCost = 0;
