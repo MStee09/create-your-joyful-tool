@@ -40,6 +40,8 @@ import { generateId, formatCurrency, formatNumber, downloadCSV } from '@/lib/cal
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
 import { decodeBidEventScope } from '@/lib/bidEventScope';
 import { updatePriceBookFromAwards } from '@/lib/priceBookUtils';
+import { buildDraftOrdersFromAwards } from '@/lib/ordersFromAwards';
+import type { Order } from '@/types/orderInvoice';
 import { Breadcrumb } from './Breadcrumb';
 import {
   Dialog,
@@ -59,6 +61,11 @@ interface BidEventDetailViewProps {
   awards: Award[];
   priceBook: PriceBookEntry[];
   season: Season | null;
+  // Phase 2.2: For generating orders from awards
+  orders: Order[];
+  onAddOrder: (order: Order) => Promise<void> | void;
+  onNavigate: (viewId: string) => void;
+  // Original props
   onUpdateEvent: (event: BidEvent) => void;
   onUpdateQuotes: (quotes: VendorQuote[]) => void;
   onUpdateAwards: (awards: Award[]) => void;
@@ -83,6 +90,9 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
   awards,
   priceBook,
   season,
+  orders,
+  onAddOrder,
+  onNavigate,
   onUpdateEvent,
   onUpdateQuotes,
   onUpdateAwards,
@@ -299,6 +309,50 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
     
     setShowAwardModal(null);
     toast.success('Award saved & price book updated');
+  };
+
+  // Phase 2.2: Generate draft orders from awards
+  const handleGenerateOrdersFromAwards = async () => {
+    const eventAwards = awards.filter(a => a.bidEventId === event.id);
+
+    if (eventAwards.length === 0) {
+      toast.error('No awards found for this event. Award vendors first.');
+      return;
+    }
+
+    const { orders: newOrders, warnings } = buildDraftOrdersFromAwards({
+      bidEventId: event.id,
+      seasonYear: event.seasonYear || season?.year || new Date().getFullYear(),
+      awards: eventAwards,
+      vendorQuotes,
+      commoditySpecs,
+      existingOrders: orders,
+    });
+
+    if (newOrders.length === 0) {
+      toast.error('Could not generate orders. Check that awards have vendor, quantity, and price.');
+      return;
+    }
+
+    // Create all orders
+    for (const o of newOrders) {
+      await onAddOrder(o);
+    }
+
+    if (warnings.length > 0) {
+      console.warn('Order generation warnings:', warnings);
+      toast.success(`Created ${newOrders.length} draft order(s), with ${warnings.length} warning(s) (check console).`);
+    } else {
+      toast.success(`Created ${newOrders.length} draft order(s) from awards.`);
+    }
+
+    // Auto-advance bid status to "awarded" if still collecting
+    if (event.status === 'collecting') {
+      onUpdateEvent({ ...event, status: 'awarded' });
+    }
+
+    // Navigate to Orders screen
+    onNavigate('orders');
   };
   
   const handleExportBidSheet = () => {
@@ -711,7 +765,17 @@ export const BidEventDetailView: React.FC<BidEventDetailViewProps> = ({
       {/* Awards Tab */}
       {activeTab === 'awards' && (
         <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
-          <h3 className="font-semibold text-stone-800 mb-4">Award Summary</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-stone-800">Award Summary</h3>
+            {eventAwards.length > 0 && (
+              <button
+                onClick={handleGenerateOrdersFromAwards}
+                className="rounded-xl border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
+              >
+                Generate Draft Orders from Awards
+              </button>
+            )}
+          </div>
           
           {demandRollup.length === 0 ? (
             <p className="text-sm text-stone-400 italic">No commodities to award</p>
