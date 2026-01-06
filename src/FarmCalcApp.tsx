@@ -1224,6 +1224,7 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             vendors={state.vendors}
             season={currentSeason}
+            orders={state.orders}
             onUpdateInventory={handleUpdateInventory}
           />
         );
