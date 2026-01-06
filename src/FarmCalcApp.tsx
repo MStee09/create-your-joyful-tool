@@ -1259,6 +1259,11 @@ const AppContent: React.FC = () => {
             orders={state.orders}
             onAddOrder={addOrder}
             onNavigate={(viewId) => setActiveView(viewId)}
+            productMasters={state.productMasters || []}
+            commoditySpecs={state.commoditySpecs || []}
+            bidEvents={state.bidEvents || []}
+            onUpdateBidEvents={updateBidEvents}
+            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
           />
         );
       case 'procurement':
