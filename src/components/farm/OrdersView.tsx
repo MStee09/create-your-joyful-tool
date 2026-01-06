@@ -1,585 +1,398 @@
-import React, { useState } from 'react';
-import {
-  Package, Truck, FileText, ChevronRight, Plus, Calendar, DollarSign,
-  CheckCircle, Clock, Building2, Phone, Receipt, X, Calculator,
-  Trash2, Info, TrendingDown, ChevronDown, ChevronUp, Sun
-} from 'lucide-react';
-import { PackageTierPreview } from './PackageTierPricing';
-import { PendingDeliveriesDashboard } from './PendingDeliveriesDashboard';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Package, Truck, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import type { Vendor, Product, InventoryItem } from '@/types/farm';
+import type { Order, OrderLineItem, OrderStatus } from '@/types/orderInvoice';
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-type OrderStatus = 'ordered' | 'in_transit' | 'complete';
-type PaymentStatus = 'unpaid' | 'prepaid';
-
-interface OrderLineItem {
-  id: string;
-  productName: string;
-  orderedQuantity: number;
-  remainingQuantity: number;
-  unit: string;
-  unitPrice: number;
-  packageType?: string;
+function fmt(n: number, decimals = 1) {
+  const v = Number.isFinite(n) ? n : 0;
+  return v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  vendorName: string;
-  vendorPhone: string;
-  orderDate: string;
-  status: OrderStatus;
-  paymentStatus: PaymentStatus;
-  deliveryWindow: { month: string; notes?: string };
-  scheduledDate?: string;
-  lineItems: OrderLineItem[];
-  subtotal: number;
-  receivedTotal: number;
-  bidEventId?: string;
+function safeId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-interface PackageTier {
-  id: string;
-  packageType: string;
-  packageSize: number;
-  pricePerUnit: number;
-  minQty?: number;
+function statusLabel(status: OrderStatus) {
+  switch (status) {
+    case 'draft': return { text: 'Draft', cls: 'bg-stone-100 text-stone-700 border-stone-200' };
+    case 'ordered': return { text: 'Ordered', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+    case 'confirmed': return { text: 'Confirmed', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+    case 'partial': return { text: 'Partial', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'complete': return { text: 'Complete', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'cancelled': return { text: 'Cancelled', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
+    default: return { text: status || 'Unknown', cls: 'bg-stone-100 text-stone-700 border-stone-200' };
+  }
 }
 
-interface Charge {
-  id: string;
-  type: string;
-  description: string;
-  amount: number;
+interface OrdersViewProps {
+  orders: Order[];
+  vendors: Vendor[];
+  products: Product[];
+  inventory: InventoryItem[];
+  seasonYear: number;
+  onUpdateOrders: (orders: Order[]) => Promise<void> | void;
+  onUpdateInventory: (inventory: InventoryItem[]) => Promise<void> | void;
 }
 
-// ============================================================================
-// SHARED DATA
-// ============================================================================
+export const OrdersView: React.FC<OrdersViewProps> = ({
+  orders,
+  vendors,
+  products,
+  inventory,
+  seasonYear,
+  onUpdateOrders,
+  onUpdateInventory,
+}) => {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [receiveState, setReceiveState] = useState<{
+    open: boolean;
+    orderId: string;
+    lineId: string;
+    qty: number;
+    alsoAddToInventory: boolean;
+  }>({ open: false, orderId: '', lineId: '', qty: 0, alsoAddToInventory: true });
 
-const mockOrders: Order[] = [
-  {
-    id: '1', orderNumber: 'ORD-2026-001', vendorName: 'Nutrien Ag Solutions', vendorPhone: '(320) 555-0123',
-    orderDate: '2026-01-15', status: 'ordered', paymentStatus: 'prepaid',
-    deliveryWindow: { month: 'March', notes: 'Call when ground thaws' },
-    lineItems: [
-      { id: 'li-1', productName: 'AMS 21-0-0-24S', orderedQuantity: 15, remainingQuantity: 15, unit: 'tons', unitPrice: 415 },
-      { id: 'li-2', productName: 'Urea 46-0-0', orderedQuantity: 12, remainingQuantity: 12, unit: 'tons', unitPrice: 510 },
-    ],
-    subtotal: 12345, receivedTotal: 0, bidEventId: 'bid-1',
-  },
-  {
-    id: '2', orderNumber: 'ORD-2026-002', vendorName: 'BW Fusion', vendorPhone: '(612) 555-0456',
-    orderDate: '2026-02-01', status: 'ordered', paymentStatus: 'unpaid',
-    deliveryWindow: { month: 'April' },
-    lineItems: [
-      { id: 'li-3', productName: 'Humical', orderedQuantity: 20, remainingQuantity: 20, unit: 'gal', unitPrice: 42, packageType: '275 gal tote' },
-    ],
-    subtotal: 840, receivedTotal: 0,
-  },
-  {
-    id: '3', orderNumber: 'ORD-2026-003', vendorName: 'CHS', vendorPhone: '(320) 555-0789',
-    orderDate: '2026-02-10', status: 'in_transit', paymentStatus: 'unpaid',
-    deliveryWindow: { month: 'March' }, scheduledDate: '2026-03-15',
-    lineItems: [
-      { id: 'li-4', productName: 'Glyphosate 4.5#', orderedQuantity: 50, remainingQuantity: 50, unit: 'gal', unitPrice: 15 },
-    ],
-    subtotal: 750, receivedTotal: 0,
-  },
-];
+  const seasonOrders = useMemo(() => {
+    return [...(orders || [])]
+      .filter(o => o.seasonYear === seasonYear)
+      .sort((a, b) => {
+        // Sort by status (drafts first), then by date
+        const statusOrder: Record<string, number> = { draft: 0, ordered: 1, confirmed: 2, partial: 3, complete: 4, cancelled: 5 };
+        const aStatus = statusOrder[a.status] ?? 3;
+        const bStatus = statusOrder[b.status] ?? 3;
+        if (aStatus !== bStatus) return aStatus - bStatus;
+        return (b.orderDate || '').localeCompare(a.orderDate || '');
+      });
+  }, [orders, seasonYear]);
 
-const packageTiers: PackageTier[] = [
-  { id: 'pt1', packageType: '2.5 gal jug', packageSize: 2.5, pricePerUnit: 48 },
-  { id: 'pt2', packageType: '30 gal drum', packageSize: 30, pricePerUnit: 45 },
-  { id: 'pt3', packageType: '275 gal tote', packageSize: 275, pricePerUnit: 42 },
-  { id: 'pt4', packageType: 'Bulk (500+ gal)', packageSize: 0, pricePerUnit: 38, minQty: 500 },
-];
+  const vendorName = (vendorId: string) => vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
+  const productName = (productId: string) => products.find(p => p.id === productId)?.name || 'Unknown Product';
 
-const statusConfig = {
-  ordered: { label: 'Ordered', bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
-  in_transit: { label: 'In Transit', bg: 'bg-amber-100', text: 'text-amber-700', icon: Truck },
-  complete: { label: 'Complete', bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle },
-};
+  const openReceive = (orderId: string, line: OrderLineItem) => {
+    setReceiveState({
+      open: true,
+      orderId,
+      lineId: line.id,
+      qty: Math.max(0, Number(line.remainingQuantity || 0)),
+      alsoAddToInventory: true,
+    });
+  };
 
-const paymentConfig = {
-  unpaid: { label: 'Unpaid', bg: 'bg-muted', text: 'text-muted-foreground' },
-  prepaid: { label: 'Prepaid', bg: 'bg-emerald-100', text: 'text-emerald-700' },
-};
+  const applyReceive = async () => {
+    const { orderId, lineId, qty, alsoAddToInventory } = receiveState;
+    if (!orderId || !lineId || qty <= 0) {
+      setReceiveState(prev => ({ ...prev, open: false }));
+      return;
+    }
 
-// ============================================================================
-// RECORD INVOICE MODAL
-// ============================================================================
+    const nextOrders = (orders || []).map(o => {
+      if (o.id !== orderId) return o;
 
-interface RecordInvoiceModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  order: Order | null;
-}
+      const nextLineItems = (o.lineItems || []).map(li => {
+        if (li.id !== lineId) return li;
 
-const RecordInvoiceModal: React.FC<RecordInvoiceModalProps> = ({ isOpen, onClose, order }) => {
-  const [charges] = useState<Charge[]>([{ id: '1', type: 'freight', description: 'Freight', amount: 485 }]);
-  
-  if (!isOpen || !order) return null;
+        const receivedQuantity = Number(li.receivedQuantity || 0) + qty;
+        const remainingQuantity = Math.max(0, Number(li.orderedQuantity || 0) - receivedQuantity);
 
-  const lineItems = order.lineItems.map(li => ({
-    ...li, quantity: li.remainingQuantity, subtotal: li.remainingQuantity * li.unitPrice
-  }));
+        const status: OrderLineItem['status'] =
+          remainingQuantity <= 0 ? 'complete' : receivedQuantity > 0 ? 'partial' : 'pending';
 
-  const productSubtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const chargesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
-  const invoiceTotal = productSubtotal + chargesTotal;
+        return { ...li, receivedQuantity, remainingQuantity, status };
+      });
 
-  // Freight allocation
-  const totalWeight = lineItems.reduce((sum, item) => {
-    const mult = item.unit === 'tons' ? 2000 : 10;
-    return sum + (item.quantity * mult);
-  }, 0);
+      const allComplete = nextLineItems.every(li => (Number(li.remainingQuantity || 0) <= 0));
+      const anyReceived = nextLineItems.some(li => (Number(li.receivedQuantity || 0) > 0));
 
-  const lineItemsWithFreight = lineItems.map(item => {
-    const mult = item.unit === 'tons' ? 2000 : 10;
-    const ratio = totalWeight > 0 ? (item.quantity * mult) / totalWeight : 0;
-    const allocated = chargesTotal * ratio;
-    const landed = item.quantity > 0 ? (item.subtotal + allocated) / item.quantity : 0;
-    return { ...item, allocatedFreight: allocated, landedCost: landed };
-  });
+      const status: OrderStatus =
+        allComplete ? 'complete' : anyReceived ? 'partial' : o.status;
+
+      return { ...o, lineItems: nextLineItems, status, updatedAt: new Date().toISOString() };
+    });
+
+    await onUpdateOrders(nextOrders);
+
+    if (alsoAddToInventory) {
+      const order = nextOrders.find(o => o.id === orderId);
+      const line = order?.lineItems.find(li => li.id === lineId);
+      if (line) {
+        const productId = line.productId;
+        const unit = String(line.unit || 'gal');
+
+        const existing = inventory.find(i => i.productId === productId);
+        const nextInventory = existing
+          ? inventory.map(i => (i.id === existing.id ? { ...i, quantity: Number(i.quantity || 0) + qty } : i))
+          : [
+              ...inventory,
+              {
+                id: safeId(),
+                productId,
+                quantity: qty,
+                unit: unit as 'gal' | 'lbs',
+                packagingName: undefined,
+                packagingSize: undefined,
+                containerCount: undefined,
+              } as InventoryItem,
+            ];
+
+        await onUpdateInventory(nextInventory);
+      }
+    }
+
+    setReceiveState(prev => ({ ...prev, open: false }));
+  };
+
+  const confirmOrder = async (orderId: string) => {
+    const nextOrders = (orders || []).map(o => {
+      if (o.id !== orderId) return o;
+      return { ...o, status: 'ordered' as OrderStatus, updatedAt: new Date().toISOString() };
+    });
+    await onUpdateOrders(nextOrders);
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    const nextOrders = (orders || []).map(o => {
+      if (o.id !== orderId) return o;
+      return { ...o, status: 'cancelled' as OrderStatus, updatedAt: new Date().toISOString() };
+    });
+    await onUpdateOrders(nextOrders);
+  };
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const draftCount = seasonOrders.filter(o => o.status === 'draft').length;
+    const activeCount = seasonOrders.filter(o => ['ordered', 'confirmed', 'partial'].includes(o.status)).length;
+    const completeCount = seasonOrders.filter(o => o.status === 'complete').length;
+    const totalValue = seasonOrders.reduce((s, o) => s + (o.subtotal || 0), 0);
+    return { draftCount, activeCount, completeCount, totalValue };
+  }, [seasonOrders]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <Receipt className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Record Invoice</h2>
-              <p className="text-sm text-muted-foreground">{order.orderNumber} · {order.vendorName}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Invoice Details */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Vendor Invoice #</label>
-              <input type="text" placeholder="INV-2026-0342" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Invoice Date</label>
-              <input type="date" defaultValue="2026-03-15" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Received Date</label>
-              <input type="date" defaultValue="2026-03-15" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
-            </div>
-          </div>
-
-          {/* Products */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <Package className="w-4 h-4" /> Products Received
-            </h3>
-            <div className="space-y-4">
-              {lineItems.map((item, idx) => {
-                const wf = lineItemsWithFreight[idx];
-                return (
-                  <div key={item.id} className="p-4 bg-muted rounded-xl">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="font-medium text-foreground">{item.productName}</div>
-                        <div className="text-sm text-muted-foreground">Ordered: {item.orderedQuantity} {item.unit}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-foreground">${item.subtotal.toLocaleString()}</div>
-                        <div className="text-xs text-muted-foreground">@ ${item.unitPrice}/{item.unit.replace(/s$/, '')}</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Qty Received</label>
-                        <div className="flex">
-                          <input type="number" defaultValue={item.quantity} step="0.01" className="flex-1 px-3 py-2 border border-border rounded-l-lg bg-background" />
-                          <span className="px-3 py-2 bg-muted border border-l-0 border-border rounded-r-lg text-muted-foreground text-sm">{item.unit}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Unit Price</label>
-                        <div className="flex">
-                          <span className="px-3 py-2 bg-muted border border-r-0 border-border rounded-l-lg text-muted-foreground text-sm">$</span>
-                          <input type="number" defaultValue={item.unitPrice} readOnly className="flex-1 px-3 py-2 border border-border rounded-r-lg bg-muted" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Scale Ticket #</label>
-                        <input type="text" placeholder="4521" className="w-full px-3 py-2 border border-border rounded-lg bg-background" />
-                      </div>
-                    </div>
-                    {chargesTotal > 0 && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">+ Allocated Freight</span>
-                          <span className="text-foreground">${wf.allocatedFreight.toFixed(2)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm font-medium mt-1">
-                          <span className="text-emerald-600">Landed Cost</span>
-                          <span className="text-emerald-600">${wf.landedCost.toFixed(2)}/{item.unit.replace(/s$/, '')}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-end mt-3">
-              <span className="text-sm text-muted-foreground">Product Subtotal:</span>
-              <span className="ml-3 text-lg font-semibold text-foreground">${productSubtotal.toLocaleString()}</span>
-            </div>
-          </div>
-
-          {/* Freight */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Truck className="w-4 h-4" /> Freight & Charges
-              </h3>
-              <button className="flex items-center gap-1 text-sm text-emerald-600">
-                <Plus className="w-4 h-4" /> Add Charge
-              </button>
-            </div>
-            <div className="space-y-2">
-              {charges.map(charge => (
-                <div key={charge.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Truck className="w-5 h-5 text-muted-foreground" />
-                    <span className="text-foreground">{charge.description}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">${charge.amount.toFixed(2)}</span>
-                    <button className="p-1 hover:bg-background rounded"><Trash2 className="w-4 h-4 text-muted-foreground" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end mt-3">
-              <span className="text-sm text-muted-foreground">Charges Total:</span>
-              <span className="ml-3 text-lg font-semibold text-foreground">${chargesTotal.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-border bg-muted">
-          {chargesTotal > 0 && (
-            <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-              <div className="flex items-center gap-2 text-sm text-emerald-800 mb-2">
-                <Calculator className="w-4 h-4" />
-                <span className="font-medium">Landed Costs (freight allocated by weight)</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {lineItemsWithFreight.map(item => (
-                  <div key={item.id} className="flex justify-between">
-                    <span className="text-emerald-700">{item.productName}:</span>
-                    <span className="font-medium text-emerald-800">${item.landedCost.toFixed(2)}/{item.unit.replace(/s$/, '')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Invoice Total</div>
-              <div className="text-2xl font-bold text-foreground">${invoiceTotal.toLocaleString()}</div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={onClose} className="px-4 py-2 border border-border text-foreground rounded-lg hover:bg-background">Cancel</button>
-              <button className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
-                <CheckCircle className="w-5 h-5" /> Save Invoice & Update Inventory
-              </button>
-            </div>
-          </div>
+    <div className="p-8 space-y-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-semibold text-stone-900">Orders</h2>
+          <p className="text-sm text-stone-500 mt-1">
+            Manage orders for {seasonYear}. Draft orders from Buy Workflow appear here.
+          </p>
         </div>
       </div>
-    </div>
-  );
-};
 
-// ============================================================================
-// PACKAGE PRICING CALCULATOR
-// ============================================================================
-
-const PackagePricingCalculator: React.FC = () => {
-  const [needed, setNeeded] = useState('100');
-  const [expanded, setExpanded] = useState(true);
-  const qty = parseFloat(needed) || 0;
-  const maxPrice = Math.max(...packageTiers.map(t => t.pricePerUnit));
-
-  const tierCosts = packageTiers.map(tier => {
-    if (tier.minQty && qty < tier.minQty) return { tier, packages: 0, totalQty: 0, cost: Infinity, eligible: false };
-    let packages = 0, totalQty = 0;
-    if (tier.packageSize > 0) {
-      packages = Math.ceil(qty / tier.packageSize);
-      totalQty = packages * tier.packageSize;
-    } else {
-      packages = 1; totalQty = qty;
-    }
-    return { tier, packages, totalQty, cost: totalQty * tier.pricePerUnit, eligible: true };
-  }).filter(tc => tc.eligible);
-
-  const best = tierCosts.reduce((b, c) => c.cost < b.cost ? c : b, tierCosts[0]);
-
-  return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-muted">
-        <div className="flex items-center gap-3">
-          <Package className="w-6 h-6 text-emerald-600" />
-          <div className="text-left">
-            <div className="font-semibold text-foreground">Humical Package Pricing</div>
-            <div className="text-sm text-muted-foreground">See savings by package size</div>
-          </div>
+      {/* Summary Cards */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="text-xs font-semibold text-stone-500">Draft</div>
+          <div className="mt-1 text-2xl font-semibold text-stone-600">{stats.draftCount}</div>
         </div>
-        {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-      </button>
-      
-      {expanded && (
-        <div className="p-4 border-t border-border space-y-4">
-          {/* Tiers */}
-          <div className="space-y-2">
-            {packageTiers.map((tier, idx) => {
-              const savings = ((maxPrice - tier.pricePerUnit) / maxPrice) * 100;
-              return (
-                <div key={tier.id} className={`flex items-center justify-between p-3 rounded-lg ${idx === packageTiers.length - 1 ? 'bg-emerald-50 border border-emerald-200' : 'bg-muted'}`}>
-                  <div>
-                    <div className="font-medium text-foreground">{tier.packageType}</div>
-                    {tier.packageSize > 0 && <div className="text-sm text-muted-foreground">{tier.packageSize} gal</div>}
-                    {tier.minQty && <div className="text-xs text-amber-600">Min {tier.minQty} gal</div>}
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="text-xs font-semibold text-stone-500">Active</div>
+          <div className="mt-1 text-2xl font-semibold text-blue-600">{stats.activeCount}</div>
+        </div>
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="text-xs font-semibold text-stone-500">Complete</div>
+          <div className="mt-1 text-2xl font-semibold text-emerald-600">{stats.completeCount}</div>
+        </div>
+        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="text-xs font-semibold text-stone-500">Total Value</div>
+          <div className="mt-1 text-2xl font-semibold text-stone-900">${fmt(stats.totalValue, 0)}</div>
+        </div>
+      </div>
+
+      {/* Orders List */}
+      <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden">
+        <div className="grid grid-cols-12 bg-stone-50 px-5 py-3 text-xs font-semibold text-stone-600">
+          <div className="col-span-3">Order</div>
+          <div className="col-span-3">Vendor</div>
+          <div className="col-span-2">Date</div>
+          <div className="col-span-2">Subtotal</div>
+          <div className="col-span-2 text-right">Actions</div>
+        </div>
+
+        <div className="divide-y divide-stone-200">
+          {seasonOrders.map(order => {
+            const pill = statusLabel(order.status);
+            const isOpen = !!expanded[order.id];
+            const remainingTotal = (order.lineItems || []).reduce((s, li) => s + Number(li.remainingQuantity || 0), 0);
+            const isDraft = order.status === 'draft';
+            const isCancelled = order.status === 'cancelled';
+
+            return (
+              <div key={order.id} className={`px-5 py-4 ${isCancelled ? 'opacity-50' : ''}`}>
+                <div className="grid grid-cols-12 items-center gap-2">
+                  <div className="col-span-3">
+                    <div className="font-semibold text-stone-900">{order.orderNumber}</div>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${pill.cls}`}>
+                        {order.status === 'complete' ? <CheckCircle className="w-3.5 h-3.5 mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}
+                        {pill.text}
+                      </span>
+                      {remainingTotal > 0 && !isCancelled && (
+                        <span className="text-xs text-stone-500">{fmt(remainingTotal)} remaining</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-foreground">${tier.pricePerUnit.toFixed(2)}/gal</div>
-                    {savings > 0 && (
-                      <div className="text-sm text-emerald-600 flex items-center gap-1 justify-end">
-                        <TrendingDown className="w-3 h-3" /> Save {savings.toFixed(0)}%
+
+                  <div className="col-span-3 text-stone-700">{vendorName(order.vendorId)}</div>
+                  <div className="col-span-2 text-stone-700">{order.orderDate || '—'}</div>
+                  <div className="col-span-2 text-stone-700 font-medium">${fmt(order.subtotal || 0, 0)}</div>
+
+                  <div className="col-span-2 flex justify-end gap-2">
+                    {isDraft && (
+                      <>
+                        <button
+                          onClick={() => confirmOrder(order.id)}
+                          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => cancelOrder(order.id)}
+                          className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setExpanded(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                      className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-stone-50"
+                    >
+                      {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expanded line items */}
+                {isOpen && (
+                  <div className="mt-4 rounded-2xl border border-stone-200 overflow-hidden">
+                    <div className="grid grid-cols-12 bg-stone-50 px-4 py-2 text-[11px] font-semibold text-stone-600">
+                      <div className="col-span-4">Product</div>
+                      <div className="col-span-2">Ordered</div>
+                      <div className="col-span-2">Received</div>
+                      <div className="col-span-2">Remaining</div>
+                      <div className="col-span-2 text-right">Action</div>
+                    </div>
+
+                    <div className="divide-y divide-stone-200 bg-white">
+                      {(order.lineItems || []).map(li => {
+                        const remaining = Number(li.remainingQuantity || 0);
+                        const canReceive = remaining > 0 && !isCancelled;
+
+                        return (
+                          <div key={li.id} className="grid grid-cols-12 px-4 py-3 text-sm text-stone-800 items-center">
+                            <div className="col-span-4">
+                              <div className="font-semibold">{productName(li.productId)}</div>
+                              <div className="text-xs text-stone-500">
+                                <Package className="inline w-3.5 h-3.5 mr-1" />
+                                ${fmt(li.unitPrice || 0, 2)} / {li.unit}
+                              </div>
+                            </div>
+                            <div className="col-span-2">{fmt(li.orderedQuantity)} {li.unit}</div>
+                            <div className="col-span-2">{fmt(li.receivedQuantity || 0)} {li.unit}</div>
+                            <div className="col-span-2 font-semibold">
+                              {remaining > 0 ? (
+                                <span className="text-amber-600">{fmt(remaining)} {li.unit}</span>
+                              ) : (
+                                <span className="text-emerald-600">—</span>
+                              )}
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              {canReceive ? (
+                                <button
+                                  onClick={() => openReceive(order.id, li)}
+                                  className="rounded-xl border border-stone-900 bg-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-800"
+                                >
+                                  Receive
+                                </button>
+                              ) : remaining <= 0 && !isCancelled ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                                  <CheckCircle className="w-3.5 h-3.5" /> Done
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {order.notes && (
+                      <div className="px-4 py-3 bg-stone-50 border-t border-stone-200 text-xs text-stone-600">
+                        <span className="font-semibold">Notes:</span> {order.notes}
                       </div>
                     )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Calculator */}
-          <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
-            <div className="text-sm font-medium text-foreground mb-2">How much do you need?</div>
-            <div className="flex gap-2 mb-4">
-              <input type="number" value={needed} onChange={e => setNeeded(e.target.value)} className="flex-1 px-3 py-2 border border-border rounded-lg bg-background" />
-              <span className="px-4 py-2 bg-background rounded-lg text-muted-foreground border border-border">gal</span>
-            </div>
-            
-            {qty > 0 && tierCosts.length > 0 && (
-              <div className="space-y-2">
-                {tierCosts.slice(0, 3).map(({ tier, packages, totalQty, cost }) => {
-                  const isBest = cost === best?.cost;
-                  return (
-                    <div key={tier.id} className={`p-3 rounded-lg ${isBest ? 'bg-emerald-100 border border-emerald-300' : 'bg-background'}`}>
-                      <div className="flex justify-between">
-                        <div>
-                          <span className="font-medium">{tier.packageType}</span>
-                          {isBest && <span className="ml-2 px-2 py-0.5 text-xs bg-emerald-500 text-white rounded-full">Best Value</span>}
-                        </div>
-                        <span className="font-bold">${cost.toFixed(2)}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {tier.packageSize > 0 ? `${packages} × ${tier.packageSize} gal = ${totalQty} gal` : `${totalQty} gal bulk`}
-                        {totalQty > qty && <span className="text-amber-600 ml-1">(+{(totalQty - qty).toFixed(0)} extra)</span>}
-                      </div>
-                    </div>
-                  );
-                })}
+                )}
               </div>
-            )}
+            );
+          })}
+
+          {seasonOrders.length === 0 && (
+            <div className="px-5 py-12 text-center text-stone-500">
+              No orders for {seasonYear}. Create draft orders from <b>Buy → Buy Workflow</b>.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Receive Modal */}
+      {receiveState.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setReceiveState(prev => ({ ...prev, open: false }))} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-start justify-between gap-3 mb-6">
+              <div>
+                <div className="text-lg font-semibold text-stone-900">Receive Shipment</div>
+                <div className="text-sm text-stone-500">Record quantity received</div>
+              </div>
+              <button
+                onClick={() => setReceiveState(prev => ({ ...prev, open: false }))}
+                className="p-2 hover:bg-stone-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-stone-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-stone-700 mb-2">Quantity received</label>
+                <input
+                  type="number"
+                  value={receiveState.qty}
+                  onChange={(e) => setReceiveState(prev => ({ ...prev, qty: Number(e.target.value) }))}
+                  className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  min={0}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={receiveState.alsoAddToInventory}
+                  onChange={(e) => setReceiveState(prev => ({ ...prev, alsoAddToInventory: e.target.checked }))}
+                  className="rounded"
+                />
+                Also add to Inventory
+              </label>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  This is a simple receive. Invoice-based receiving with landed cost + freight allocation coming soon.
+                </div>
+              </div>
+
+              <button
+                onClick={applyReceive}
+                className="w-full rounded-xl border border-stone-900 bg-stone-900 px-4 py-3 text-sm font-semibold text-white hover:bg-stone-800"
+              >
+                Save Received
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
-
-// ============================================================================
-// MAIN VIEW
-// ============================================================================
-
-export const OrdersView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'pending' | 'pricing'>('orders');
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [invoiceModalOrder, setInvoiceModalOrder] = useState<Order | null>(null);
-
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Tabs */}
-      <div className="bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex gap-1">
-            {[
-              { id: 'orders' as const, label: 'Orders', icon: FileText },
-              { id: 'pending' as const, label: 'Pending Deliveries', icon: Truck },
-              { id: 'pricing' as const, label: 'Package Pricing', icon: Package },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Orders Tab */}
-        {activeTab === 'orders' && (
-          <>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Orders</h1>
-                <p className="text-muted-foreground">Track purchases from order to delivery</p>
-              </div>
-              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
-                <Plus className="w-5 h-5" /> New Order
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="text-sm text-muted-foreground mb-1">Total Ordered</div>
-                <div className="text-2xl font-bold text-foreground">$13,935</div>
-              </div>
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="text-sm text-muted-foreground mb-1">On Order</div>
-                <div className="text-2xl font-bold text-blue-600">$13,935</div>
-              </div>
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="text-sm text-muted-foreground mb-1">Prepaid</div>
-                <div className="text-2xl font-bold text-emerald-600">$12,345</div>
-              </div>
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <div className="text-sm text-muted-foreground mb-1">Awaiting Delivery</div>
-                <div className="text-2xl font-bold text-amber-600">3 orders</div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {mockOrders.map(order => {
-                const statusInfo = statusConfig[order.status];
-                const paymentInfo = paymentConfig[order.paymentStatus];
-                const StatusIcon = statusInfo.icon;
-                const isExpanded = expandedOrderId === order.id;
-
-                return (
-                  <div key={order.id} className="bg-card rounded-xl border border-border overflow-hidden">
-                    <div className="p-4 cursor-pointer hover:bg-muted" onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}>
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full ${statusInfo.bg} flex items-center justify-center`}>
-                          <StatusIcon className={`w-5 h-5 ${statusInfo.text}`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold text-foreground">{order.orderNumber}</span>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusInfo.bg} ${statusInfo.text}`}>{statusInfo.label}</span>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${paymentInfo.bg} ${paymentInfo.text}`}>{paymentInfo.label}</span>
-                            {order.bidEventId && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700">From Bid</span>}
-                          </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1"><Building2 className="w-4 h-4" />{order.vendorName}</span>
-                            <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />Delivery: {order.scheduledDate ? new Date(order.scheduledDate).toLocaleDateString() : order.deliveryWindow?.month}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-foreground">${order.subtotal.toLocaleString()}</div>
-                        </div>
-                        <ChevronRight className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                      </div>
-                    </div>
-                    {isExpanded && (
-                      <div className="border-t border-border bg-muted p-4">
-                        <div className="space-y-2 mb-4">
-                          {order.lineItems.map(item => (
-                            <div key={item.id} className="flex justify-between text-sm">
-                              <span>{item.productName} {item.packageType && `(${item.packageType})`}</span>
-                              <span>{item.orderedQuantity} {item.unit} @ ${item.unitPrice} = ${(item.orderedQuantity * item.unitPrice).toLocaleString()}</span>
-                            </div>
-                          ))}
-                        </div>
-                        {order.deliveryWindow?.notes && (
-                          <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 mb-4">
-                            <strong>Note:</strong> {order.deliveryWindow.notes}
-                          </div>
-                        )}
-                        <div className="flex gap-3">
-                          {order.status === 'in_transit' ? (
-                            <button onClick={() => setInvoiceModalOrder(order)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
-                              <Receipt className="w-4 h-4" /> Record Invoice
-                            </button>
-                          ) : (
-                            <>
-                              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-                                <Phone className="w-4 h-4" /> Call In Delivery
-                              </button>
-                              <button onClick={() => setInvoiceModalOrder(order)} className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-background rounded-lg text-sm font-medium text-foreground">
-                                <Receipt className="w-4 h-4" /> Record Invoice
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Pending Deliveries Tab */}
-        {activeTab === 'pending' && (
-          <PendingDeliveriesDashboard />
-        )}
-
-        {/* Package Pricing Tab */}
-        {activeTab === 'pricing' && (
-          <PackageTierPreview />
-        )}
-
-        {/* Info Box */}
-        <div className="mt-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-          <div className="flex gap-3 text-sm text-emerald-800">
-            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <strong>Try it:</strong> Click on an order to expand it, then click "Record Invoice" to see the landed cost calculation with freight allocation.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Invoice Modal */}
-      <RecordInvoiceModal
-        isOpen={!!invoiceModalOrder}
-        onClose={() => setInvoiceModalOrder(null)}
-        order={invoiceModalOrder}
-      />
-    </div>
-  );
-};
-
-export default OrdersView;
