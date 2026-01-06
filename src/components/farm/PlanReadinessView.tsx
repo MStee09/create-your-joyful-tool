@@ -95,7 +95,8 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         getVendorName: (o: Order) => vendors.find(v => v.id === o.vendorId)?.name ?? undefined,
         getLines: (o: Order) => o.lineItems || [],
         getLineProductId: (l) => l.productId,
-        getLineRemainingQty: (l) => l.remainingQuantity,
+        getLineRemainingQty: (l: any) =>
+          l.remainingQuantity ?? (Number(l.orderedQuantity || 0) - Number(l.receivedQuantity || 0)),
         getLineUnit: (l) => l.unit,
       },
     });
