@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
+import type { Order } from '@/types/orderInvoice';
 import { formatCurrency, formatNumber, calculateCropCosts, calculateCropNutrientSummary } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
@@ -9,6 +10,7 @@ interface DashboardViewProps {
   season: Season | null;
   products: Product[];
   inventory?: InventoryItem[];
+  orders?: Order[];
   onViewChange?: (view: string) => void;
 }
 
@@ -16,6 +18,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   season, 
   products,
   inventory = [],
+  orders = [],
   onViewChange,
 }) => {
   const stats = useMemo(() => {
@@ -69,10 +72,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return null;
   };
 
-  // Calculate plan readiness
+  // Calculate plan readiness - NOW WITH ORDERS!
   const readiness = useMemo(() => 
-    calculateReadinessSummary(season, products, inventory),
-    [season, products, inventory]
+    calculateReadinessSummary(season, products, inventory, orders),
+    [season, products, inventory, orders]
   );
 
   return (

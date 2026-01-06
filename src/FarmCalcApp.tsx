@@ -1142,6 +1142,7 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             products={legacyProducts}
             inventory={state.inventory}
+            orders={state.orders}
             onViewChange={setActiveView}
           />
         );
