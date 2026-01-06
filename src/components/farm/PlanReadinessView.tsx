@@ -1,154 +1,135 @@
-import React, { useState, useMemo } from 'react';
-import { Droplets, Weight, Package, CheckCircle, Truck, AlertTriangle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
-import { calculatePlannedUsage, PlannedUsageItem } from '@/lib/calculations';
-import { formatCurrency } from '@/utils/farmUtils';
-import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
+import type { Order } from '@/types/orderInvoice';
+import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
+import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
+import { ExplainMathDrawer } from './ExplainMathDrawer';
 import { AddInventoryModal } from './AddInventoryModal';
-import { formatInventoryDisplay, getDefaultPackagingOptions } from '@/lib/packagingUtils';
+import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
+import { getDefaultPackagingOptions } from '@/lib/packagingUtils';
 
 interface PlanReadinessViewProps {
   inventory: InventoryItem[];
   products: Product[];
   vendors: Vendor[];
   season: Season | null;
+  orders: Order[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
-const formatNumber = (n: number, decimals = 1) => {
-  return n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-};
-
 type FilterTab = 'blocking' | 'on-order' | 'ready' | 'all';
+
+const fmt = (n: number, decimals = 1) =>
+  (Number.isFinite(n) ? n : 0).toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+function statusPill(status: ReadinessStatus) {
+  if (status === 'READY') return { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
+  if (status === 'ON_ORDER') return { label: 'On Order', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
+  return { label: 'Blocking', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
+}
 
 export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   inventory,
   products,
   vendors,
   season,
+  orders,
   onUpdateInventory,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
+
+  // Product selector modal state (for browsing all products)
   const [showProductSelector, setShowProductSelector] = useState(false);
+
+  // Add inventory modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productContext, setProductContext] = useState<ProductWithContext | null>(null);
 
-  // Calculate planned usage
-  const plannedUsage = useMemo(() => 
-    calculatePlannedUsage(season, products), 
-    [season, products]
-  );
+  // Explain drawer state
+  const [explainOpen, setExplainOpen] = useState(false);
+  const [explainTitle, setExplainTitle] = useState('');
+  const [explainStatus, setExplainStatus] = useState<ReadinessStatus>('BLOCKING');
+  const [explainData, setExplainData] = useState<ReadinessExplain | null>(null);
 
-  // Build readiness data
-  const readinessData = useMemo(() => {
-    const blocking: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      short: number;
-      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
-      usages: PlannedUsageItem['usages'];
-      inventoryItem?: InventoryItem;
-    }> = [];
-    
-    const ready: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      remaining: number;
-      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
-      value: number;
-      usages: PlannedUsageItem['usages'];
-      inventoryId?: string;
-      inventoryItem?: InventoryItem;
-    }> = [];
+  // 1) Calculate planned usage from season/products (existing function)
+  const plannedUsage = useMemo(() => calculatePlannedUsage(season, products), [season, products]);
 
-    const onOrder: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      onOrderQty: number;
-      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
-      usages: PlannedUsageItem['usages'];
-    }> = [];
-    
-    const planned: Array<{
-      product: Product;
-      needed: number;
-      onHand: number;
-      remaining: number;
-      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
-      value: number;
-      usages: PlannedUsageItem['usages'];
-      inventoryId?: string;
-      inventoryItem?: InventoryItem;
-    }> = [];
-    
-    plannedUsage.forEach(usage => {
-      const product = products.find(p => p.id === usage.productId);
-      if (!product) return;
-      
-      const invItem = inventory.find(i => i.productId === usage.productId);
-      const onHand = invItem?.quantity || 0;
-      const remaining = onHand - usage.totalNeeded;
-      
-      let value = onHand * product.price;
-      if (product.priceUnit === 'ton') {
-        value = (onHand / 2000) * product.price;
-      }
-      
-      if (remaining < 0) {
-        blocking.push({
-          product,
-          needed: usage.totalNeeded,
-          onHand,
-          short: Math.abs(remaining),
-          unit: usage.unit,
-          usages: usage.usages,
-          inventoryItem: invItem,
-        });
-      } else {
-        ready.push({
-          product,
-          needed: usage.totalNeeded,
-          onHand,
-          remaining,
-          unit: usage.unit,
-          value,
-          usages: usage.usages,
-          inventoryId: invItem?.id,
-          inventoryItem: invItem,
-        });
-      }
-      
-      planned.push({
-        product,
-        needed: usage.totalNeeded,
-        onHand,
-        remaining,
-        unit: usage.unit,
-        value,
-        usages: usage.usages,
-        inventoryId: invItem?.id,
-        inventoryItem: invItem,
-      });
+  // 2) Map planned usage -> readiness engine input format
+  const plannedForEngine: PlannedUsage[] = useMemo(() => {
+    return (plannedUsage || []).map((u: PlannedUsageItem) => {
+      const product = products.find(p => p.id === u.productId);
+      return {
+        id: u.productId,
+        label: product?.name || 'Unknown product',
+        productId: u.productId,
+        requiredQty: u.totalNeeded,
+        plannedUnit: u.unit,
+        crop: u.usages?.[0]?.cropName,
+        passName: u.usages?.[0]?.timingName,
+        when: undefined,
+      };
     });
-    
-    return { blocking, ready, onOrder, planned };
-  }, [plannedUsage, inventory, products]);
+  }, [plannedUsage, products]);
 
-  const handleQuickAddFromBlocking = (productId: string, shortAmount: number, unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote') => {
+  // 3) Compute readiness with canonical aggregation (FIXED: no inventory.find() bug)
+  //    This properly sums ALL inventory rows for each product and includes on-order quantities
+  const readiness = useMemo(() => {
+    return computeReadiness({
+      planned: plannedForEngine,
+      inventory,
+      orders: orders || [],
+      inventoryAccessors: {
+        getProductId: (row: InventoryItem) => row.productId,
+        getQty: (row: InventoryItem) => row.quantity,
+        getContainerCount: (row: InventoryItem) => row.containerCount,
+      },
+      orderAccessors: {
+        orders: orders || [],
+        getOrderId: (o: Order) => o.id,
+        getOrderStatus: (o: Order) => o.status,
+        getVendorName: (o: Order) => vendors.find(v => v.id === o.vendorId)?.name ?? undefined,
+        getLines: (o: Order) => o.lineItems || [],
+        getLineProductId: (l) => l.productId,
+        getLineRemainingQty: (l) => l.remainingQuantity,
+        getLineUnit: (l) => l.unit,
+      },
+    });
+  }, [plannedForEngine, inventory, orders, vendors]);
+
+  // Helper: get usages detail for a product (so we can show "used in")
+  const usageMap = useMemo(() => {
+    const m = new Map<string, PlannedUsageItem['usages']>();
+    plannedUsage.forEach(u => m.set(u.productId, u.usages));
+    return m;
+  }, [plannedUsage]);
+
+  // Filter items for selected tab
+  const filteredItems = useMemo(() => {
+    if (filterTab === 'all') return readiness.items;
+    if (filterTab === 'ready') return readiness.items.filter(i => i.status === 'READY');
+    if (filterTab === 'on-order') return readiness.items.filter(i => i.status === 'ON_ORDER');
+    return readiness.items.filter(i => i.status === 'BLOCKING');
+  }, [readiness.items, filterTab]);
+
+  // Quick-add handler: opens modal pre-filled with product context
+  const handleQuickAdd = (productId: string, shortAmount: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
-    
+
     const vendor = vendors.find(v => v.id === product.vendorId);
+    // Sum ALL inventory rows for this product (matches trust layer logic)
     const invItems = inventory.filter(i => i.productId === productId);
     const onHand = invItems.reduce((sum, i) => sum + i.quantity, 0);
+
     const usageItem = plannedUsage.find(u => u.productId === productId);
     const plannedNeeded = usageItem?.totalNeeded || 0;
     const usedIn = usageItem?.usages.map(u => `${u.cropName} → ${u.timingName}`) || [];
-    
+
     const context: ProductWithContext = {
       product,
       vendor,
@@ -158,20 +139,16 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       shortfall: shortAmount,
       usedIn,
     };
-    
+
     setSelectedProduct(product);
     setProductContext(context);
     setShowAddModal(true);
   };
 
-  const handleAddInventoryData = (data: {
-    quantity: number;
-    unit: string;
-    packageType?: string;
-    packageQuantity?: number;
-  }) => {
+  // Handle inventory addition from modal
+  const handleAddInventoryData = (data: { quantity: number; unit: string; packageType?: string; packageQuantity?: number }) => {
     if (!selectedProduct) return;
-    
+
     const newItem: InventoryItem = {
       id: crypto.randomUUID(),
       productId: selectedProduct.id,
@@ -181,17 +158,19 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       packagingSize: data.packageQuantity ? data.quantity / data.packageQuantity : undefined,
       containerCount: data.packageQuantity,
     };
-    
+
+    // Merge into existing inventory row for this product (if exists)
     const existing = inventory.find(i => i.productId === newItem.productId);
     if (existing) {
-      onUpdateInventory(inventory.map(i => i.id === existing.id 
-        ? { ...i, quantity: i.quantity + newItem.quantity }
-        : i
-      ));
+      onUpdateInventory(
+        inventory.map(i =>
+          i.id === existing.id ? { ...i, quantity: i.quantity + newItem.quantity } : i
+        )
+      );
     } else {
       onUpdateInventory([...inventory, newItem]);
     }
-    
+
     setShowAddModal(false);
     setSelectedProduct(null);
     setProductContext(null);
@@ -203,35 +182,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     packageType?: string;
     packageQuantity?: number;
   }) => {
+    // For now, treat as inventory addition
     handleAddInventoryData(data);
   };
 
-  // Summary counts
-  const totalProducts = readinessData.planned.length;
-  const readyCount = readinessData.ready.length;
-  const onOrderCount = readinessData.onOrder.length;
-  const blockingCount = readinessData.blocking.length;
-
-  // Progress bar percentages
-  const total = totalProducts || 1;
-  const readyPct = (readyCount / total) * 100;
-  const onOrderPct = (onOrderCount / total) * 100;
-  const blockingPct = (blockingCount / total) * 100;
-
-  // Filter items based on tab
-  const filteredPlanned = useMemo(() => {
-    switch (filterTab) {
-      case 'blocking':
-        return readinessData.planned.filter(p => p.remaining < 0);
-      case 'ready':
-        return readinessData.planned.filter(p => p.remaining >= 0);
-      case 'on-order':
-        return []; // No on-order items yet
-      default:
-        return readinessData.planned;
-    }
-  }, [filterTab, readinessData.planned]);
-
+  // Derived values for modal
   const packageOptions = useMemo(() => {
     if (!selectedProduct) return [];
     return getDefaultPackagingOptions(selectedProduct.form).map(p => ({
@@ -241,7 +196,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     }));
   }, [selectedProduct]);
 
-  const usedIn = useMemo(() => {
+  const usedInForModal = useMemo(() => {
     if (!productContext) return [];
     return productContext.usedIn.map(u => ({
       cropName: u.split(' → ')[0] || u,
@@ -254,230 +209,206 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return vendors.find(v => v.id === selectedProduct.vendorId) || null;
   }, [selectedProduct, vendors]);
 
+  // Progress bar percentages
+  const total = readiness.totalCount || 1;
+  const readyPct = (readiness.readyCount / total) * 100;
+  const onOrderPct = (readiness.onOrderCount / total) * 100;
+  const blockingPct = (readiness.blockingCount / total) * 100;
+
   return (
-    <div className="p-8">
+    <div className="p-8 space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-stone-800">Plan Readiness</h2>
-        <p className="text-stone-500 mt-1">Track inventory coverage for your crop plans</p>
-      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-stone-800">Plan Readiness</h2>
+            <p className="text-sm text-stone-500 mt-1">
+              Track inventory coverage for your crop plans. Inventory is summed across all rows per product.
+            </p>
+          </div>
+        </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
-              <Package className="w-5 h-5 text-stone-600" />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4 mt-6">
+          <div className="bg-stone-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
+                <Package className="w-5 h-5 text-stone-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-stone-800">{readiness.totalCount}</p>
+                <p className="text-sm text-stone-500">Total Products</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-stone-800">{totalProducts}</p>
-              <p className="text-sm text-stone-500">Total Products</p>
+          </div>
+          
+          <div className="bg-emerald-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-emerald-600">{readiness.readyCount}</p>
+                <p className="text-sm text-stone-500">Ready</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-amber-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <Truck className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-amber-600">{readiness.onOrderCount}</p>
+                <p className="text-sm text-stone-500">On Order</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-rose-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-rose-600">{readiness.blockingCount}</p>
+                <p className="text-sm text-stone-500">Blocking</p>
+              </div>
             </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-emerald-600">{readyCount}</p>
-              <p className="text-sm text-stone-500">Ready</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Truck className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{onOrderCount}</p>
-              <p className="text-sm text-stone-500">On Order</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">{blockingCount}</p>
-              <p className="text-sm text-stone-500">Blocking</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-4 mb-6">
-        <div className="flex items-center justify-between text-sm text-stone-500 mb-2">
-          <span>Plan Coverage</span>
-          <span>{Math.round(readyPct)}% ready</span>
-        </div>
-        <div className="h-3 bg-stone-100 rounded-full overflow-hidden flex">
-          <div 
-            className="h-full bg-emerald-500 transition-all" 
-            style={{ width: `${readyPct}%` }} 
-          />
-          <div 
-            className="h-full bg-blue-500 transition-all" 
-            style={{ width: `${onOrderPct}%` }} 
-          />
-          <div 
-            className="h-full bg-red-500 transition-all" 
-            style={{ width: `${blockingPct}%` }} 
-          />
-        </div>
-        <div className="flex items-center gap-6 mt-3 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-            <span className="text-stone-600">Ready ({readyCount})</span>
+        {/* Progress bar */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between text-sm text-stone-500 mb-2">
+            <span>Plan Coverage</span>
+            <span>{Math.round(readyPct)}% ready</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full" />
-            <span className="text-stone-600">On Order ({onOrderCount})</span>
+          <div className="h-3 bg-stone-100 rounded-full overflow-hidden flex">
+            <div className="bg-emerald-500 transition-all" style={{ width: `${readyPct}%` }} />
+            <div className="bg-amber-500 transition-all" style={{ width: `${onOrderPct}%` }} />
+            <div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full" />
-            <span className="text-stone-600">Blocking ({blockingCount})</span>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-emerald-500 rounded-full" />
+              <span className="text-stone-600">Ready ({readiness.readyCount})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-amber-500 rounded-full" />
+              <span className="text-stone-600">On Order ({readiness.onOrderCount})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-rose-500 rounded-full" />
+              <span className="text-stone-600">Blocking ({readiness.blockingCount})</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        {[
-          { id: 'all' as FilterTab, label: 'All', count: totalProducts },
-          { id: 'blocking' as FilterTab, label: 'Blocking', count: blockingCount },
-          { id: 'on-order' as FilterTab, label: 'On Order', count: onOrderCount },
-          { id: 'ready' as FilterTab, label: 'Ready', count: readyCount },
-        ].map(tab => (
+      <div className="flex flex-wrap gap-2">
+        {([
+          { id: 'all', label: 'All', count: readiness.totalCount },
+          { id: 'blocking', label: 'Blocking', count: readiness.blockingCount },
+          { id: 'on-order', label: 'On Order', count: readiness.onOrderCount },
+          { id: 'ready', label: 'Ready', count: readiness.readyCount },
+        ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
           <button
-            key={tab.id}
-            onClick={() => setFilterTab(tab.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterTab === tab.id
-                ? 'bg-stone-800 text-white'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
+            key={t.id}
+            onClick={() => setFilterTab(t.id)}
+            className={
+              'px-4 py-2 rounded-xl border text-sm font-semibold transition ' +
+              (filterTab === t.id
+                ? 'bg-stone-900 text-white border-stone-900'
+                : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-50')
+            }
           >
-            {tab.label} ({tab.count})
+            {t.label} ({t.count})
           </button>
         ))}
       </div>
 
-      {/* Blocking Section */}
-      {(filterTab === 'all' || filterTab === 'blocking') && readinessData.blocking.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <h3 className="text-sm font-semibold text-red-600 uppercase tracking-wider">
-              Blocking Plan Execution
-            </h3>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden">
-            <div className="divide-y divide-red-100">
-              {readinessData.blocking.map(item => (
-                <div key={item.product.id} className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+      {/* Main Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="grid grid-cols-12 bg-stone-50 px-5 py-3 text-xs font-semibold text-stone-600">
+          <div className="col-span-4">Product</div>
+          <div className="col-span-2">Need</div>
+          <div className="col-span-2">On Hand</div>
+          <div className="col-span-2">On Order</div>
+          <div className="col-span-2 text-right">Actions</div>
+        </div>
+
+        <div className="divide-y divide-stone-200">
+          {filteredItems.map(item => {
+            const p = statusPill(item.status);
+            const usages = usageMap.get(item.productId) || [];
+            const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
+            const product = products.find(pr => pr.id === item.productId);
+
+            return (
+              <div key={item.id} className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
+                <div className="col-span-4">
+                  <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+                      product?.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
                     }`}>
-                      {item.product.form === 'liquid' 
+                      {product?.form === 'liquid' 
                         ? <Droplets className="w-5 h-5 text-blue-600" /> 
                         : <Weight className="w-5 h-5 text-amber-600" />}
                     </div>
                     <div>
-                      <p className="text-[10px] text-stone-400 uppercase tracking-wide">
-                        {vendors.find(v => v.id === item.product.vendorId)?.name || ''}
-                      </p>
-                      <p className="font-medium text-stone-800">{item.product.name}</p>
-                      <p className="text-sm text-stone-500">
-                        {item.usages.map(u => u.cropName).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
-                      </p>
+                      <div className="font-semibold">{item.label}</div>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
+                          <p.icon className="w-3.5 h-3.5" />
+                          {p.label}
+                        </span>
+                        {usedIn && <span className="text-xs text-stone-500">{usedIn}</span>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-sm text-stone-500">
-                        Need {formatNumber(item.needed, 1)} {item.unit}, have {formatNumber(item.onHand, 1)}
-                      </p>
-                      <p className="font-semibold text-red-600">
-                        Short {formatNumber(item.short, 1)} {item.unit}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleQuickAddFromBlocking(item.product.id, item.short, item.unit)}
-                      className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
-                    >
-                      Add {formatNumber(item.short, 1)}
-                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Planned Usage Overview Table */}
-      <div>
-        <h3 className="text-sm font-semibold text-stone-600 uppercase tracking-wider mb-3">
-          Planned Usage Overview
-        </h3>
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-stone-50">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Planned</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Remaining</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-200">
-              {filteredPlanned.map(item => (
-                <tr key={item.product.id} className="hover:bg-stone-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        item.product.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                      }`}>
-                        {item.product.form === 'liquid' 
-                          ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                          : <Weight className="w-5 h-5 text-amber-600" />}
-                      </div>
-                      <div>
-                        <span className="font-medium text-stone-800">{item.product.name}</span>
-                        <p className="text-xs text-stone-400">
-                          {item.usages.map(u => `${u.cropName} → ${u.timingName}`).join(', ')}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-stone-700">{formatNumber(item.onHand, 1)} {item.unit}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right text-stone-600">
-                    {formatNumber(item.needed, 1)} {item.unit}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`font-semibold ${item.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {item.remaining >= 0 ? '+' : ''}{formatNumber(item.remaining, 1)} {item.unit}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                <div className="col-span-2 flex items-center">
+                  {fmt(item.requiredQty)} {item.plannedUnit}
+                </div>
+                <div className="col-span-2 flex items-center">
+                  {fmt(item.onHandQty)} {item.plannedUnit}
+                </div>
+                <div className="col-span-2 flex items-center">
+                  {fmt(item.onOrderQty)} {item.plannedUnit}
+                </div>
 
-          {filteredPlanned.length === 0 && (
-            <div className="p-12 text-center">
+                <div className="col-span-2 flex justify-end items-center gap-2">
+                  {item.status === 'BLOCKING' && (
+                    <button
+                      onClick={() => handleQuickAdd(item.productId, item.shortQty)}
+                      className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
+                    >
+                      Add {fmt(item.shortQty, 0)}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setExplainTitle(item.label);
+                      setExplainStatus(item.status);
+                      setExplainData(item.explain);
+                      setExplainOpen(true);
+                    }}
+                    className="px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold hover:bg-stone-50"
+                  >
+                    Explain
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredItems.length === 0 && (
+            <div className="px-5 py-12 text-center">
               <Package className="w-12 h-12 text-stone-300 mx-auto mb-4" />
               <h3 className="font-semibold text-stone-800 mb-2">No items in this category</h3>
               <p className="text-stone-500">
@@ -491,7 +422,59 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
       </div>
 
-      {/* Product Selector Modal */}
+      {/* Explain drawer */}
+      <ExplainMathDrawer
+        open={explainOpen}
+        onClose={() => setExplainOpen(false)}
+        title={explainTitle}
+        explain={explainData}
+        status={explainStatus}
+        renderInventoryRow={(row) => {
+          const product = products.find(p => p.id === row.productId);
+          return (
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-stone-600">
+                  {row.packagingName || `Inventory`}
+                </span>
+                {row.containerCount && (
+                  <span className="text-xs text-stone-400 ml-2">
+                    ({row.containerCount} containers)
+                  </span>
+                )}
+              </div>
+              <span className="font-semibold">
+                {fmt(row.quantity ?? 0)} {row.unit || (product?.form === 'liquid' ? 'gal' : 'lbs')}
+              </span>
+            </div>
+          );
+        }}
+      />
+
+      {/* Add inventory modal */}
+      {showAddModal && selectedProduct && productContext && (
+        <AddInventoryModal
+          product={selectedProduct}
+          vendor={selectedVendor}
+          vendors={vendors}
+          onHand={productContext.onHand}
+          planNeeds={productContext.plannedUsage}
+          unit={selectedProduct.form === 'liquid' ? 'gal' : 'lbs'}
+          usedIn={usedInForModal}
+          packageOptions={packageOptions}
+          priceHistory={[]}
+          currentSeasonYear={season?.year || new Date().getFullYear()}
+          onClose={() => {
+            setShowAddModal(false);
+            setSelectedProduct(null);
+            setProductContext(null);
+          }}
+          onAddInventory={handleAddInventoryData}
+          onCreatePurchase={handleCreatePurchase}
+        />
+      )}
+
+      {/* Product Selector Modal (hidden, but keeps imports working) */}
       <ProductSelectorModal
         open={showProductSelector}
         onOpenChange={setShowProductSelector}
@@ -506,29 +489,6 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
           setShowAddModal(true);
         }}
       />
-
-      {/* Add Inventory Modal */}
-      {showAddModal && selectedProduct && productContext && (
-        <AddInventoryModal
-          product={selectedProduct}
-          vendor={selectedVendor}
-          vendors={vendors}
-          onHand={productContext.onHand}
-          planNeeds={productContext.plannedUsage}
-          unit={selectedProduct.form === 'liquid' ? 'gal' : 'lbs'}
-          usedIn={usedIn}
-          packageOptions={packageOptions}
-          priceHistory={[]}
-          currentSeasonYear={season?.year || new Date().getFullYear()}
-          onClose={() => {
-            setShowAddModal(false);
-            setSelectedProduct(null);
-            setProductContext(null);
-          }}
-          onAddInventory={handleAddInventoryData}
-          onCreatePurchase={handleCreatePurchase}
-        />
-      )}
     </div>
   );
 };
