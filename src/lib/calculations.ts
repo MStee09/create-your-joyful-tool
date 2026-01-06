@@ -474,7 +474,7 @@ export interface ProductUsage {
 export interface PlannedUsageItem {
   productId: string;
   totalNeeded: number;
-  unit: 'gal' | 'lbs';
+  unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
   usages: ProductUsage[];
 }
 
@@ -510,15 +510,45 @@ export const calculatePlannedUsage = (
       const treatedAcres = crop.totalAcres * acresMultiplier;
       const timing = crop.applicationTimings.find(t => t.id === app.timingId);
       
-      let quantityPerAcre = 0;
-      if (product.form === 'liquid') {
-        quantityPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-      } else {
-        quantityPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-      }
+      let totalQuantity = 0;
+      let unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote' = product.form === 'liquid' ? 'gal' : 'lbs';
       
-      const totalQuantity = quantityPerAcre * treatedAcres;
-      const unit: 'gal' | 'lbs' = product.form === 'liquid' ? 'gal' : 'lbs';
+      // Handle container-based products (e.g., $900/jug with 1800g per jug)
+      const isContainerBased = product.containerSize && product.containerUnit && 
+        ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+      
+      if (isContainerBased) {
+        // Calculate total grams needed, then convert to containers
+        let gramsPerAcre = 0;
+        if (app.rateUnit === 'g') {
+          gramsPerAcre = app.rate;
+        } else if (app.rateUnit === 'oz') {
+          gramsPerAcre = app.rate * 28.3495;
+        } else if (app.rateUnit === 'lbs') {
+          gramsPerAcre = app.rate * 453.592;
+        }
+        const totalGrams = gramsPerAcre * treatedAcres;
+        
+        // Convert container size to grams for calculation
+        let containerGrams = product.containerSize!;
+        if (product.containerUnit === 'lbs') {
+          containerGrams = product.containerSize! * 453.592;
+        } else if (product.containerUnit === 'oz') {
+          containerGrams = product.containerSize! * 28.3495;
+        }
+        
+        // Express in container units (e.g., jugs)
+        totalQuantity = totalGrams / containerGrams;
+        unit = product.priceUnit as 'jug' | 'bag' | 'case' | 'tote';
+      } else if (product.form === 'liquid') {
+        const quantityPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+        totalQuantity = quantityPerAcre * treatedAcres;
+        unit = 'gal';
+      } else {
+        const quantityPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+        totalQuantity = quantityPerAcre * treatedAcres;
+        unit = 'lbs';
+      }
       
       if (!usageMap.has(app.productId)) {
         usageMap.set(app.productId, {

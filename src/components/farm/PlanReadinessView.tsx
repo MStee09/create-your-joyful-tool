@@ -47,7 +47,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       needed: number;
       onHand: number;
       short: number;
-      unit: 'gal' | 'lbs';
+      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
       usages: PlannedUsageItem['usages'];
       inventoryItem?: InventoryItem;
     }> = [];
@@ -57,7 +57,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       needed: number;
       onHand: number;
       remaining: number;
-      unit: 'gal' | 'lbs';
+      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
       value: number;
       usages: PlannedUsageItem['usages'];
       inventoryId?: string;
@@ -69,7 +69,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       needed: number;
       onHand: number;
       onOrderQty: number;
-      unit: 'gal' | 'lbs';
+      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
       usages: PlannedUsageItem['usages'];
     }> = [];
     
@@ -78,7 +78,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       needed: number;
       onHand: number;
       remaining: number;
-      unit: 'gal' | 'lbs';
+      unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote';
       value: number;
       usages: PlannedUsageItem['usages'];
       inventoryId?: string;
@@ -138,7 +138,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return { blocking, ready, onOrder, planned };
   }, [plannedUsage, inventory, products]);
 
-  const handleQuickAddFromBlocking = (productId: string, shortAmount: number, unit: 'gal' | 'lbs') => {
+  const handleQuickAddFromBlocking = (productId: string, shortAmount: number, unit: 'gal' | 'lbs' | 'g' | 'jug' | 'bag' | 'case' | 'tote') => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
     
