@@ -109,7 +109,7 @@ export interface AwardedPriceInfo {
   price: number | null;
   priceUom: 'ton' | 'gal' | 'lbs' | null;
   vendorId: string | null;
-  source: 'estimated' | 'awarded' | 'manual' | 'manual_override' | null;
+  source: 'estimated' | 'awarded' | 'manual' | 'manual_override' | 'invoice' | null;
 }
 
 export const getAwardedPriceInfo = (
