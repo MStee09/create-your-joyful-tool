@@ -403,6 +403,17 @@ export function useSupabaseData(user: User | null) {
     fetchData();
   }, [fetchData]);
 
+  // Auto-save to cache when data changes
+  useEffect(() => {
+    if (!user) return;
+    if (state.loading) return;
+    if (state.error) return;
+
+    // Only cache the data fields, not loading/error
+    const { loading, error, ...dataOnly } = state;
+    saveCache(user.id, dataOnly);
+  }, [state, user]);
+
   // CRUD operations
   const setCurrentSeasonId = useCallback((id: string | null) => {
     if (id) localStorage.setItem('farmcalc-current-season', id);
@@ -1070,17 +1081,6 @@ export function useSupabaseData(user: User | null) {
     
     setState(prev => ({ ...prev, invoices: [...prev.invoices, invoice] }));
   }, [user]);
-
-  // Auto-save to cache when data changes
-  useEffect(() => {
-    if (!user) return;
-    if (state.loading) return;
-    if (state.error) return;
-
-    // Only cache the data fields, not loading/error
-    const { loading, error, ...dataOnly } = state;
-    saveCache(user.id, dataOnly);
-  }, [state, user]);
 
   return {
     ...state,
