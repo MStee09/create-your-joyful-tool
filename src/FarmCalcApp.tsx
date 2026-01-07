@@ -1287,13 +1287,16 @@ const AppContent: React.FC = () => {
       case 'orders':
         return (
           <OrdersView
-            orders={state.orders}
+            orders={state.orders || []}
             vendors={state.vendors}
             products={legacyProducts}
             inventory={state.inventory}
             seasonYear={currentSeason?.year || new Date().getFullYear()}
             onUpdateOrders={updateOrders}
             onUpdateInventory={handleUpdateInventory}
+            priceBook={state.priceBook || []}
+            onUpdatePriceBook={updatePriceBook}
+            onAddInvoice={addInvoice}
           />
         );
       case 'plan-readiness':
