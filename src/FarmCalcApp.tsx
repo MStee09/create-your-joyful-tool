@@ -74,6 +74,8 @@ import { BuyWorkflowView } from './components/farm/BuyWorkflowView';
 import { VarianceView } from './components/farm/VarianceView';
 import { VarianceByPassView } from './components/farm/VarianceByPassView';
 import { ChangeLogView } from './components/farm/ChangeLogView';
+import { ImportCenterView } from './components/farm/ImportCenterView';
+import { TemplatesView } from './components/farm/TemplatesView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -293,6 +295,8 @@ const Sidebar: React.FC<{
               <SubButton id="variance" label="Variance (Product)" icon={BarChart3} />
               <SubButton id="variance-by-pass" label="Variance (Crop/Pass)" icon={ClipboardList} />
               <SubButton id="changes" label="What Changed" icon={FileText} />
+              <SubButton id="import" label="Import Center" icon={Upload} />
+              <SubButton id="templates" label="Templates" icon={StickyNote} />
               <SubButton id="exports" label="Export" icon={FileSpreadsheet} />
               <SubButton id="settings" label="Settings" icon={Settings} />
             </>
@@ -1395,6 +1399,31 @@ const AppContent: React.FC = () => {
             invoices={state.invoices || []}
             priceBook={state.priceBook || []}
             bidEvents={state.bidEvents || []}
+          />
+        );
+      case 'import':
+        return (
+          <ImportCenterView
+            currentSeason={currentSeason}
+            vendors={state.vendors}
+            productMasters={state.productMasters || []}
+            vendorOfferings={state.vendorOfferings || []}
+            inventory={state.inventory}
+            commoditySpecs={state.commoditySpecs || []}
+            priceBook={state.priceBook || []}
+            onUpdateVendors={handleUpdateVendors}
+            onUpdateProductMasters={handleUpdateProductMasters}
+            onUpdateVendorOfferings={handleUpdateVendorOfferings}
+            onUpdateInventory={handleUpdateInventory}
+            onUpdateCommoditySpecs={updateCommoditySpecs}
+            onUpdatePriceBook={updatePriceBook}
+          />
+        );
+      case 'templates':
+        return (
+          <TemplatesView
+            season={currentSeason}
+            onUpdateSeason={handleUpdateSeason}
           />
         );
       default:
