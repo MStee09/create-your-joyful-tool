@@ -33,6 +33,7 @@ import {
   ClipboardCheck,
   ShoppingCart,
   Truck,
+  Bell,
 } from 'lucide-react';
 
 // Import types
@@ -76,6 +77,9 @@ import { VarianceByPassView } from './components/farm/VarianceByPassView';
 import { ChangeLogView } from './components/farm/ChangeLogView';
 import { ImportCenterView } from './components/farm/ImportCenterView';
 import { TemplatesView } from './components/farm/TemplatesView';
+import { AlertsView } from './components/farm/AlertsView';
+import { MarketPricesView } from './components/farm/MarketPricesView';
+import { AssistantView } from './components/farm/AssistantView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -292,9 +296,12 @@ const Sidebar: React.FC<{
           {mode === 'review' && (
             <>
               <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
+              <SubButton id="alerts" label="Alerts" icon={Bell} />
+              <SubButton id="assistant" label="Assistant" icon={BarChart3} />
               <SubButton id="variance" label="Variance (Product)" icon={BarChart3} />
               <SubButton id="variance-by-pass" label="Variance (Crop/Pass)" icon={ClipboardList} />
               <SubButton id="changes" label="What Changed" icon={FileText} />
+              <SubButton id="market-prices" label="Market Prices" icon={DollarSign} />
               <SubButton id="import" label="Import Center" icon={Upload} />
               <SubButton id="templates" label="Templates" icon={StickyNote} />
               <SubButton id="exports" label="Export" icon={FileSpreadsheet} />
@@ -1424,6 +1431,32 @@ const AppContent: React.FC = () => {
           <TemplatesView
             season={currentSeason}
             onUpdateSeason={handleUpdateSeason}
+          />
+        );
+      case 'alerts':
+        return (
+          <AlertsView
+            season={currentSeason}
+            products={legacyProducts}
+            inventory={state.inventory}
+            orders={state.orders || []}
+            invoices={state.invoices || []}
+            priceBook={state.priceBook || []}
+            onNavigate={setActiveView}
+          />
+        );
+      case 'market-prices':
+        return <MarketPricesView />;
+      case 'assistant':
+        return (
+          <AssistantView
+            season={currentSeason}
+            products={legacyProducts}
+            inventory={state.inventory}
+            orders={state.orders || []}
+            invoices={state.invoices || []}
+            priceBook={state.priceBook || []}
+            onNavigate={setActiveView}
           />
         );
       default:

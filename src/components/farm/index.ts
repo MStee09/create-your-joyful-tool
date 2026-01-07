@@ -22,3 +22,6 @@ export { CropTypeSelector } from './CropTypeSelector';
 export { HowToPage } from './HowToPage';
 export { OrdersView } from './OrdersView';
 export { RecordInvoiceModal } from './RecordInvoiceModal';
+export { AlertsView } from './AlertsView';
+export { MarketPricesView } from './MarketPricesView';
+export { AssistantView } from './AssistantView';
