@@ -1378,10 +1378,7 @@ const AppContent: React.FC = () => {
                 priceBook={state.priceBook || []}
                 season={currentSeason}
                 orders={state.orders || []}
-                onAddOrder={async (order) => {
-                  const newOrders = [...(state.orders || []), order];
-                  await updateOrders(newOrders);
-                }}
+                onAddOrder={addOrder}
                 onNavigate={setActiveView}
                 onUpdateEvent={async (updatedEvent) => {
                   const newEvents = bidEvents.map(e => 
