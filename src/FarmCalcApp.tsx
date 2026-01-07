@@ -71,6 +71,7 @@ import { OrdersView } from './components/farm/OrdersView';
 import { PlanReadinessView } from './components/farm/PlanReadinessView';
 import { VendorSpendView } from './components/farm/VendorSpendView';
 import { BuyWorkflowView } from './components/farm/BuyWorkflowView';
+import { VarianceView } from './components/farm/VarianceView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -287,6 +288,7 @@ const Sidebar: React.FC<{
           {mode === 'review' && (
             <>
               <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
+              <SubButton id="variance" label="Variance" icon={BarChart3} />
               <SubButton id="exports" label="Export" icon={FileSpreadsheet} />
               <SubButton id="settings" label="Settings" icon={Settings} />
             </>
@@ -1362,6 +1364,15 @@ const AppContent: React.FC = () => {
             onAddSeason={handleAddSeason}
             onDeleteSeason={handleDeleteSeason}
             onResetData={handleResetData}
+          />
+        );
+      case 'variance':
+        return (
+          <VarianceView
+            season={currentSeason}
+            products={legacyProducts}
+            invoices={state.invoices || []}
+            priceBook={state.priceBook || []}
           />
         );
       default:
