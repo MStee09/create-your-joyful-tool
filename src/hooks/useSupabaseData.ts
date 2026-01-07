@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { loadCache, saveCache } from '@/lib/cache';
 import type { User } from '@supabase/supabase-js';
 import type { 
   Season, 
@@ -218,7 +219,18 @@ export function useSupabaseData(user: User | null) {
       return;
     }
 
-    setState(prev => ({ ...prev, loading: true, error: null }));
+    // Load cached data for instant display
+    const cached = loadCache(user.id);
+    if (cached) {
+      setState(prev => ({
+        ...prev,
+        ...cached,
+        loading: true, // still show loading since we're fetching fresh
+        error: null,
+      }));
+    } else {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+    }
 
     try {
       const [
@@ -1058,6 +1070,17 @@ export function useSupabaseData(user: User | null) {
     
     setState(prev => ({ ...prev, invoices: [...prev.invoices, invoice] }));
   }, [user]);
+
+  // Auto-save to cache when data changes
+  useEffect(() => {
+    if (!user) return;
+    if (state.loading) return;
+    if (state.error) return;
+
+    // Only cache the data fields, not loading/error
+    const { loading, error, ...dataOnly } = state;
+    saveCache(user.id, dataOnly);
+  }, [state, user]);
 
   return {
     ...state,
