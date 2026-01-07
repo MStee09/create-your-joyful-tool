@@ -398,7 +398,7 @@ export interface PriceBookEntry {
   price: number;
   unit?: 'ton' | 'gal' | 'lbs';
   priceUom?: 'ton' | 'gal' | 'lbs';
-  source?: 'estimated' | 'awarded' | 'manual' | 'manual_override';
+  source?: 'estimated' | 'awarded' | 'manual' | 'manual_override' | 'invoice';
   effectiveDate?: string;
   notes?: string;
 }
