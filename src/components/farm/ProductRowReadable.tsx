@@ -245,7 +245,7 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             <h4 className="font-medium text-foreground">
               {product.name}
               {formatNPKS(product.analysis) && (
-                <span className="ml-1.5 text-muted-foreground font-normal">
+                <span className="ml-1.5 text-muted-foreground font-normal text-xs">
                   {formatNPKS(product.analysis)}
                 </span>
               )}
