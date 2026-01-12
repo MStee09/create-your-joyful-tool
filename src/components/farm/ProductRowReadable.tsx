@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MessageSquare, Edit3, Award } from 'lucide-react';
-import type { Application, Product, LiquidUnit, DryUnit, Vendor } from '@/types/farm';
+import type { Application, Product, LiquidUnit, DryUnit, Vendor, NutrientAnalysis } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ProductRole, ApplicationOverride } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
 import { getAwardedPriceInfo } from '@/lib/priceBookUtils';
+import { calculateApplicationNutrients } from '@/lib/calculations';
 import {
   Tooltip,
   TooltipContent,
@@ -55,6 +56,14 @@ const SHORT_ROLE_LABELS: Record<ProductRole, string> = {
   'rooting-vigor': 'Root',
   'water-conditioning': 'Water',
   'adjuvant': 'Adj',
+};
+
+// Nutrient badge styles (matching NutrientSummary colors)
+const NUTRIENT_STYLES: Record<string, string> = {
+  n: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  p: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  k: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  s: 'bg-purple-500/15 text-purple-700 dark:text-purple-400',
 };
 
 // Coverage label based on percentage
@@ -146,6 +155,21 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   // Get roles from purpose or override
   const roles = override?.customRoles || purpose?.roles || [];
   const whyHere = override?.whyHere;
+
+  // Calculate nutrient contribution for this application
+  const applicationNutrients = useMemo(() => {
+    return calculateApplicationNutrients(
+      application.rate,
+      application.rateUnit,
+      product?.analysis,
+      product?.form || 'liquid',
+      product?.densityLbsPerGal
+    );
+  }, [application.rate, application.rateUnit, product?.analysis, product?.form, product?.densityLbsPerGal]);
+
+  // Check if we have meaningful nutrients to display (>0.1 lbs/ac threshold)
+  const hasNutrients = applicationNutrients.n > 0.1 || applicationNutrients.p > 0.1 || 
+                       applicationNutrients.k > 0.1 || applicationNutrients.s > 0.1;
 
   // Visual weight based on acres percentage
   const getWeightOpacity = () => {
@@ -314,6 +338,80 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
               </>
             )}
           </div>
+
+          {/* Nutrient contribution badges */}
+          {hasNutrients && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {applicationNutrients.n > 0.1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', NUTRIENT_STYLES.n)}>
+                        N {formatNumber(applicationNutrients.n, 1)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{formatNumber(applicationNutrients.n, 2)} lbs N/acre</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        {formatNumber(application.rate, 1)} {application.rateUnit} × {product?.analysis?.n || 0}% N
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {applicationNutrients.p > 0.1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', NUTRIENT_STYLES.p)}>
+                        P {formatNumber(applicationNutrients.p, 1)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{formatNumber(applicationNutrients.p, 2)} lbs P/acre</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        {formatNumber(application.rate, 1)} {application.rateUnit} × {product?.analysis?.p || 0}% P
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {applicationNutrients.k > 0.1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', NUTRIENT_STYLES.k)}>
+                        K {formatNumber(applicationNutrients.k, 1)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{formatNumber(applicationNutrients.k, 2)} lbs K/acre</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        {formatNumber(application.rate, 1)} {application.rateUnit} × {product?.analysis?.k || 0}% K
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {applicationNutrients.s > 0.1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', NUTRIENT_STYLES.s)}>
+                        S {formatNumber(applicationNutrients.s, 1)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <p className="font-medium">{formatNumber(applicationNutrients.s, 2)} lbs S/acre</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        {formatNumber(application.rate, 1)} {application.rateUnit} × {product?.analysis?.s || 0}% S
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
           
           {/* Why Here note - pass-level intent */}
           {(whyHere || isEditingWhyHere) && (
