@@ -267,6 +267,44 @@ export const calculateCropNutrientSummaryNew = (
   return summary;
 };
 
+// Calculate per-application nutrient contribution in lbs/acre
+export interface ApplicationNutrients {
+  n: number;
+  p: number;
+  k: number;
+  s: number;
+}
+
+export const calculateApplicationNutrients = (
+  rate: number,
+  rateUnit: string,
+  analysis: { n: number; p: number; k: number; s: number } | undefined | null,
+  form: 'liquid' | 'dry',
+  densityLbsPerGal?: number
+): ApplicationNutrients => {
+  if (!analysis) {
+    return { n: 0, p: 0, k: 0, s: 0 };
+  }
+
+  // Calculate lbs of product per acre
+  let lbsPerAcre = 0;
+  
+  if (form === 'liquid') {
+    const gallonsPerAcre = convertToGallons(rate, rateUnit as LiquidUnit);
+    lbsPerAcre = gallonsPerAcre * (densityLbsPerGal || 10);
+  } else {
+    lbsPerAcre = convertToPounds(rate, rateUnit as DryUnit);
+  }
+
+  // Calculate nutrient contribution: lbs product × (nutrient % / 100)
+  return {
+    n: lbsPerAcre * (analysis.n / 100),
+    p: lbsPerAcre * (analysis.p / 100),
+    k: lbsPerAcre * (analysis.k / 100),
+    s: lbsPerAcre * (analysis.s / 100),
+  };
+};
+
 // Legacy nutrient calculation
 export const calculateCropNutrientSummary = (crop: Crop, products: Product[]): NutrientSummary => {
   const summary: NutrientSummary = { n: 0, p: 0, k: 0, s: 0 };
