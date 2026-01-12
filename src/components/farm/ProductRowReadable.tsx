@@ -66,6 +66,16 @@ const NUTRIENT_STYLES: Record<string, string> = {
   s: 'bg-purple-500/15 text-purple-700 dark:text-purple-400',
 };
 
+// Format NPK-S analysis as standard fertilizer grade notation
+const formatNPKS = (analysis: NutrientAnalysis | undefined): string | null => {
+  if (!analysis) return null;
+  const { n = 0, p = 0, k = 0, s = 0 } = analysis;
+  if (n === 0 && p === 0 && k === 0 && s === 0) return null;
+  
+  const base = `${Math.round(n)}-${Math.round(p)}-${Math.round(k)}`;
+  return s > 0 ? `${base}-${Math.round(s)}` : base;
+};
+
 // Coverage label based on percentage
 const getCoverageLabel = (percentage: number): string => {
   if (percentage >= 90) return 'Core';
@@ -230,9 +240,16 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
             </p>
           )}
           
-          {/* Product name with coverage badge and role chips */}
+          {/* Product name with NPK-S, coverage badge and role chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-medium text-foreground">{product.name}</h4>
+            <h4 className="font-medium text-foreground">
+              {product.name}
+              {formatNPKS(product.analysis) && (
+                <span className="ml-1.5 text-muted-foreground font-normal">
+                  {formatNPKS(product.analysis)}
+                </span>
+              )}
+            </h4>
             
             {/* Awarded bid price indicator */}
             {awardedPriceInfo.isAwarded && (
