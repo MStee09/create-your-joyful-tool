@@ -146,40 +146,58 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
 ): number => {
   if (!product) return 0;
   
-  // Check if this product has a price book entry (from awarded bids)
   const productMaster = productMasters.find(pm => pm.id === product.id);
-  if (productMaster?.isBidEligible) {
-    // Look for price book entry
+  
+  // Check if this product has a price book entry (from awarded bids or manual entries)
+  if (productMaster) {
+    // Look for price book entry - check by specId OR productId
     const priceEntry = priceBook.find(pb => 
       pb.seasonYear === seasonYear && 
       (
-        (productMaster.commoditySpecId && pb.specId === productMaster.commoditySpecId) ||
+        (productMaster.commoditySpecId && (pb.specId === productMaster.commoditySpecId || pb.commoditySpecId === productMaster.commoditySpecId)) ||
         pb.productId === product.id
       )
     );
     
     if (priceEntry) {
-      // Use awarded price from price book
+      // Use price from price book (could be awarded, manual, estimated, or invoice)
+      const priceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
       if (product.form === 'liquid') {
         const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-        // Convert price if units differ
-        if (priceEntry.priceUom === 'gal') {
+        if (priceUom === 'gal') {
           return gallonsPerAcre * priceEntry.price;
         }
-        // priceEntry is per lb or ton, convert using density
         const density = product.densityLbsPerGal || 10;
         const lbsPerAcre = gallonsPerAcre * density;
-        const pricePerLb = priceEntry.priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
+        const pricePerLb = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
         return lbsPerAcre * pricePerLb;
       } else {
         const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-        const pricePerPound = priceEntry.priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
+        const pricePerPound = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
+        return poundsPerAcre * pricePerPound;
+      }
+    }
+    
+    // No price book entry - use ProductMaster's estimated price if available
+    if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
+      if (product.form === 'liquid') {
+        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+        if (productMaster.estimatedPriceUnit === 'gal') {
+          return gallonsPerAcre * productMaster.estimatedPrice;
+        }
+        const density = product.densityLbsPerGal || productMaster.densityLbsPerGal || 10;
+        const lbsPerAcre = gallonsPerAcre * density;
+        const pricePerLb = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
+        return lbsPerAcre * pricePerLb;
+      } else {
+        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+        const pricePerPound = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
         return poundsPerAcre * pricePerPound;
       }
     }
   }
   
-  // Fall back to regular product price
+  // Fall back to legacy product price (for old data with price on Product)
   return calculateApplicationCostPerAcre(app, product);
 };
 
