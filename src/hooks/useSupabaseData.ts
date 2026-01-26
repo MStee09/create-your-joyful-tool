@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { loadCache, saveCache } from '@/lib/cache';
+import { toast } from 'sonner';
 import type { User } from '@supabase/supabase-js';
 import type { 
   Season, 
@@ -578,6 +579,12 @@ export function useSupabaseData(user: User | null) {
 
     if (error) {
       console.error('Error updating product:', error);
+      // Show user-friendly error for foreign key constraint violations
+      if (error.code === '23503' && error.message.includes('commodity_spec')) {
+        toast.error('Failed to link commodity spec - the selected spec may no longer exist. Try creating a new one.');
+      } else {
+        toast.error('Failed to update product');
+      }
       return;
     }
 
