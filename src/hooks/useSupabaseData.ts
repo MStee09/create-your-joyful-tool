@@ -74,6 +74,9 @@ const dbProductMasterToProductMaster = (row: any): ProductMaster => ({
   productType: row.product_type || undefined,
   isBidEligible: row.is_bid_eligible ?? false,
   commoditySpecId: row.commodity_spec_id || undefined,
+  // Estimated pricing (fallback when no price book / vendor offering)
+  estimatedPrice: row.estimated_price !== null && row.estimated_price !== undefined ? Number(row.estimated_price) : undefined,
+  estimatedPriceUnit: row.estimated_price_unit || undefined,
 });
 
 const dbVendorOfferingToVendorOffering = (row: any): VendorOffering => ({
@@ -509,6 +512,8 @@ export function useSupabaseData(user: User | null) {
         label_file_name: product.labelFileName,
         sds_file_name: product.sdsFileName,
         reorder_point: product.reorderPoint,
+        estimated_price: product.estimatedPrice ?? null,
+        estimated_price_unit: product.estimatedPriceUnit ?? null,
         // Procurement
         product_type: product.productType ?? null,
         is_bid_eligible: product.isBidEligible ?? false,
@@ -539,6 +544,8 @@ export function useSupabaseData(user: User | null) {
       label_file_name: product.labelFileName,
       sds_file_name: product.sdsFileName,
       reorder_point: product.reorderPoint,
+      estimated_price: product.estimatedPrice ?? null,
+      estimated_price_unit: product.estimatedPriceUnit ?? null,
       product_type: product.productType ?? null,
       is_bid_eligible: product.isBidEligible ?? false,
       commodity_spec_id: product.commoditySpecId ?? null,
@@ -571,6 +578,8 @@ export function useSupabaseData(user: User | null) {
       label_file_name: product.labelFileName,
       sds_file_name: product.sdsFileName,
       reorder_point: product.reorderPoint,
+      estimated_price: product.estimatedPrice ?? null,
+      estimated_price_unit: product.estimatedPriceUnit ?? null,
       // Procurement
       product_type: product.productType ?? null,
       is_bid_eligible: product.isBidEligible ?? false,

@@ -100,12 +100,16 @@ export const createProductFromMaster = (
     vo => vo.productId === productMaster.id && vo.isPreferred
   ) || vendorOfferings.find(vo => vo.productId === productMaster.id);
 
+  // If there is no vendor offering, fall back to ProductMaster estimated price (if present)
+  const fallbackPrice = productMaster.estimatedPrice ?? 0;
+  const fallbackUnit = (productMaster.estimatedPriceUnit as Product['priceUnit'] | undefined) || (productMaster.defaultUnit as any) || 'gal';
+
   return {
     id: productMaster.id,
     vendorId: preferredOffering?.vendorId || '',
     name: productMaster.name,
-    price: preferredOffering?.price || 0,
-    priceUnit: (preferredOffering?.priceUnit as Product['priceUnit']) || 'gal',
+    price: preferredOffering?.price ?? fallbackPrice,
+    priceUnit: (preferredOffering?.priceUnit as Product['priceUnit']) || fallbackUnit,
     form: productMaster.form,
     analysis: productMaster.analysis,
     densityLbsPerGal: productMaster.densityLbsPerGal,
