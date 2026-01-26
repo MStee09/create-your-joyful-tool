@@ -1129,7 +1129,11 @@ const AppContent: React.FC = () => {
   };
 
   // Get legacy products for backward-compatible components
-  const legacyProducts = getProductsAsLegacy(productMasters || [], vendorOfferings || []);
+  // Memoized to ensure stable reference that updates when source data changes
+  const legacyProducts = useMemo(() => 
+    getProductsAsLegacy(productMasters || [], vendorOfferings || []),
+    [productMasters, vendorOfferings]
+  );
 
   const currentSeason = seasons.find(s => s.id === currentSeasonId) || null;
 
