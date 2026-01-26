@@ -260,8 +260,8 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
 
         {/* Right Column: Nutrients (quieter) + Insights toggle */}
         <div className="flex flex-col items-end gap-3">
-          {/* Compact nutrient totals - quieter styling */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {/* Compact nutrient totals with ratios - quieter styling */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap justify-end">
             <span>
               N <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.n, 1)}</span>
             </span>
@@ -277,6 +277,23 @@ export const SeasonOverviewBar: React.FC<SeasonOverviewBarProps> = ({
             <span>
               S <span className="font-medium text-foreground/80">{formatNumber(summary.nutrients.s, 1)}</span>
             </span>
+            {/* Nutrient ratios */}
+            {summary.nutrients.s > 0 && (
+              <>
+                <span className="text-muted-foreground/40">|</span>
+                <span className="text-xs">
+                  N:S <span className="font-medium text-foreground/70">{formatNumber(summary.nutrients.n / summary.nutrients.s, 1)}:1</span>
+                </span>
+              </>
+            )}
+            {summary.nutrients.k > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="text-xs">
+                  N:K <span className="font-medium text-foreground/70">{formatNumber(summary.nutrients.n / summary.nutrients.k, 1)}:1</span>
+                </span>
+              </>
+            )}
           </div>
 
           {/* Toggle button */}
