@@ -316,19 +316,23 @@ export const PassCard: React.FC<PassCardProps> = ({
                 totalProducts={summary.applications.length}
               />
               {hasNutrients && (
-                <span className="text-sm text-muted-foreground">
-                  • N {formatNumber(summary.nutrients.n, 1)} | P {formatNumber(summary.nutrients.p, 1)} | K {formatNumber(summary.nutrients.k, 1)} | S {formatNumber(summary.nutrients.s, 1)}
-                  {summary.nutrients.s > 0 && (
-                    <span className="ml-2 text-xs">
-                      N:S {formatNumber(summary.nutrients.n / summary.nutrients.s, 1)}:1
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm text-muted-foreground">
+                    • N {formatNumber(summary.nutrients.n, 1)} | P {formatNumber(summary.nutrients.p, 1)} | K {formatNumber(summary.nutrients.k, 1)} | S {formatNumber(summary.nutrients.s, 1)}
+                  </span>
+                  {(summary.nutrients.s > 0 || summary.nutrients.k > 0) && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      <span className="text-muted-foreground/60">Ratios</span>{' '}
+                      {summary.nutrients.s > 0 && (
+                        <span>N:S {formatNumber(summary.nutrients.n / summary.nutrients.s, 1)}:1</span>
+                      )}
+                      {summary.nutrients.s > 0 && summary.nutrients.k > 0 && ' · '}
+                      {summary.nutrients.k > 0 && (
+                        <span>N:K {formatNumber(summary.nutrients.n / summary.nutrients.k, 1)}:1</span>
+                      )}
                     </span>
                   )}
-                  {summary.nutrients.k > 0 && (
-                    <span className="ml-1 text-xs">
-                      · N:K {formatNumber(summary.nutrients.n / summary.nutrients.k, 1)}:1
-                    </span>
-                  )}
-                </span>
+                </div>
               )}
             </div>
           </div>
