@@ -246,31 +246,47 @@ export const calculateCoverageGroups = (
   crop: Crop,
   products: Product[]
 ): CoverageGroup[] => {
-  const groupMap = new Map<number, { apps: Application[]; costSum: number }>();
+  // NOTE: We bucket by acres % for display (100/60/25/etc), but ALL economics
+  // must use the *actual* acresPercentage from each application to ensure that
+  // pass $/ac and crop totals reconcile perfectly.
+  const groupMap = new Map<
+    number,
+    {
+      apps: Application[];
+      treatedCostSum: number; // $/treated-ac (sum of product $/treated-ac)
+      fieldCostSum: number; // $/field-ac (sum of product $/treated-ac * actual%/100)
+      acresTreatedSum: number; // treated acres in this group (sum of actual treated acres)
+    }
+  >();
 
   applications.forEach(app => {
     const product = products.find(p => p.id === app.productId);
-    const acresPercentage = getApplicationAcresPercentage(app, crop);
-    const bucket = bucketAcres(acresPercentage);
+    const actualAcresPercentage = getApplicationAcresPercentage(app, crop);
+    const bucket = bucketAcres(actualAcresPercentage);
     const costPerAcre = calculateApplicationCostPerAcre(app, product);
 
     if (!groupMap.has(bucket)) {
-      groupMap.set(bucket, { apps: [], costSum: 0 });
+      groupMap.set(bucket, { apps: [], treatedCostSum: 0, fieldCostSum: 0, acresTreatedSum: 0 });
     }
     const group = groupMap.get(bucket)!;
     group.apps.push(app);
-    group.costSum += costPerAcre;
+
+    group.treatedCostSum += costPerAcre;
+    group.fieldCostSum += costPerAcre * (actualAcresPercentage / 100);
+    group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
   });
 
   // Convert to array and sort by acres descending
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, costSum }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+      // This is the *display* percentage bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
       applications: apps,
-      costPerTreatedAcre: costSum,
-      costPerFieldAcre: costSum * (acresPercentage / 100),
-      acresTreated: crop.totalAcres * (acresPercentage / 100),
+      // Economics MUST be computed using actual application percentages.
+      costPerTreatedAcre: treatedCostSum,
+      costPerFieldAcre: fieldCostSum,
+      acresTreated: acresTreatedSum,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
 };
@@ -434,12 +450,22 @@ export const calculateCoverageGroupsWithPriceBook = (
   products: Product[],
   priceBookContext: PriceBookContext
 ): CoverageGroup[] => {
-  const groupMap = new Map<number, { apps: Application[]; costSum: number }>();
+  // Same idea as calculateCoverageGroups(): group for display, but compute costs
+  // using actual (unbucketed) acres percentages so totals reconcile.
+  const groupMap = new Map<
+    number,
+    {
+      apps: Application[];
+      treatedCostSum: number;
+      fieldCostSum: number;
+      acresTreatedSum: number;
+    }
+  >();
 
   applications.forEach(app => {
     const product = products.find(p => p.id === app.productId);
-    const acresPercentage = getApplicationAcresPercentage(app, crop);
-    const bucket = bucketAcres(acresPercentage);
+    const actualAcresPercentage = getApplicationAcresPercentage(app, crop);
+    const bucket = bucketAcres(actualAcresPercentage);
     const costPerAcre = calculateApplicationCostPerAcreWithPriceBook(
       app, 
       product,
@@ -449,21 +475,26 @@ export const calculateCoverageGroupsWithPriceBook = (
     );
 
     if (!groupMap.has(bucket)) {
-      groupMap.set(bucket, { apps: [], costSum: 0 });
+      groupMap.set(bucket, { apps: [], treatedCostSum: 0, fieldCostSum: 0, acresTreatedSum: 0 });
     }
     const group = groupMap.get(bucket)!;
     group.apps.push(app);
-    group.costSum += costPerAcre;
+
+    group.treatedCostSum += costPerAcre;
+    group.fieldCostSum += costPerAcre * (actualAcresPercentage / 100);
+    group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
   });
 
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, costSum }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+      // Display bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
       applications: apps,
-      costPerTreatedAcre: costSum,
-      costPerFieldAcre: costSum * (acresPercentage / 100),
-      acresTreated: crop.totalAcres * (acresPercentage / 100),
+      // Economics from actual %.
+      costPerTreatedAcre: treatedCostSum,
+      costPerFieldAcre: fieldCostSum,
+      acresTreated: acresTreatedSum,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
 };
