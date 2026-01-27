@@ -1211,6 +1211,9 @@ const AppContent: React.FC = () => {
           <DashboardView
             season={currentSeason}
             products={legacyProducts}
+            productMasters={state.productMasters || []}
+            priceBook={state.priceBook || []}
+            seasonYear={currentSeason?.year || new Date().getFullYear()}
             inventory={state.inventory}
             orders={state.orders}
             onViewChange={setActiveView}
