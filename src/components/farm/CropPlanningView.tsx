@@ -6,6 +6,7 @@ import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
+import { ExportPdfButton } from './ExportPdfButton';
 import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
@@ -367,6 +368,16 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
               </button>
             )}
           </div>
+          
+          {/* Export PDF Button */}
+          <ExportPdfButton
+            crop={crop}
+            products={products}
+            productMasters={productMasters}
+            priceBook={priceBook}
+            seasonYear={seasonYear}
+            purposes={purposes}
+          />
         </div>
 
         {/* Horizontal Timeline */}

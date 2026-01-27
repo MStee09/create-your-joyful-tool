@@ -123,3 +123,43 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* Print styles for PDF export */
+@media print {
+  /* Hide non-printable elements */
+  .no-print,
+  nav,
+  aside,
+  button:not(.print-button),
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for print */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page break handling */
+  .pass-card {
+    page-break-inside: avoid;
+  }
+
+  .page-break {
+    page-break-after: always;
+  }
+
+  /* Proper page margins */
+  @page {
+    size: letter;
+    margin: 0.75in;
+  }
+
+  /* Reset shadows and borders for cleaner printing */
+  .print-view * {
+    box-shadow: none !important;
+  }
+}
