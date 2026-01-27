@@ -3,7 +3,7 @@ import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { Order } from '@/types/orderInvoice';
 import type { ProductMaster, PriceBookEntry } from '@/types';
-import { formatCurrency, formatNumber, calculateCropNutrientSummary } from '@/lib/calculations';
+import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
 import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
@@ -63,7 +63,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return season.crops.map(crop => {
       // Use price book-aware calculation for consistency with CropPlanningView
       const summary = calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext);
-      const nutrients = calculateCropNutrientSummary(crop, products);
       
       return {
         name: crop.name,
@@ -71,7 +70,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         totalCost: summary.totalCost,
         costPerAcre: summary.costPerAcre,
         applicationCount: crop.applicationTimings.length,
-        nutrients,
+        // Use nutrients from the same calculation for consistency
+        nutrients: summary.nutrients,
       };
     });
   }, [season, products, priceBookContext]);
