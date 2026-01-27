@@ -2,13 +2,18 @@ import React, { useMemo } from 'react';
 import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { Order } from '@/types/orderInvoice';
-import { formatCurrency, formatNumber, calculateCropCosts, calculateCropNutrientSummary } from '@/lib/calculations';
+import type { ProductMaster, PriceBookEntry } from '@/types';
+import { formatCurrency, formatNumber, calculateCropNutrientSummary } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
+import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 
 interface DashboardViewProps {
   season: Season | null;
   products: Product[];
+  productMasters?: ProductMaster[];
+  priceBook?: PriceBookEntry[];
+  seasonYear?: number;
   inventory?: InventoryItem[];
   orders?: Order[];
   onViewChange?: (view: string) => void;
@@ -17,10 +22,20 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ 
   season, 
   products,
+  productMasters = [],
+  priceBook = [],
+  seasonYear = new Date().getFullYear(),
   inventory = [],
   orders = [],
   onViewChange,
 }) => {
+  // Build price book context for consistent cost calculations
+  const priceBookContext: PriceBookContext = useMemo(() => ({
+    productMasters,
+    priceBook,
+    seasonYear,
+  }), [productMasters, priceBook, seasonYear]);
+
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
     
@@ -29,8 +44,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     
     season.crops.forEach(crop => {
       totalAcres += crop.totalAcres;
-      const costs = calculateCropCosts(crop, products);
-      totalCost += costs.totalCost;
+      // Use price book-aware calculation for consistency with CropPlanningView
+      const summary = calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext);
+      totalCost += summary.totalCost;
     });
     
     return {
@@ -39,25 +55,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       costPerAcre: totalAcres > 0 ? totalCost / totalAcres : 0,
       cropCount: season.crops.length,
     };
-  }, [season, products]);
+  }, [season, products, priceBookContext]);
 
   const cropSummaries = useMemo(() => {
     if (!season) return [];
     
     return season.crops.map(crop => {
-      const costs = calculateCropCosts(crop, products);
+      // Use price book-aware calculation for consistency with CropPlanningView
+      const summary = calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext);
       const nutrients = calculateCropNutrientSummary(crop, products);
       
       return {
         name: crop.name,
         acres: crop.totalAcres,
-        totalCost: costs.totalCost,
-        costPerAcre: costs.costPerAcre,
+        totalCost: summary.totalCost,
+        costPerAcre: summary.costPerAcre,
         applicationCount: crop.applicationTimings.length,
         nutrients,
       };
     });
-  }, [season, products]);
+  }, [season, products, priceBookContext]);
 
   // Get comparative indicator for crop cost/acre vs farm average
   const getComparativeIndicator = (cropCostPerAcre: number) => {
