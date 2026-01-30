@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, Tier, RateUnit, LiquidUnit, DryUnit } from '@/types/farm';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds, generateId } from '@/utils/farmUtils';
+import { TIMING_BUCKET_INFO, getStageOrder } from '@/lib/growthStages';
 
 interface CropDetailProps {
   crop: Crop;
@@ -25,6 +26,25 @@ export const CropDetail: React.FC<CropDetailProps> = ({
   const [showAddTiming, setShowAddTiming] = useState(false);
   const [newTimingName, setNewTimingName] = useState('');
   const [expandedTimings, setExpandedTimings] = useState<Set<string>>(new Set(crop.applicationTimings.map(t => t.id)));
+
+  // Sort timings by bucket then growth stage then order
+  const sortedTimings = useMemo(() => {
+    return crop.applicationTimings
+      .slice()
+      .sort((a, b) => {
+        const bucketOrderA = TIMING_BUCKET_INFO[a.timingBucket || 'IN_SEASON'].order;
+        const bucketOrderB = TIMING_BUCKET_INFO[b.timingBucket || 'IN_SEASON'].order;
+        if (bucketOrderA !== bucketOrderB) return bucketOrderA - bucketOrderB;
+        
+        if ((a.timingBucket || 'IN_SEASON') === 'IN_SEASON') {
+          const stageOrderA = getStageOrder(crop.cropType, a.growthStageStart, crop.name);
+          const stageOrderB = getStageOrder(crop.cropType, b.growthStageStart, crop.name);
+          if (stageOrderA !== stageOrderB) return stageOrderA - stageOrderB;
+        }
+        
+        return a.order - b.order;
+      });
+  }, [crop.applicationTimings, crop.cropType, crop.name]);
 
   const calculations = useMemo(() => {
     let totalCost = 0;
@@ -218,7 +238,7 @@ export const CropDetail: React.FC<CropDetailProps> = ({
 
       {/* Application Timings */}
       <div className="space-y-4">
-        {crop.applicationTimings.map(timing => {
+        {sortedTimings.map(timing => {
           const timingApps = crop.applications.filter(a => a.timingId === timing.id);
           const isExpanded = expandedTimings.has(timing.id);
           const timingCost = calculations.timingCosts[timing.id] || 0;

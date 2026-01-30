@@ -202,17 +202,17 @@ export const GROWTH_STAGES: Record<CropType, GrowthStage[]> = {
 };
 
 // Get stage order for sorting
-export function getStageOrder(cropType: CropType | string | undefined, stage: string | undefined): number {
+export function getStageOrder(cropType: CropType | string | undefined, stage: string | undefined, cropName?: string): number {
   if (!stage) return 999;
-  const normalizedCropType = normalizeCropType(cropType);
+  const normalizedCropType = normalizeCropType(cropType, cropName);
   const stages = GROWTH_STAGES[normalizedCropType];
   const found = stages.find(s => s.stage === stage);
   return found?.order ?? 999;
 }
 
 // Get stage with description for display
-export function getStageDisplay(cropType: CropType | string | undefined, stage: string): string {
-  const normalizedCropType = normalizeCropType(cropType);
+export function getStageDisplay(cropType: CropType | string | undefined, stage: string, cropName?: string): string {
+  const normalizedCropType = normalizeCropType(cropType, cropName);
   const stages = GROWTH_STAGES[normalizedCropType];
   const found = stages.find(s => s.stage === stage);
   return found ? `${stage} - ${found.description}` : stage;
