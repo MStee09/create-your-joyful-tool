@@ -1,140 +1,114 @@
 
 
-# Add Per-Tier Nutrient Totals to Coverage Groups
+# Improve Acres Percentage Clarity with Tier Labels
 
-## Overview
-Add nutrient analysis (N-P-K-S) to each coverage group header (Core, Selective, Trial) so users can see exactly what those treated acres receive, rather than having to sum individual product rows.
+## Problem
+The current coverage distribution display shows only raw percentages like `100% (4) · 90% (1) · 50% (1) · 25% (1)`. Not everyone understands that:
+- 100% = Core (full commitment)
+- 50-60% = Building/Selective (gaining confidence)
+- 25% = Trial (testing)
+
+## Solution
+Add human-readable tier labels to the coverage distribution display in the pass header, making the strategy behind each percentage bucket immediately clear.
 
 ---
 
-## Visual Result
+## Visual Change
 
-### Expanded Pass View (Trial Tier Example)
-```text
-Before:
-  Trial                 25% · 40 ac                    $6.50/ac treated
-                                                       $1.63/ac field
-
-After:
-  Trial                 25% · 40 ac                    $6.50/ac treated
-  N 18.9 | K 10.0 | S 25.2                             $1.63/ac field
+**Before:**
+```
+100% (4) · 90% (1) · 50% (1) · 25% (1)
 ```
 
-Each tier header shows the **raw nutrient sum** for products in that tier - this is exactly what those 40 acres receive.
+**After:**
+```
+Core 100% (4) · Core 90% (1) · Building 50% (1) · Trial 25% (1)
+```
+
+Or with color-coded badges for better scanning:
+```
+[Core] 100% (4) · [Core] 90% (1) · [Building] 50% (1) · [Trial] 25% (1)
+```
 
 ---
 
 ## Technical Implementation
 
-### 1. Update `CoverageGroup` Interface
-**File**: `src/lib/cropCalculations.ts` (lines 22-29)
+### File: `src/components/farm/PassCard.tsx`
 
-Add a `nutrients` field to store the aggregated nutrient totals for the group:
-
-```typescript
-export interface CoverageGroup {
-  acresPercentage: number;
-  tierLabel: 'Core' | 'Selective' | 'Trial';
-  applications: Application[];
-  costPerTreatedAcre: number;
-  costPerFieldAcre: number;
-  acresTreated: number;
-  nutrients: { n: number; p: number; k: number; s: number }; // NEW
-}
-```
-
-### 2. Update `calculateCoverageGroups()` Function
-**File**: `src/lib/cropCalculations.ts` (~lines 244-297)
-
-Track nutrient sums while building coverage groups:
+#### 1. Add Coverage Label Helper Function
+Add a helper function (similar to the one in `ProductRowReadable.tsx`) to get the tier label from percentage:
 
 ```typescript
-const groupMap = new Map<
-  number,
-  {
-    apps: Application[];
-    treatedCostSum: number;
-    fieldCostSum: number;
-    acresTreatedSum: number;
-    nutrients: { n: number; p: number; k: number; s: number }; // NEW
-  }
->();
+// Coverage label based on percentage (matching ProductRowReadable logic)
+const getCoverageLabel = (percentage: number): 'Core' | 'Building' | 'Trial' => {
+  if (percentage >= 90) return 'Core';
+  if (percentage >= 50) return 'Building';
+  return 'Trial';
+};
 
-applications.forEach(app => {
-  const product = products.find(p => p.id === app.productId);
-  // ...existing code...
-  
-  if (!groupMap.has(bucket)) {
-    groupMap.set(bucket, { 
-      apps: [], treatedCostSum: 0, fieldCostSum: 0, acresTreatedSum: 0,
-      nutrients: { n: 0, p: 0, k: 0, s: 0 } // NEW
-    });
-  }
-  const group = groupMap.get(bucket)!;
-  group.apps.push(app);
-  
-  // Existing economics
-  group.treatedCostSum += costPerAcre;
-  group.fieldCostSum += costPerAcre * (actualAcresPercentage / 100);
-  group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
-  
-  // NEW: Accumulate raw nutrients (unweighted - what treated acres receive)
-  const appNutrients = calculateApplicationNutrients(app, product);
-  group.nutrients.n += appNutrients.n;
-  group.nutrients.p += appNutrients.p;
-  group.nutrients.k += appNutrients.k;
-  group.nutrients.s += appNutrients.s;
-});
-
-// In the return, include nutrients in each group
-return Array.from(groupMap.entries())
-  .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum, nutrients }]) => ({
-    acresPercentage,
-    tierLabel: getTierLabel(acresPercentage),
-    applications: apps.slice().sort(/* existing sort logic */),
-    costPerTreatedAcre: treatedCostSum,
-    costPerFieldAcre: fieldCostSum,
-    acresTreated: acresTreatedSum,
-    nutrients, // NEW
-  }))
-  .sort((a, b) => b.acresPercentage - a.acresPercentage);
+// Tier badge styles (matching existing pattern)
+const TIER_LABEL_STYLES: Record<string, { bg: string; text: string }> = {
+  'Core': { bg: 'bg-emerald-500/15', text: 'text-emerald-600' },
+  'Building': { bg: 'bg-amber-500/15', text: 'text-amber-600' },
+  'Trial': { bg: 'bg-violet-500/15', text: 'text-violet-600' },
+};
 ```
 
-### 3. Update `calculateCoverageGroupsWithPriceBook()` Function
-**File**: `src/lib/cropCalculations.ts` (~lines 452-520)
-
-Same pattern applied to the price-book-aware function.
-
-### 4. Update PassCard Tier Header Display
-**File**: `src/components/farm/PassCard.tsx` (~lines 393-419)
-
-Add nutrient display in the coverage group header:
+#### 2. Update `CoverageDistribution` Component
+Modify lines 53-80 to include tier labels with color-coding:
 
 ```tsx
-{summary.coverageGroups.length > 1 && (
-  <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
-    <div className="flex items-center gap-2">
-      <span className={cn(/* tier badge styles */)}>
-        {group.tierLabel}
-      </span>
-      <span className="text-sm text-muted-foreground">
-        {formatNumber(group.acresPercentage, 0)}% · {formatNumber(group.acresTreated, 0)} ac
-      </span>
-      {/* NEW: Tier-level nutrient analysis */}
-      {(group.nutrients.n > 0.1 || group.nutrients.k > 0.1 || group.nutrients.s > 0.1) && (
-        <span className="text-xs text-muted-foreground ml-2">
-          {group.nutrients.n > 0.1 && <span className="text-emerald-600">N {formatNumber(group.nutrients.n, 1)}</span>}
-          {group.nutrients.k > 0.1 && <span className="text-amber-600 ml-1">K {formatNumber(group.nutrients.k, 1)}</span>}
-          {group.nutrients.s > 0.1 && <span className="text-purple-600 ml-1">S {formatNumber(group.nutrients.s, 1)}</span>}
+const CoverageDistribution: React.FC<{ 
+  coverageGroups: CoverageGroup[]; 
+  totalProducts: number;
+}> = ({ coverageGroups, totalProducts }) => {
+  if (coverageGroups.length === 0) return null;
+  
+  if (coverageGroups.length === 1) {
+    const group = coverageGroups[0];
+    const label = getCoverageLabel(group.acresPercentage);
+    const style = TIER_LABEL_STYLES[label];
+    return (
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+          {label}
         </span>
-      )}
-    </div>
-    <div className="text-right">
-      {/* existing cost display */}
-    </div>
-  </div>
-)}
+        {formatNumber(group.acresPercentage, 0)}% → {group.applications.length} product{group.applications.length !== 1 ? 's' : ''}
+      </span>
+    );
+  }
+  
+  // Multiple tiers - compact display with labels
+  return (
+    <span className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+      {coverageGroups.map((g, i) => {
+        const label = getCoverageLabel(g.acresPercentage);
+        const style = TIER_LABEL_STYLES[label];
+        return (
+          <span key={g.acresPercentage} className="flex items-center gap-1">
+            <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+              {label}
+            </span>
+            <span className="text-foreground/80">{formatNumber(g.acresPercentage, 0)}%</span>
+            <span className="text-muted-foreground/70">({g.applications.length})</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+};
 ```
+
+---
+
+## Result
+Users will immediately understand the strategic meaning of each coverage bucket:
+- **Core** = Confident, full coverage products
+- **Building** = Gaining confidence, expanding coverage
+- **Trial** = Testing on limited acres
+
+The color-coding (green/amber/violet) provides instant visual hierarchy matching the existing pattern in the expanded view.
 
 ---
 
@@ -142,17 +116,5 @@ Add nutrient display in the coverage group header:
 
 | File | Changes |
 |------|---------|
-| `src/lib/cropCalculations.ts` | Add `nutrients` to `CoverageGroup` interface; accumulate unweighted nutrient sums in `calculateCoverageGroups()` and `calculateCoverageGroupsWithPriceBook()` |
-| `src/components/farm/PassCard.tsx` | Display tier-level nutrients in the coverage group header |
-
----
-
-## Summary
-
-- **Pass Header**: Continues to show **field-weighted** nutrients (what this pass contributes to the whole crop budget)
-- **Tier Headers** (Core/Selective/Trial): Now show **raw nutrient totals** (what those treated acres actually receive)
-- Color-coded display (N=emerald, K=amber, S=purple) for quick scanning
-- Only shows nutrients above 0.1 lbs/ac to reduce clutter
-
-This gives you both perspectives: the budget-level contribution at the pass header, and the agronomic intensity at the tier level.
+| `src/components/farm/PassCard.tsx` | Add `getCoverageLabel` helper, add `TIER_LABEL_STYLES`, update `CoverageDistribution` component to show tier labels with badges |
 
