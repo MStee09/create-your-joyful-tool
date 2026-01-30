@@ -104,12 +104,26 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
                       <SelectValue placeholder="Start stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stages.map(({ stage, description }) => (
-                        <SelectItem key={stage} value={stage}>
-                          <span className="font-medium">{stage}</span>
-                          <span className="text-muted-foreground ml-2">- {description}</span>
-                        </SelectItem>
-                      ))}
+                      {(() => {
+                        let lastGroup: string | undefined = undefined;
+                        return stages.map(({ stage, description, group }) => {
+                          const showGroupHeader = group && group !== lastGroup;
+                          lastGroup = group;
+                          return (
+                            <React.Fragment key={stage}>
+                              {showGroupHeader && (
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t border-border first:border-t-0 mt-1 first:mt-0">
+                                  {group}
+                                </div>
+                              )}
+                              <SelectItem value={stage}>
+                                <span className="font-medium">{stage}</span>
+                                <span className="text-muted-foreground ml-2">- {description}</span>
+                              </SelectItem>
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>
@@ -127,19 +141,32 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">None (single stage)</SelectItem>
-                      {stages
-                        .filter(({ stage }) => {
+                      {(() => {
+                        const filteredStages = stages.filter(({ stage }) => {
                           if (!stageStart) return true;
                           const startOrder = stages.find(s => s.stage === stageStart)?.order ?? 0;
                           const currentOrder = stages.find(s => s.stage === stage)?.order ?? 0;
                           return currentOrder > startOrder;
-                        })
-                        .map(({ stage, description }) => (
-                          <SelectItem key={stage} value={stage}>
-                            <span className="font-medium">{stage}</span>
-                            <span className="text-muted-foreground ml-2">- {description}</span>
-                          </SelectItem>
-                        ))}
+                        });
+                        let lastGroup: string | undefined = undefined;
+                        return filteredStages.map(({ stage, description, group }) => {
+                          const showGroupHeader = group && group !== lastGroup;
+                          lastGroup = group;
+                          return (
+                            <React.Fragment key={stage}>
+                              {showGroupHeader && (
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t border-border mt-1">
+                                  {group}
+                                </div>
+                              )}
+                              <SelectItem value={stage}>
+                                <span className="font-medium">{stage}</span>
+                                <span className="text-muted-foreground ml-2">- {description}</span>
+                              </SelectItem>
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>

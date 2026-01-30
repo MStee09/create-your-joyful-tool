@@ -63,6 +63,7 @@ interface GrowthStage {
   stage: string;
   description: string;
   order: number;
+  group?: string; // Feekes grouping for small grains
 }
 
 // Growth stages per crop type (with sort order and descriptions)
@@ -140,25 +141,32 @@ export const GROWTH_STAGES: Record<CropType, GrowthStage[]> = {
     { stage: 'R9', description: 'Full maturity', order: 21 },
   ],
   small_grains: [
-    { stage: 'F1', description: 'One shoot', order: 0 },
-    { stage: 'F2', description: 'Tillering begins', order: 1 },
-    { stage: 'F3', description: 'Tillers formed', order: 2 },
-    { stage: 'F4', description: 'Leaf sheaths lengthen', order: 3 },
-    { stage: 'F5', description: 'Leaf sheaths strongly erected', order: 4 },
-    { stage: 'F6', description: 'First node visible', order: 5 },
-    { stage: 'F7', description: 'Second node visible', order: 6 },
-    { stage: 'F8', description: 'Last leaf just visible', order: 7 },
-    { stage: 'F9', description: 'Ligule of last leaf visible', order: 8 },
-    { stage: 'F10', description: 'In boot', order: 9 },
-    { stage: 'F10.1', description: 'Heading', order: 10 },
-    { stage: 'F10.5', description: 'Flowering', order: 11 },
-    { stage: 'F10.5.1', description: 'Beginning flowering', order: 12 },
-    { stage: 'F10.5.2', description: 'Flowering complete', order: 13 },
-    { stage: 'F11', description: 'Ripening', order: 14 },
-    { stage: 'F11.1', description: 'Milk', order: 15 },
-    { stage: 'F11.2', description: 'Soft dough', order: 16 },
-    { stage: 'F11.3', description: 'Hard dough', order: 17 },
-    { stage: 'F11.4', description: 'Harvest ready', order: 18 },
+    // Seedling
+    { stage: 'F1', description: 'One shoot', order: 0, group: 'Seedling' },
+    // Tillering
+    { stage: 'F2', description: 'Tillering begins', order: 1, group: 'Tillering' },
+    { stage: 'F3', description: 'Tillers formed', order: 2, group: 'Tillering' },
+    // Stem Extension
+    { stage: 'F4', description: 'Leaf sheaths lengthen', order: 3, group: 'Stem Extension' },
+    { stage: 'F5', description: 'Leaf sheaths strongly erected', order: 4, group: 'Stem Extension' },
+    // Jointing
+    { stage: 'F6', description: 'First node visible', order: 5, group: 'Jointing' },
+    { stage: 'F7', description: 'Second node visible', order: 6, group: 'Jointing' },
+    // Boot
+    { stage: 'F8', description: 'Flag leaf just visible', order: 7, group: 'Boot' },
+    { stage: 'F9', description: 'Ligule of flag leaf visible', order: 8, group: 'Boot' },
+    { stage: 'F10', description: 'In boot', order: 9, group: 'Boot' },
+    // Heading
+    { stage: 'F10.1', description: 'Heading', order: 10, group: 'Heading' },
+    { stage: 'F10.5', description: 'Flowering', order: 11, group: 'Heading' },
+    { stage: 'F10.5.1', description: 'Beginning flowering', order: 12, group: 'Heading' },
+    { stage: 'F10.5.2', description: 'Flowering complete', order: 13, group: 'Heading' },
+    // Ripening
+    { stage: 'F11', description: 'Ripening', order: 14, group: 'Ripening' },
+    { stage: 'F11.1', description: 'Milk', order: 15, group: 'Ripening' },
+    { stage: 'F11.2', description: 'Soft dough', order: 16, group: 'Ripening' },
+    { stage: 'F11.3', description: 'Hard dough', order: 17, group: 'Ripening' },
+    { stage: 'F11.4', description: 'Harvest ready', order: 18, group: 'Ripening' },
   ],
   sunflowers: [
     { stage: 'VE', description: 'Emergence', order: 0 },
