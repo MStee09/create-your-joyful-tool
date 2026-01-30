@@ -26,6 +26,7 @@ export interface CoverageGroup {
   costPerTreatedAcre: number;
   costPerFieldAcre: number;
   acresTreated: number;
+  nutrients: { n: number; p: number; k: number; s: number };
 }
 
 export type PassPattern = 'uniform' | 'selective' | 'trial';
@@ -256,6 +257,7 @@ export const calculateCoverageGroups = (
       treatedCostSum: number; // $/treated-ac (sum of product $/treated-ac)
       fieldCostSum: number; // $/field-ac (sum of product $/treated-ac * actual%/100)
       acresTreatedSum: number; // treated acres in this group (sum of actual treated acres)
+      nutrients: { n: number; p: number; k: number; s: number }; // Raw nutrient sums for this tier
     }
   >();
 
@@ -266,7 +268,13 @@ export const calculateCoverageGroups = (
     const costPerAcre = calculateApplicationCostPerAcre(app, product);
 
     if (!groupMap.has(bucket)) {
-      groupMap.set(bucket, { apps: [], treatedCostSum: 0, fieldCostSum: 0, acresTreatedSum: 0 });
+      groupMap.set(bucket, { 
+        apps: [], 
+        treatedCostSum: 0, 
+        fieldCostSum: 0, 
+        acresTreatedSum: 0,
+        nutrients: { n: 0, p: 0, k: 0, s: 0 }
+      });
     }
     const group = groupMap.get(bucket)!;
     group.apps.push(app);
@@ -274,11 +282,18 @@ export const calculateCoverageGroups = (
     group.treatedCostSum += costPerAcre;
     group.fieldCostSum += costPerAcre * (actualAcresPercentage / 100);
     group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
+    
+    // Accumulate raw nutrients (unweighted - what treated acres receive)
+    const appNutrients = calculateApplicationNutrients(app, product);
+    group.nutrients.n += appNutrients.n;
+    group.nutrients.p += appNutrients.p;
+    group.nutrients.k += appNutrients.k;
+    group.nutrients.s += appNutrients.s;
   });
 
   // Convert to array and sort by acres descending
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum, nutrients }]) => ({
       // This is the *display* percentage bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
@@ -292,6 +307,7 @@ export const calculateCoverageGroups = (
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
       acresTreated: acresTreatedSum,
+      nutrients,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
 };
@@ -464,6 +480,7 @@ export const calculateCoverageGroupsWithPriceBook = (
       treatedCostSum: number;
       fieldCostSum: number;
       acresTreatedSum: number;
+      nutrients: { n: number; p: number; k: number; s: number }; // Raw nutrient sums for this tier
     }
   >();
 
@@ -480,7 +497,13 @@ export const calculateCoverageGroupsWithPriceBook = (
     );
 
     if (!groupMap.has(bucket)) {
-      groupMap.set(bucket, { apps: [], treatedCostSum: 0, fieldCostSum: 0, acresTreatedSum: 0 });
+      groupMap.set(bucket, { 
+        apps: [], 
+        treatedCostSum: 0, 
+        fieldCostSum: 0, 
+        acresTreatedSum: 0,
+        nutrients: { n: 0, p: 0, k: 0, s: 0 }
+      });
     }
     const group = groupMap.get(bucket)!;
     group.apps.push(app);
@@ -488,10 +511,17 @@ export const calculateCoverageGroupsWithPriceBook = (
     group.treatedCostSum += costPerAcre;
     group.fieldCostSum += costPerAcre * (actualAcresPercentage / 100);
     group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
+    
+    // Accumulate raw nutrients (unweighted - what treated acres receive)
+    const appNutrients = calculateApplicationNutrients(app, product);
+    group.nutrients.n += appNutrients.n;
+    group.nutrients.p += appNutrients.p;
+    group.nutrients.k += appNutrients.k;
+    group.nutrients.s += appNutrients.s;
   });
 
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum, nutrients }]) => ({
       // Display bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
@@ -511,6 +541,7 @@ export const calculateCoverageGroupsWithPriceBook = (
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
       acresTreated: acresTreatedSum,
+      nutrients,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
 };
