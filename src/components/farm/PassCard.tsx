@@ -49,6 +49,20 @@ const PATTERN_BADGE_STYLES: Record<PassPattern, { bg: string; text: string; labe
   'trial': { bg: 'bg-violet-500/15', text: 'text-violet-600', label: 'Trial' },
 };
 
+// Coverage label based on percentage (matching ProductRowReadable logic)
+const getCoverageLabel = (percentage: number): 'Core' | 'Building' | 'Trial' => {
+  if (percentage >= 90) return 'Core';
+  if (percentage >= 50) return 'Building';
+  return 'Trial';
+};
+
+// Tier badge styles for coverage distribution
+const TIER_LABEL_STYLES: Record<string, { bg: string; text: string }> = {
+  'Core': { bg: 'bg-emerald-500/15', text: 'text-emerald-600' },
+  'Building': { bg: 'bg-amber-500/15', text: 'text-amber-600' },
+  'Trial': { bg: 'bg-violet-500/15', text: 'text-violet-600' },
+};
+
 // Coverage distribution display
 const CoverageDistribution: React.FC<{ 
   coverageGroups: CoverageGroup[]; 
@@ -58,23 +72,34 @@ const CoverageDistribution: React.FC<{
   
   if (coverageGroups.length === 1) {
     const group = coverageGroups[0];
+    const label = getCoverageLabel(group.acresPercentage);
+    const style = TIER_LABEL_STYLES[label];
     return (
-      <span className="text-sm text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+          {label}
+        </span>
         {formatNumber(group.acresPercentage, 0)}% → {group.applications.length} product{group.applications.length !== 1 ? 's' : ''}
       </span>
     );
   }
   
-  // Multiple tiers - compact display
+  // Multiple tiers - compact display with labels
   return (
-    <span className="text-sm text-muted-foreground">
-      {coverageGroups.map((g, i) => (
-        <span key={g.acresPercentage}>
-          {i > 0 && ' · '}
-          <span className="text-foreground/80">{formatNumber(g.acresPercentage, 0)}%</span>
-          <span className="text-muted-foreground/70"> ({g.applications.length})</span>
-        </span>
-      ))}
+    <span className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+      {coverageGroups.map((g) => {
+        const label = getCoverageLabel(g.acresPercentage);
+        const style = TIER_LABEL_STYLES[label];
+        return (
+          <span key={g.acresPercentage} className="flex items-center gap-1">
+            <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+              {label}
+            </span>
+            <span className="text-foreground/80">{formatNumber(g.acresPercentage, 0)}%</span>
+            <span className="text-muted-foreground/70">({g.applications.length})</span>
+          </span>
+        );
+      })}
     </span>
   );
 };
