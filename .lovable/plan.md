@@ -1,176 +1,147 @@
 
+# Fix: Crop-Specific Growth Stages Not Matching Selected Crop
 
-# Complete Crop-Specific Growth Stages with Descriptions
+## Problem Identified
+Looking at your screenshot, I can see the issue:
+- The crop is named **"Edible Beans"** but the dropdown shows **"Select crop..."** (placeholder text)
+- This means the `cropType` field is **undefined** for this crop
+- When undefined, the system defaults to **Corn** stages (V8 - "Eighth leaf collar")
+- You should be seeing **Dry Beans** stages (V1 - "First trifoliate", R2 - "Beginning pod", etc.)
 
-## Overview
-Update the growth stage system with **complete stage lists** and descriptions for each crop type:
-- **Corn** - Full V1-V18 + VT + R1-R6
-- **Small Grains** (Barley, Wheat, Oats) - Feekes scale F1-F11.4
-- **Dry Beans** - VE through R9 (from your PDF guide)
-- **Soybeans** - VE through R8
-- **Sunflowers** - VE through R9
-
----
-
-## Complete Stage Lists
-
-### Corn (All Vegetative + Reproductive Stages)
-| Stage | Description |
-|-------|-------------|
-| VE | Emergence |
-| V1 | First leaf collar |
-| V2 | Second leaf collar |
-| V3 | Third leaf collar |
-| V4 | Fourth leaf collar |
-| V5 | Fifth leaf collar |
-| V6 | Sixth leaf collar |
-| V7 | Seventh leaf collar |
-| V8 | Eighth leaf collar |
-| V9 | Ninth leaf collar |
-| V10 | Tenth leaf collar |
-| V11 | Eleventh leaf collar |
-| V12 | Twelfth leaf collar |
-| V13 | Thirteenth leaf collar |
-| V14 | Fourteenth leaf collar |
-| V15 | Fifteenth leaf collar |
-| V16 | Sixteenth leaf collar |
-| V17 | Seventeenth leaf collar |
-| V18 | Eighteenth leaf collar |
-| VT | Tasseling |
-| R1 | Silking |
-| R2 | Blister |
-| R3 | Milk |
-| R4 | Dough |
-| R5 | Dent |
-| R6 | Maturity |
-
-### Soybeans (All Stages)
-| Stage | Description |
-|-------|-------------|
-| VE | Emergence |
-| VC | Cotyledon |
-| V1 | First node |
-| V2 | Second node |
-| V3 | Third node |
-| V4 | Fourth node |
-| V5 | Fifth node |
-| V6 | Sixth node |
-| V7 | Seventh node |
-| V8 | Eighth node |
-| R1 | Beginning bloom |
-| R2 | Full bloom |
-| R3 | Beginning pod |
-| R4 | Full pod |
-| R5 | Beginning seed |
-| R6 | Full seed |
-| R7 | Beginning maturity |
-| R8 | Full maturity |
-
-### Dry Beans (From Your PDF Guide)
-| Stage | Description |
-|-------|-------------|
-| VE | Emergence |
-| VC | Unifoliate |
-| V1 | First trifoliate |
-| V2 | Second trifoliate |
-| V3 | Third trifoliate |
-| V4 | Fourth trifoliate |
-| V5 | Flower buds visible |
-| R1 | Beginning bloom |
-| R2 | Beginning pod (pin bean) |
-| R3 | 50% bloom |
-| R4 | Full pod |
-| R5 | Beginning seed |
-| R6 | 50% seed |
-| R7 | Full seed |
-| R8 | Beginning maturity |
-| R8.5 | Mid maturity |
-| R9 | Full maturity |
-
-### Small Grains - Feekes Scale (Complete)
-| Stage | Description |
-|-------|-------------|
-| F1 | One shoot |
-| F2 | Tillering begins |
-| F3 | Tillers formed |
-| F4 | Leaf sheaths lengthen |
-| F5 | Leaf sheaths strongly erected |
-| F6 | First node visible |
-| F7 | Second node visible |
-| F8 | Last leaf just visible |
-| F9 | Ligule of last leaf visible |
-| F10 | In boot |
-| F10.1 | Heading |
-| F10.5 | Flowering |
-| F10.5.1 | Beginning flowering |
-| F10.5.2 | Flowering complete |
-| F11 | Ripening |
-| F11.1 | Milk |
-| F11.2 | Soft dough |
-| F11.3 | Hard dough |
-| F11.4 | Harvest ready |
-
-### Sunflowers (Complete)
-| Stage | Description |
-|-------|-------------|
-| VE | Emergence |
-| V1 | First true leaves |
-| V2 | Two true leaves |
-| V3 | Three true leaves |
-| V4 | Four true leaves |
-| V5 | Five true leaves |
-| V6 | Six true leaves |
-| V8 | Eight true leaves |
-| V10 | Ten true leaves |
-| V12 | Twelve true leaves |
-| V14 | Fourteen true leaves |
-| V16 | Sixteen true leaves |
-| R1 | Bud visible |
-| R2 | Bud elongation |
-| R3 | Bud opening |
-| R4 | Inflorescence begins |
-| R5 | Beginning flowering |
-| R5.1 | 10% flowering |
-| R5.5 | 50% flowering |
-| R5.9 | 90% flowering |
-| R6 | Flowering complete |
-| R7 | Back of head pale yellow |
-| R8 | Back of head yellow |
-| R9 | Physiological maturity |
+The growth stages are correctly defined in the code - the issue is that the crop type hasn't been set yet.
 
 ---
 
-## Technical Implementation
+## Solution: Auto-Infer Crop Type from Crop Name
 
-### Data Structure Change
-Update stage objects from:
+When creating or displaying crops, automatically infer the crop type from the crop name if not explicitly set.
+
+---
+
+## Implementation
+
+### 1. Add Crop Name to Type Inference Function
+
+**File: `src/lib/growthStages.ts`**
+
+Add a new function to infer crop type from the crop name:
+
 ```typescript
-{ stage: string; order: number }
+export function inferCropTypeFromName(name: string): CropType {
+  const lower = name.toLowerCase();
+  
+  if (lower.includes('corn') || lower.includes('maize')) return 'corn';
+  if (lower.includes('soybean') || lower.includes('soy bean')) return 'soybeans';
+  if (lower.includes('edible bean') || lower.includes('dry bean') || 
+      lower.includes('black turtle') || lower.includes('field pea') || 
+      lower.includes('small red') || lower.includes('pinto') ||
+      lower.includes('navy bean') || lower.includes('kidney')) return 'dry_beans';
+  if (lower.includes('wheat') || lower.includes('barley') || 
+      lower.includes('oat') || lower.includes('rye')) return 'small_grains';
+  if (lower.includes('sunflower')) return 'sunflowers';
+  
+  return 'other';
+}
 ```
-To:
+
+### 2. Update Normalization to Use Inferred Type
+
+**File: `src/lib/growthStages.ts`**
+
+Update `normalizeCropType` to optionally accept a crop name for inference:
+
 ```typescript
-{ stage: string; description: string; order: number }
+export function normalizeCropType(
+  cropType: string | undefined, 
+  cropName?: string
+): CropType {
+  // If cropType is explicitly set, use it
+  if (cropType) {
+    if (cropType === 'wheat') return 'small_grains';
+    if (cropType === 'edible_beans') return 'dry_beans';
+    return cropType as CropType;
+  }
+  
+  // If no cropType but we have a name, infer from name
+  if (cropName) {
+    return inferCropTypeFromName(cropName);
+  }
+  
+  // Default fallback
+  return 'corn';
+}
 ```
 
-### Crop Type Updates
-| Current | New | Notes |
-|---------|-----|-------|
-| `corn` | `corn` | Keep |
-| `soybeans` | `soybeans` | Keep |
-| `wheat` | Remove | Merge into small_grains |
-| `small_grains` | `small_grains` | Feekes scale |
-| `edible_beans` | `dry_beans` | Rename |
-| - | `sunflowers` | Add new |
-| `other` | `other` | Keep |
+### 3. Update TimingEditorPopover to Use Crop Name
 
-### UI Update
-Dropdown will show:
+**File: `src/components/farm/TimingEditorPopover.tsx`**
+
+Accept optional `cropName` prop for inference:
+
+```typescript
+interface TimingEditorPopoverProps {
+  timing: ApplicationTiming;
+  cropType?: CropType;
+  cropName?: string;  // NEW: for inference
+  onUpdate: (timing: ApplicationTiming) => void;
+  children?: React.ReactNode;
+}
+
+// In the component:
+const normalizedCropType = normalizeCropType(cropType, cropName);
 ```
-V5 - Fifth leaf collar
-V6 - Sixth leaf collar
-V7 - Seventh leaf collar
-...
+
+### 4. Update PassCard to Pass Crop Name
+
+**File: `src/components/farm/PassCard.tsx`**
+
+Pass the crop name to TimingEditorPopover:
+
+```typescript
+<TimingEditorPopover
+  timing={timing}
+  cropType={crop.cropType}
+  cropName={crop.name}  // NEW
+  onUpdate={onUpdateTiming}
+>
 ```
+
+### 5. Auto-Set cropType When Creating/Loading Crops
+
+**File: `src/components/farm/CropPlanningView.tsx`** (or where crops are managed)
+
+When a crop is created or loaded without a cropType, auto-set it:
+
+```typescript
+// When crop loads or is created
+if (!crop.cropType) {
+  const inferredType = inferCropTypeFromName(crop.name);
+  onUpdate({ ...crop, cropType: inferredType });
+}
+```
+
+---
+
+## Result
+
+| Before | After |
+|--------|-------|
+| "Edible Beans" shows "V8 - Eighth leaf collar" (Corn stages) | "Edible Beans" shows "V1 - First trifoliate" (Dry Beans stages) |
+| User must manually select crop type | Crop type auto-inferred from name |
+| Fallback to Corn always | Smart fallback based on crop name |
+
+---
+
+## Crop Name to Type Mapping
+
+| Crop Name Contains | Inferred Type |
+|-------------------|---------------|
+| corn, maize | `corn` |
+| soybean | `soybeans` |
+| edible bean, dry bean, black turtle, field pea, small red, pinto, navy, kidney | `dry_beans` |
+| wheat, barley, oat, rye | `small_grains` |
+| sunflower | `sunflowers` |
+| (anything else) | `other` |
 
 ---
 
@@ -178,14 +149,7 @@ V7 - Seventh leaf collar
 
 | File | Changes |
 |------|---------|
-| `src/lib/growthStages.ts` | Update CropType, add sunflowers, rename edible_beans to dry_beans, add description to ALL stages, add complete stage lists, add getStageDisplay helper |
-| `src/types/farm.ts` | Update CropType to match |
-| `src/components/farm/TimingEditorPopover.tsx` | Update dropdown to show "Stage - Description" format |
-
----
-
-## Backward Compatibility
-Code will map legacy values:
-- `wheat` -> `small_grains`
-- `edible_beans` -> `dry_beans`
-
+| `src/lib/growthStages.ts` | Add `inferCropTypeFromName()` function, update `normalizeCropType()` to accept optional crop name |
+| `src/components/farm/TimingEditorPopover.tsx` | Add `cropName` prop, pass to `normalizeCropType()` |
+| `src/components/farm/PassCard.tsx` | Pass `crop.name` to `TimingEditorPopover` |
+| `src/components/farm/CropPlanningView.tsx` | Auto-set `cropType` on load if undefined |
