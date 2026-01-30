@@ -11,7 +11,7 @@ import {
   PriceBookContext 
 } from '@/lib/cropCalculations';
 import { TIMING_BUCKET_INFO } from '@/lib/growthStages';
-
+import { calculateApplicationNutrients } from '@/lib/calculations';
 interface CropPlanPrintViewProps {
   crop: Crop;
   products: Product[];
@@ -36,6 +36,16 @@ const formatGrade = (analysis: { n: number; p: number; k: number; s: number } | 
   const { n, p, k, s } = analysis;
   if (s > 0) return `${n}-${p}-${k}-${s}S`;
   return `${n}-${p}-${k}`;
+};
+
+// Helper to format applied nutrients (lbs/ac)
+const formatAppliedNutrients = (nutrients: { n: number; p: number; k: number; s: number }): string => {
+  const parts: string[] = [];
+  if (nutrients.n > 0.1) parts.push(`N ${nutrients.n.toFixed(1)}`);
+  if (nutrients.p > 0.1) parts.push(`P ${nutrients.p.toFixed(1)}`);
+  if (nutrients.k > 0.1) parts.push(`K ${nutrients.k.toFixed(1)}`);
+  if (nutrients.s > 0.1) parts.push(`S ${nutrients.s.toFixed(1)}`);
+  return parts.join(' · ') || '—';
 };
 
 export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
@@ -240,6 +250,7 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
                           <th className="px-4 py-2 text-right">Rate</th>
                           <th className="px-4 py-2 text-right">Acres %</th>
                           <th className="px-4 py-2 text-right">$/Acre</th>
+                          <th className="px-4 py-2 text-right">Applied (lbs/ac)</th>
                           <th className="px-4 py-2">Role</th>
                         </tr>
                       </thead>
@@ -266,6 +277,15 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
                           
                           const productName = product?.name || productMaster?.name || 'Unknown';
                           
+                          // Calculate applied nutrients
+                          const appNutrients = calculateApplicationNutrients(
+                            app.rate,
+                            app.rateUnit,
+                            analysisData,
+                            product?.form || productMaster?.form || 'liquid',
+                            product?.densityLbsPerGal || productMaster?.densityLbsPerGal
+                          );
+                          
                           return (
                             <tr key={app.id} className="border-t border-gray-100">
                               <td className="px-4 py-2">
@@ -280,6 +300,9 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
                               </td>
                               <td className="px-4 py-2 text-right font-medium">
                                 {formatCurrency(costPerAcre, 2)}
+                              </td>
+                              <td className="px-4 py-2 text-right text-xs">
+                                {formatAppliedNutrients(appNutrients)}
                               </td>
                               <td className="px-4 py-2 text-gray-600">
                                 {roleLabel}
