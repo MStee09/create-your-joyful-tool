@@ -63,40 +63,52 @@ const TIER_LABEL_STYLES: Record<string, { bg: string; text: string }> = {
   'Trial': { bg: 'bg-violet-500/15', text: 'text-violet-600' },
 };
 
-// Coverage distribution display
+// Coverage distribution display - aggregated by tier
 const CoverageDistribution: React.FC<{ 
   coverageGroups: CoverageGroup[]; 
   totalProducts: number;
 }> = ({ coverageGroups, totalProducts }) => {
   if (coverageGroups.length === 0) return null;
   
-  if (coverageGroups.length === 1) {
-    const group = coverageGroups[0];
-    const label = getCoverageLabel(group.acresPercentage);
+  // Aggregate products by tier label (not by exact percentage)
+  const tierCounts = coverageGroups.reduce((acc, g) => {
+    const label = getCoverageLabel(g.acresPercentage);
+    acc[label] = (acc[label] || 0) + g.applications.length;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const tiers = Object.entries(tierCounts) as [string, number][];
+  
+  // Single tier - simple display
+  if (tiers.length === 1) {
+    const [label, count] = tiers[0];
     const style = TIER_LABEL_STYLES[label];
     return (
       <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
           {label}
         </span>
-        {formatNumber(group.acresPercentage, 0)}% → {group.applications.length} product{group.applications.length !== 1 ? 's' : ''}
+        {count} product{count !== 1 ? 's' : ''}
       </span>
     );
   }
   
-  // Multiple tiers - compact display with labels
+  // Multiple tiers - compact badges with counts
+  const tierOrder = ['Core', 'Building', 'Trial'];
+  const sortedTiers = tiers.sort((a, b) => 
+    tierOrder.indexOf(a[0]) - tierOrder.indexOf(b[0])
+  );
+  
   return (
-    <span className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-      {coverageGroups.map((g) => {
-        const label = getCoverageLabel(g.acresPercentage);
+    <span className="flex items-center gap-2 text-sm text-muted-foreground">
+      {sortedTiers.map(([label, count]) => {
         const style = TIER_LABEL_STYLES[label];
         return (
-          <span key={g.acresPercentage} className="flex items-center gap-1">
+          <span key={label} className="flex items-center gap-1">
             <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
               {label}
             </span>
-            <span className="text-foreground/80">{formatNumber(g.acresPercentage, 0)}%</span>
-            <span className="text-muted-foreground/70">({g.applications.length})</span>
+            <span className="text-foreground/70">{count}</span>
           </span>
         );
       })}
