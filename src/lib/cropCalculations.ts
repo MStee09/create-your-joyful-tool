@@ -282,7 +282,12 @@ export const calculateCoverageGroups = (
       // This is the *display* percentage bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
-      applications: apps,
+      // Sort applications by cost (descending) within each group
+      applications: apps.slice().sort((a, b) => {
+        const costA = calculateApplicationCostPerAcre(a, products.find(p => p.id === a.productId));
+        const costB = calculateApplicationCostPerAcre(b, products.find(p => p.id === b.productId));
+        return costB - costA; // Descending: highest cost first
+      }),
       // Economics MUST be computed using actual application percentages.
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
@@ -490,7 +495,18 @@ export const calculateCoverageGroupsWithPriceBook = (
       // Display bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
-      applications: apps,
+      // Sort applications by cost (descending) within each group
+      applications: apps.slice().sort((a, b) => {
+        const costA = calculateApplicationCostPerAcreWithPriceBook(
+          a, products.find(p => p.id === a.productId),
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+        );
+        const costB = calculateApplicationCostPerAcreWithPriceBook(
+          b, products.find(p => p.id === b.productId),
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+        );
+        return costB - costA; // Descending: highest cost first
+      }),
       // Economics from actual %.
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
