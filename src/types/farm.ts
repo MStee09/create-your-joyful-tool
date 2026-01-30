@@ -40,7 +40,7 @@ export interface Tier {
 }
 
 export type TimingBucket = 'PRE_PLANT' | 'AT_PLANTING' | 'IN_SEASON' | 'POST_HARVEST';
-export type CropType = 'corn' | 'soybeans' | 'wheat' | 'small_grains' | 'edible_beans' | 'other';
+export type CropType = 'corn' | 'soybeans' | 'dry_beans' | 'small_grains' | 'sunflowers' | 'other';
 export type TierLabel = 'core' | 'selective' | 'trial';
 
 export interface ApplicationTiming {

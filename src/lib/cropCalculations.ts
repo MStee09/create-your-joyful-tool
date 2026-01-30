@@ -550,9 +550,9 @@ export const calculateCoverageGroupsWithPriceBook = (
 const LATE_STAGE_THRESHOLDS: Record<CropType, string[]> = {
   corn: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'],
   soybeans: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'],
-  wheat: ['Heading', 'Flowering', 'Grain Fill', 'Maturity'],
-  small_grains: ['Heading', 'Flowering', 'Grain Fill', 'Maturity'],
-  edible_beans: ['R1', 'R2', 'R3', 'R4', 'R5'],
+  small_grains: ['F10.5', 'F10.5.1', 'F10.5.2', 'F11', 'F11.1', 'F11.2', 'F11.3', 'F11.4'],
+  dry_beans: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R8.5', 'R9'],
+  sunflowers: ['R5', 'R5.1', 'R5.5', 'R5.9', 'R6', 'R7', 'R8', 'R9'],
   other: ['Late'],
 };
 

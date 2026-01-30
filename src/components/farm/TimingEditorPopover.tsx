@@ -3,7 +3,7 @@ import { Clock, X, ChevronRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ApplicationTiming, CropType, TimingBucket } from '@/types/farm';
-import { TIMING_BUCKET_INFO, GROWTH_STAGES, getTimingDisplayText } from '@/lib/growthStages';
+import { TIMING_BUCKET_INFO, GROWTH_STAGES, getTimingDisplayText, normalizeCropType } from '@/lib/growthStages';
 import { cn } from '@/lib/utils';
 
 interface TimingEditorPopoverProps {
@@ -24,7 +24,8 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
   const [stageStart, setStageStart] = useState(timing.growthStageStart || '');
   const [stageEnd, setStageEnd] = useState(timing.growthStageEnd || '');
 
-  const stages = GROWTH_STAGES[cropType] || GROWTH_STAGES.corn;
+  const normalizedCropType = normalizeCropType(cropType);
+  const stages = GROWTH_STAGES[normalizedCropType];
 
   const handleBucketChange = (newBucket: TimingBucket) => {
     setBucket(newBucket);
@@ -101,9 +102,10 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
                       <SelectValue placeholder="Start stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stages.map(({ stage }) => (
+                      {stages.map(({ stage, description }) => (
                         <SelectItem key={stage} value={stage}>
-                          {stage}
+                          <span className="font-medium">{stage}</span>
+                          <span className="text-muted-foreground ml-2">- {description}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -130,9 +132,10 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
                           const currentOrder = stages.find(s => s.stage === stage)?.order ?? 0;
                           return currentOrder > startOrder;
                         })
-                        .map(({ stage }) => (
+                        .map(({ stage, description }) => (
                           <SelectItem key={stage} value={stage}>
-                            {stage}
+                            <span className="font-medium">{stage}</span>
+                            <span className="text-muted-foreground ml-2">- {description}</span>
                           </SelectItem>
                         ))}
                     </SelectContent>

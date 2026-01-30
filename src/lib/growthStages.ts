@@ -2,7 +2,15 @@
 export type TimingBucket = 'PRE_PLANT' | 'AT_PLANTING' | 'IN_SEASON' | 'POST_HARVEST';
 
 // Crop types for growth stage selection
-export type CropType = 'corn' | 'soybeans' | 'wheat' | 'small_grains' | 'edible_beans' | 'other';
+export type CropType = 'corn' | 'soybeans' | 'dry_beans' | 'small_grains' | 'sunflowers' | 'other';
+
+// Legacy crop type mapping for backward compatibility
+export function normalizeCropType(cropType: string | undefined): CropType {
+  if (!cropType) return 'corn';
+  if (cropType === 'wheat') return 'small_grains';
+  if (cropType === 'edible_beans') return 'dry_beans';
+  return cropType as CropType;
+}
 
 // Timing bucket display info
 export const TIMING_BUCKET_INFO: Record<TimingBucket, { label: string; order: number }> = {
@@ -16,99 +24,157 @@ export const TIMING_BUCKET_INFO: Record<TimingBucket, { label: string; order: nu
 export const CROP_TYPE_LABELS: Record<CropType, string> = {
   corn: 'Corn',
   soybeans: 'Soybeans',
-  wheat: 'Wheat',
+  dry_beans: 'Dry Beans',
   small_grains: 'Small Grains',
-  edible_beans: 'Edible Beans',
+  sunflowers: 'Sunflowers',
   other: 'Other',
 };
 
-// Growth stages per crop type (with sort order)
-export const GROWTH_STAGES: Record<CropType, { stage: string; order: number }[]> = {
+// Growth stage with description
+interface GrowthStage {
+  stage: string;
+  description: string;
+  order: number;
+}
+
+// Growth stages per crop type (with sort order and descriptions)
+export const GROWTH_STAGES: Record<CropType, GrowthStage[]> = {
   corn: [
-    { stage: 'VE', order: 0 },
-    { stage: 'V2', order: 1 },
-    { stage: 'V3', order: 2 },
-    { stage: 'V4', order: 3 },
-    { stage: 'V5', order: 4 },
-    { stage: 'V6', order: 5 },
-    { stage: 'V7', order: 6 },
-    { stage: 'V8', order: 7 },
-    { stage: 'V9', order: 8 },
-    { stage: 'V10', order: 9 },
-    { stage: 'V12', order: 10 },
-    { stage: 'V14', order: 11 },
-    { stage: 'VT', order: 12 },
-    { stage: 'R1', order: 13 },
-    { stage: 'R2', order: 14 },
-    { stage: 'R3', order: 15 },
-    { stage: 'R4', order: 16 },
-    { stage: 'R5', order: 17 },
-    { stage: 'R6', order: 18 },
+    { stage: 'VE', description: 'Emergence', order: 0 },
+    { stage: 'V1', description: 'First leaf collar', order: 1 },
+    { stage: 'V2', description: 'Second leaf collar', order: 2 },
+    { stage: 'V3', description: 'Third leaf collar', order: 3 },
+    { stage: 'V4', description: 'Fourth leaf collar', order: 4 },
+    { stage: 'V5', description: 'Fifth leaf collar', order: 5 },
+    { stage: 'V6', description: 'Sixth leaf collar', order: 6 },
+    { stage: 'V7', description: 'Seventh leaf collar', order: 7 },
+    { stage: 'V8', description: 'Eighth leaf collar', order: 8 },
+    { stage: 'V9', description: 'Ninth leaf collar', order: 9 },
+    { stage: 'V10', description: 'Tenth leaf collar', order: 10 },
+    { stage: 'V11', description: 'Eleventh leaf collar', order: 11 },
+    { stage: 'V12', description: 'Twelfth leaf collar', order: 12 },
+    { stage: 'V13', description: 'Thirteenth leaf collar', order: 13 },
+    { stage: 'V14', description: 'Fourteenth leaf collar', order: 14 },
+    { stage: 'V15', description: 'Fifteenth leaf collar', order: 15 },
+    { stage: 'V16', description: 'Sixteenth leaf collar', order: 16 },
+    { stage: 'V17', description: 'Seventeenth leaf collar', order: 17 },
+    { stage: 'V18', description: 'Eighteenth leaf collar', order: 18 },
+    { stage: 'VT', description: 'Tasseling', order: 19 },
+    { stage: 'R1', description: 'Silking', order: 20 },
+    { stage: 'R2', description: 'Blister', order: 21 },
+    { stage: 'R3', description: 'Milk', order: 22 },
+    { stage: 'R4', description: 'Dough', order: 23 },
+    { stage: 'R5', description: 'Dent', order: 24 },
+    { stage: 'R6', description: 'Maturity', order: 25 },
   ],
   soybeans: [
-    { stage: 'VE', order: 0 },
-    { stage: 'VC', order: 1 },
-    { stage: 'V1', order: 2 },
-    { stage: 'V2', order: 3 },
-    { stage: 'V3', order: 4 },
-    { stage: 'V4', order: 5 },
-    { stage: 'V5', order: 6 },
-    { stage: 'V6', order: 7 },
-    { stage: 'R1', order: 8 },
-    { stage: 'R2', order: 9 },
-    { stage: 'R3', order: 10 },
-    { stage: 'R4', order: 11 },
-    { stage: 'R5', order: 12 },
-    { stage: 'R6', order: 13 },
-    { stage: 'R7', order: 14 },
-    { stage: 'R8', order: 15 },
+    { stage: 'VE', description: 'Emergence', order: 0 },
+    { stage: 'VC', description: 'Cotyledon', order: 1 },
+    { stage: 'V1', description: 'First node', order: 2 },
+    { stage: 'V2', description: 'Second node', order: 3 },
+    { stage: 'V3', description: 'Third node', order: 4 },
+    { stage: 'V4', description: 'Fourth node', order: 5 },
+    { stage: 'V5', description: 'Fifth node', order: 6 },
+    { stage: 'V6', description: 'Sixth node', order: 7 },
+    { stage: 'V7', description: 'Seventh node', order: 8 },
+    { stage: 'V8', description: 'Eighth node', order: 9 },
+    { stage: 'R1', description: 'Beginning bloom', order: 10 },
+    { stage: 'R2', description: 'Full bloom', order: 11 },
+    { stage: 'R3', description: 'Beginning pod', order: 12 },
+    { stage: 'R4', description: 'Full pod', order: 13 },
+    { stage: 'R5', description: 'Beginning seed', order: 14 },
+    { stage: 'R6', description: 'Full seed', order: 15 },
+    { stage: 'R7', description: 'Beginning maturity', order: 16 },
+    { stage: 'R8', description: 'Full maturity', order: 17 },
   ],
-  wheat: [
-    { stage: 'Emergence', order: 0 },
-    { stage: 'Tillering', order: 1 },
-    { stage: 'Jointing', order: 2 },
-    { stage: 'Flag Leaf', order: 3 },
-    { stage: 'Heading', order: 4 },
-    { stage: 'Flowering', order: 5 },
-    { stage: 'Grain Fill', order: 6 },
-    { stage: 'Maturity', order: 7 },
+  dry_beans: [
+    { stage: 'VE', description: 'Emergence', order: 0 },
+    { stage: 'VC', description: 'Unifoliate', order: 1 },
+    { stage: 'V1', description: 'First trifoliate', order: 2 },
+    { stage: 'V2', description: 'Second trifoliate', order: 3 },
+    { stage: 'V3', description: 'Third trifoliate', order: 4 },
+    { stage: 'V4', description: 'Fourth trifoliate', order: 5 },
+    { stage: 'V5', description: 'Flower buds visible', order: 6 },
+    { stage: 'R1', description: 'Beginning bloom', order: 7 },
+    { stage: 'R2', description: 'Beginning pod (pin bean)', order: 8 },
+    { stage: 'R3', description: '50% bloom', order: 9 },
+    { stage: 'R4', description: 'Full pod', order: 10 },
+    { stage: 'R5', description: 'Beginning seed', order: 11 },
+    { stage: 'R6', description: '50% seed', order: 12 },
+    { stage: 'R7', description: 'Full seed', order: 13 },
+    { stage: 'R8', description: 'Beginning maturity', order: 14 },
+    { stage: 'R8.5', description: 'Mid maturity', order: 15 },
+    { stage: 'R9', description: 'Full maturity', order: 16 },
   ],
   small_grains: [
-    { stage: 'Emergence', order: 0 },
-    { stage: 'Tillering', order: 1 },
-    { stage: 'Jointing', order: 2 },
-    { stage: 'Flag Leaf', order: 3 },
-    { stage: 'Heading', order: 4 },
-    { stage: 'Flowering', order: 5 },
-    { stage: 'Grain Fill', order: 6 },
-    { stage: 'Maturity', order: 7 },
+    { stage: 'F1', description: 'One shoot', order: 0 },
+    { stage: 'F2', description: 'Tillering begins', order: 1 },
+    { stage: 'F3', description: 'Tillers formed', order: 2 },
+    { stage: 'F4', description: 'Leaf sheaths lengthen', order: 3 },
+    { stage: 'F5', description: 'Leaf sheaths strongly erected', order: 4 },
+    { stage: 'F6', description: 'First node visible', order: 5 },
+    { stage: 'F7', description: 'Second node visible', order: 6 },
+    { stage: 'F8', description: 'Last leaf just visible', order: 7 },
+    { stage: 'F9', description: 'Ligule of last leaf visible', order: 8 },
+    { stage: 'F10', description: 'In boot', order: 9 },
+    { stage: 'F10.1', description: 'Heading', order: 10 },
+    { stage: 'F10.5', description: 'Flowering', order: 11 },
+    { stage: 'F10.5.1', description: 'Beginning flowering', order: 12 },
+    { stage: 'F10.5.2', description: 'Flowering complete', order: 13 },
+    { stage: 'F11', description: 'Ripening', order: 14 },
+    { stage: 'F11.1', description: 'Milk', order: 15 },
+    { stage: 'F11.2', description: 'Soft dough', order: 16 },
+    { stage: 'F11.3', description: 'Hard dough', order: 17 },
+    { stage: 'F11.4', description: 'Harvest ready', order: 18 },
   ],
-  edible_beans: [
-    { stage: 'VE', order: 0 },
-    { stage: 'V1', order: 1 },
-    { stage: 'V2', order: 2 },
-    { stage: 'V3', order: 3 },
-    { stage: 'V4', order: 4 },
-    { stage: 'V5', order: 5 },
-    { stage: 'R1', order: 6 },
-    { stage: 'R2', order: 7 },
-    { stage: 'R3', order: 8 },
-    { stage: 'R4', order: 9 },
-    { stage: 'R5', order: 10 },
+  sunflowers: [
+    { stage: 'VE', description: 'Emergence', order: 0 },
+    { stage: 'V1', description: 'First true leaves', order: 1 },
+    { stage: 'V2', description: 'Two true leaves', order: 2 },
+    { stage: 'V3', description: 'Three true leaves', order: 3 },
+    { stage: 'V4', description: 'Four true leaves', order: 4 },
+    { stage: 'V5', description: 'Five true leaves', order: 5 },
+    { stage: 'V6', description: 'Six true leaves', order: 6 },
+    { stage: 'V8', description: 'Eight true leaves', order: 7 },
+    { stage: 'V10', description: 'Ten true leaves', order: 8 },
+    { stage: 'V12', description: 'Twelve true leaves', order: 9 },
+    { stage: 'V14', description: 'Fourteen true leaves', order: 10 },
+    { stage: 'V16', description: 'Sixteen true leaves', order: 11 },
+    { stage: 'R1', description: 'Bud visible', order: 12 },
+    { stage: 'R2', description: 'Bud elongation', order: 13 },
+    { stage: 'R3', description: 'Bud opening', order: 14 },
+    { stage: 'R4', description: 'Inflorescence begins', order: 15 },
+    { stage: 'R5', description: 'Beginning flowering', order: 16 },
+    { stage: 'R5.1', description: '10% flowering', order: 17 },
+    { stage: 'R5.5', description: '50% flowering', order: 18 },
+    { stage: 'R5.9', description: '90% flowering', order: 19 },
+    { stage: 'R6', description: 'Flowering complete', order: 20 },
+    { stage: 'R7', description: 'Back of head pale yellow', order: 21 },
+    { stage: 'R8', description: 'Back of head yellow', order: 22 },
+    { stage: 'R9', description: 'Physiological maturity', order: 23 },
   ],
   other: [
-    { stage: 'Early', order: 0 },
-    { stage: 'Mid', order: 1 },
-    { stage: 'Late', order: 2 },
+    { stage: 'Early', description: 'Early season', order: 0 },
+    { stage: 'Mid', description: 'Mid season', order: 1 },
+    { stage: 'Late', description: 'Late season', order: 2 },
   ],
 };
 
 // Get stage order for sorting
-export function getStageOrder(cropType: CropType | undefined, stage: string | undefined): number {
+export function getStageOrder(cropType: CropType | string | undefined, stage: string | undefined): number {
   if (!stage) return 999;
-  const stages = GROWTH_STAGES[cropType || 'corn'];
+  const normalizedCropType = normalizeCropType(cropType);
+  const stages = GROWTH_STAGES[normalizedCropType];
   const found = stages.find(s => s.stage === stage);
   return found?.order ?? 999;
+}
+
+// Get stage with description for display
+export function getStageDisplay(cropType: CropType | string | undefined, stage: string): string {
+  const normalizedCropType = normalizeCropType(cropType);
+  const stages = GROWTH_STAGES[normalizedCropType];
+  const found = stages.find(s => s.stage === stage);
+  return found ? `${stage} - ${found.description}` : stage;
 }
 
 // Get timing display text
@@ -152,11 +218,12 @@ export function inferTimingBucket(name: string): TimingBucket {
 }
 
 // Infer growth stage from pass name
-export function inferGrowthStage(name: string, cropType: CropType | undefined): { start?: string; end?: string } {
-  const stages = GROWTH_STAGES[cropType || 'corn'];
+export function inferGrowthStage(name: string, cropType: CropType | string | undefined): { start?: string; end?: string } {
+  const normalizedCropType = normalizeCropType(cropType);
+  const stages = GROWTH_STAGES[normalizedCropType];
   
   // Check for range pattern (e.g., "V4-V6" or "V4 to V6")
-  const rangeMatch = name.match(/([VR]\d+)\s*[-–—to]\s*([VR]\d+)/i);
+  const rangeMatch = name.match(/([VRF][\d.]+)\s*[-–—to]\s*([VRF][\d.]+)/i);
   if (rangeMatch) {
     const start = stages.find(s => s.stage.toLowerCase() === rangeMatch[1].toLowerCase())?.stage;
     const end = stages.find(s => s.stage.toLowerCase() === rangeMatch[2].toLowerCase())?.stage;
