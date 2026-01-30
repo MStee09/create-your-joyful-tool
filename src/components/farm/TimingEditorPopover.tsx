@@ -9,13 +9,15 @@ import { cn } from '@/lib/utils';
 interface TimingEditorPopoverProps {
   timing: ApplicationTiming;
   cropType?: CropType;
+  cropName?: string;
   onUpdate: (timing: ApplicationTiming) => void;
   children?: React.ReactNode;
 }
 
 export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
   timing,
-  cropType = 'corn',
+  cropType,
+  cropName,
   onUpdate,
   children,
 }) => {
@@ -24,7 +26,7 @@ export const TimingEditorPopover: React.FC<TimingEditorPopoverProps> = ({
   const [stageStart, setStageStart] = useState(timing.growthStageStart || '');
   const [stageEnd, setStageEnd] = useState(timing.growthStageEnd || '');
 
-  const normalizedCropType = normalizeCropType(cropType);
+  const normalizedCropType = normalizeCropType(cropType, cropName);
   const stages = GROWTH_STAGES[normalizedCropType];
 
   const handleBucketChange = (newBucket: TimingBucket) => {

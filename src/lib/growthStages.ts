@@ -4,12 +4,40 @@ export type TimingBucket = 'PRE_PLANT' | 'AT_PLANTING' | 'IN_SEASON' | 'POST_HAR
 // Crop types for growth stage selection
 export type CropType = 'corn' | 'soybeans' | 'dry_beans' | 'small_grains' | 'sunflowers' | 'other';
 
-// Legacy crop type mapping for backward compatibility
-export function normalizeCropType(cropType: string | undefined): CropType {
-  if (!cropType) return 'corn';
-  if (cropType === 'wheat') return 'small_grains';
-  if (cropType === 'edible_beans') return 'dry_beans';
-  return cropType as CropType;
+// Infer crop type from crop name
+export function inferCropTypeFromName(name: string): CropType {
+  const lower = name.toLowerCase();
+  
+  if (lower.includes('corn') || lower.includes('maize')) return 'corn';
+  if (lower.includes('soybean') || lower.includes('soy bean')) return 'soybeans';
+  if (lower.includes('edible bean') || lower.includes('dry bean') || 
+      lower.includes('black turtle') || lower.includes('field pea') || 
+      lower.includes('small red') || lower.includes('pinto') ||
+      lower.includes('navy bean') || lower.includes('kidney') ||
+      lower.includes('bean')) return 'dry_beans';
+  if (lower.includes('wheat') || lower.includes('barley') || 
+      lower.includes('oat') || lower.includes('rye')) return 'small_grains';
+  if (lower.includes('sunflower')) return 'sunflowers';
+  
+  return 'other';
+}
+
+// Legacy crop type mapping for backward compatibility - now with name inference fallback
+export function normalizeCropType(cropType: string | undefined, cropName?: string): CropType {
+  // If cropType is explicitly set, use it (with legacy mapping)
+  if (cropType) {
+    if (cropType === 'wheat') return 'small_grains';
+    if (cropType === 'edible_beans') return 'dry_beans';
+    return cropType as CropType;
+  }
+  
+  // If no cropType but we have a name, infer from name
+  if (cropName) {
+    return inferCropTypeFromName(cropName);
+  }
+  
+  // Default fallback
+  return 'corn';
 }
 
 // Timing bucket display info

@@ -283,6 +283,7 @@ export const PassCard: React.FC<PassCardProps> = ({
                         <TimingEditorPopover
                           timing={timing}
                           cropType={crop.cropType}
+                          cropName={crop.name}
                           onUpdate={onUpdateTiming}
                         >
                           <button
