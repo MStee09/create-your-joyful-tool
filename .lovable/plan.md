@@ -1,83 +1,99 @@
 
-# Add Per-Product Applied Nutrient Analysis to PDF Export
+# Add Product Sorting Within Pass Coverage Groups
 
 ## Overview
-Add per-product NPKS nutrient contribution badges to each product row in the PDF export view, matching the interactive crop planning view. This will show the applied nutrients (based on product analysis × rate) for each product line item.
+Sort products within each pass by **% of acres applied** (primary, descending) and then by **application cost** (secondary, descending). This ensures the most impactful products appear first within each coverage tier.
 
-## Current State
-- **Interactive View** (`ProductRowReadable.tsx`): Shows nutrient badges like "N 20.7" for each product based on `calculateApplicationNutrients()`
-- **PDF Export View** (`CropPlanPrintView.tsx`): Only shows the fertilizer grade (e.g., "20-0-0") but NOT the applied nutrient contribution per product
+## Current Behavior
+- Coverage groups are already sorted by acreage percentage (100% → 60% → 25%)
+- Products within each group appear in the order they were added (no secondary sorting)
 
-## What Will Change
-
-Each product row in the PDF export will gain a new "Applied" column showing the calculated NPKS contribution in lbs/acre:
-
-```text
-Before:
-| Product              | Rate       | Acres % | $/Acre | Role  |
-| CheckMate N 20-0-0   | 11.00 gal  | 100%    | $21.23 | Macro |
-
-After:
-| Product              | Rate       | Acres % | $/Acre | Applied (lbs/ac) | Role  |
-| CheckMate N 20-0-0   | 11.00 gal  | 100%    | $21.23 | N 20.7           | Macro |
-```
-
-Only non-zero nutrients (>0.1 lbs/ac) will be displayed to reduce clutter.
+## Proposed Change
+Sort applications within each coverage group by their **cost per treated acre** (descending), so the most expensive products appear first within each tier.
 
 ---
 
 ## Technical Implementation
 
-### File: `src/components/farm/CropPlanPrintView.tsx`
+### File: `src/lib/cropCalculations.ts`
 
-**1. Import the calculation function:**
+**Update `calculateCoverageGroups()` function (~line 280-291):**
+
+Before returning coverage groups, sort the applications array within each group by cost:
+
 ```typescript
-import { calculateApplicationNutrients } from '@/lib/calculations';
+// Convert to array and sort by acres descending
+return Array.from(groupMap.entries())
+  .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+    acresPercentage,
+    tierLabel: getTierLabel(acresPercentage),
+    // Sort applications by cost (descending) within each group
+    applications: apps.sort((a, b) => {
+      const costA = calculateApplicationCostPerAcre(a, products.find(p => p.id === a.productId));
+      const costB = calculateApplicationCostPerAcre(b, products.find(p => p.id === b.productId));
+      return costB - costA; // Descending: highest cost first
+    }),
+    costPerTreatedAcre: treatedCostSum,
+    costPerFieldAcre: fieldCostSum,
+    acresTreated: acresTreatedSum,
+  }))
+  .sort((a, b) => b.acresPercentage - a.acresPercentage);
 ```
 
-**2. Add a helper to format applied nutrients:**
+**Update `calculateCoverageGroupsWithPriceBook()` function (~line 488-499):**
+
+Same pattern, but uses price-book-aware cost calculation:
+
 ```typescript
-const formatAppliedNutrients = (nutrients: { n: number; p: number; k: number; s: number }): string => {
-  const parts: string[] = [];
-  if (nutrients.n > 0.1) parts.push(`N ${nutrients.n.toFixed(1)}`);
-  if (nutrients.p > 0.1) parts.push(`P ${nutrients.p.toFixed(1)}`);
-  if (nutrients.k > 0.1) parts.push(`K ${nutrients.k.toFixed(1)}`);
-  if (nutrients.s > 0.1) parts.push(`S ${nutrients.s.toFixed(1)}`);
-  return parts.join(' · ') || '—';
-};
+return Array.from(groupMap.entries())
+  .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum }]) => ({
+    acresPercentage,
+    tierLabel: getTierLabel(acresPercentage),
+    // Sort applications by cost (descending) within each group
+    applications: apps.sort((a, b) => {
+      const costA = calculateApplicationCostPerAcreWithPriceBook(
+        a, products.find(p => p.id === a.productId),
+        priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+      );
+      const costB = calculateApplicationCostPerAcreWithPriceBook(
+        b, products.find(p => p.id === b.productId),
+        priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+      );
+      return costB - costA; // Descending: highest cost first
+    }),
+    costPerTreatedAcre: treatedCostSum,
+    costPerFieldAcre: fieldCostSum,
+    acresTreated: acresTreatedSum,
+  }))
+  .sort((a, b) => b.acresPercentage - a.acresPercentage);
 ```
 
-**3. Add new table column header:**
-```tsx
-<th className="px-4 py-2 text-right">Applied (lbs/ac)</th>
-```
+---
 
-**4. Calculate and display applied nutrients per product:**
-```tsx
-// Inside the product row mapping:
-const appNutrients = calculateApplicationNutrients(
-  app.rate,
-  app.rateUnit,
-  analysisData,
-  product?.form || 'liquid',
-  product?.densityLbsPerGal
-);
+## Result
 
-// New table cell:
-<td className="px-4 py-2 text-right text-xs">
-  {formatAppliedNutrients(appNutrients)}
-</td>
+Products in passes will display in this order:
+
+```text
+PASS 1: STARTER
+├─ Core (100% · 132 ac)
+│   ├─ SOP $8.50/ac        ← highest cost in Core
+│   └─ KCL $4.90/ac        ← lower cost in Core
+├─ Selective (60% · 79 ac)
+│   └─ Product X $6.00/ac
+└─ Trial (25% · 33 ac)
+    └─ AquaYield $0.00/ac
 ```
 
 ---
 
 ## Summary
 
-| Change | Description |
-|--------|-------------|
-| New column | "Applied (lbs/ac)" added to the products table in PDF |
-| Calculation | Uses existing `calculateApplicationNutrients()` function |
-| Display format | Compact inline format: "N 20.7 · S 4.0" |
-| Threshold | Only shows nutrients > 0.1 lbs/ac to reduce noise |
+| Change | Location |
+|--------|----------|
+| Sort applications by cost within each coverage group | `calculateCoverageGroups()` |
+| Sort applications by cost (price-book-aware) within each coverage group | `calculateCoverageGroupsWithPriceBook()` |
+| Primary sort maintained | Groups by acreage % (descending) |
+| Secondary sort added | Products by cost (descending) within each group |
 
-This ensures PDF exports match the interactive view, giving users a complete operational record with per-product nutrient contributions.
+This makes the most expensive products at each coverage level immediately visible, enabling faster budget review and decision-making.
