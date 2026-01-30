@@ -1,7 +1,7 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CropType } from '@/types/farm';
-import { CROP_TYPE_LABELS } from '@/lib/growthStages';
+import { CROP_TYPE_LABELS, normalizeCropType } from '@/lib/growthStages';
 
 interface CropTypeSelectorProps {
   value?: CropType;
@@ -14,8 +14,11 @@ export const CropTypeSelector: React.FC<CropTypeSelectorProps> = ({
   onChange,
   className,
 }) => {
+  // Normalize legacy crop types for display
+  const normalizedValue = value ? normalizeCropType(value) : '';
+  
   return (
-    <Select value={value || ''} onValueChange={(v) => onChange(v as CropType)}>
+    <Select value={normalizedValue} onValueChange={(v) => onChange(v as CropType)}>
       <SelectTrigger className={className}>
         <SelectValue placeholder="Select crop type" />
       </SelectTrigger>
