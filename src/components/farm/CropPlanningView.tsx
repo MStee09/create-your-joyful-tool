@@ -116,14 +116,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         if (bucketOrderA !== bucketOrderB) return bucketOrderA - bucketOrderB;
         
         if ((a.timingBucket || 'IN_SEASON') === 'IN_SEASON') {
-          const stageOrderA = getStageOrder(crop.cropType, a.growthStageStart);
-          const stageOrderB = getStageOrder(crop.cropType, b.growthStageStart);
+          const stageOrderA = getStageOrder(crop.cropType, a.growthStageStart, crop.name);
+          const stageOrderB = getStageOrder(crop.cropType, b.growthStageStart, crop.name);
           if (stageOrderA !== stageOrderB) return stageOrderA - stageOrderB;
         }
         
         return a.order - b.order;
       });
-  }, [crop.applicationTimings, crop.cropType]);
+  }, [crop.applicationTimings, crop.cropType, crop.name]);
 
   // Group timings by phase
   const timingsByPhase = useMemo(() => {

@@ -10,7 +10,7 @@ import {
   getApplicationAcresPercentage,
   PriceBookContext 
 } from '@/lib/cropCalculations';
-import { TIMING_BUCKET_INFO } from '@/lib/growthStages';
+import { TIMING_BUCKET_INFO, getStageOrder } from '@/lib/growthStages';
 import { calculateApplicationNutrients } from '@/lib/calculations';
 interface CropPlanPrintViewProps {
   crop: Crop;
@@ -67,7 +67,7 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
     [crop, products, priceBookContext]
   );
 
-  // Sort timings by bucket then order
+  // Sort timings by bucket then growth stage then order
   const sortedTimings = useMemo(() => {
     return crop.applicationTimings
       .slice()
@@ -75,9 +75,16 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
         const bucketOrderA = TIMING_BUCKET_INFO[a.timingBucket || 'IN_SEASON'].order;
         const bucketOrderB = TIMING_BUCKET_INFO[b.timingBucket || 'IN_SEASON'].order;
         if (bucketOrderA !== bucketOrderB) return bucketOrderA - bucketOrderB;
+        
+        if ((a.timingBucket || 'IN_SEASON') === 'IN_SEASON') {
+          const stageOrderA = getStageOrder(crop.cropType, a.growthStageStart, crop.name);
+          const stageOrderB = getStageOrder(crop.cropType, b.growthStageStart, crop.name);
+          if (stageOrderA !== stageOrderB) return stageOrderA - stageOrderB;
+        }
+        
         return a.order - b.order;
       });
-  }, [crop.applicationTimings]);
+  }, [crop.applicationTimings, crop.cropType, crop.name]);
 
   // Group timings by phase
   const timingsByPhase = useMemo(() => {
