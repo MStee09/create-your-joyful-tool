@@ -388,23 +388,45 @@ export const PassCard: React.FC<PassCardProps> = ({
               No products in this timing yet
             </p>
           ) : (
-            summary.coverageGroups.map(group => (
+            summary.coverageGroups.map(group => {
+              const hasGroupNutrients = group.nutrients.n > 0.1 || group.nutrients.p > 0.1 || 
+                                        group.nutrients.k > 0.1 || group.nutrients.s > 0.1;
+              return (
               <div key={group.acresPercentage} className="space-y-2">
                 {/* Group Header - only show if multiple groups */}
                 {summary.coverageGroups.length > 1 && (
                   <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        'px-2 py-0.5 rounded text-xs font-semibold',
-                        group.tierLabel === 'Core' ? 'bg-emerald-500/15 text-emerald-600' :
-                        group.tierLabel === 'Selective' ? 'bg-amber-500/15 text-amber-600' :
-                        'bg-violet-500/15 text-violet-600'
-                      )}>
-                        {group.tierLabel}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatNumber(group.acresPercentage, 0)}% · {formatNumber(group.acresTreated, 0)} ac
-                      </span>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'px-2 py-0.5 rounded text-xs font-semibold',
+                          group.tierLabel === 'Core' ? 'bg-emerald-500/15 text-emerald-600' :
+                          group.tierLabel === 'Selective' ? 'bg-amber-500/15 text-amber-600' :
+                          'bg-violet-500/15 text-violet-600'
+                        )}>
+                          {group.tierLabel}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatNumber(group.acresPercentage, 0)}% · {formatNumber(group.acresTreated, 0)} ac
+                        </span>
+                      </div>
+                      {/* Tier-level nutrient analysis */}
+                      {hasGroupNutrients && (
+                        <div className="flex items-center gap-1.5 text-xs ml-1">
+                          {group.nutrients.n > 0.1 && (
+                            <span className="text-emerald-600">N {formatNumber(group.nutrients.n, 1)}</span>
+                          )}
+                          {group.nutrients.p > 0.1 && (
+                            <span className="text-blue-600">P {formatNumber(group.nutrients.p, 1)}</span>
+                          )}
+                          {group.nutrients.k > 0.1 && (
+                            <span className="text-amber-600">K {formatNumber(group.nutrients.k, 1)}</span>
+                          )}
+                          {group.nutrients.s > 0.1 && (
+                            <span className="text-purple-600">S {formatNumber(group.nutrients.s, 1)}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <span className="text-sm text-primary font-semibold">
@@ -447,7 +469,7 @@ export const PassCard: React.FC<PassCardProps> = ({
                   })}
                 </div>
               </div>
-            ))
+            );})
           )}
           
           <button
