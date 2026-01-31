@@ -3,7 +3,7 @@
 // ============================================================================
 
 import type { Season, Product, InventoryItem } from '@/types/farm';
-import type { Order } from '@/types/orderInvoice';
+import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage } from '@/lib/readinessEngine';
 
@@ -21,7 +21,7 @@ export function calculateReadinessSummary(
   season: Season | null,
   products: Product[],
   inventory: InventoryItem[],
-  orders: Order[] = []
+  purchases: SimplePurchase[] = []
 ): ReadinessSummary {
   const plannedUsage = calculatePlannedUsage(season, products);
 
@@ -39,26 +39,27 @@ export function calculateReadinessSummary(
     };
   });
 
+  // Adapt SimplePurchase to work with the readiness engine's order accessors
   const readiness = computeReadiness({
     planned: plannedForEngine,
     inventory,
-    orders,
+    orders: purchases,
     inventoryAccessors: {
       getProductId: (row: InventoryItem) => row.productId,
       getQty: (row: InventoryItem) => row.quantity,
       getContainerCount: (row: InventoryItem) => row.containerCount,
     },
     orderAccessors: {
-      orders,
-      getOrderId: (o: Order) => o.id,
-      getOrderStatus: (o: Order) => o.status,
+      orders: purchases,
+      getOrderId: (p: SimplePurchase) => p.id,
+      getOrderStatus: (p: SimplePurchase) => p.status,
       getVendorName: () => undefined, // dashboard doesn't need vendor names
-      getLines: (o: Order) => o.lineItems || [],
-      getLineProductId: (l: any) => l.productId,
-      // IMPORTANT: fallback if remainingQuantity isn't stored
-      getLineRemainingQty: (l: any) =>
-        l.remainingQuantity ?? (Number(l.orderedQuantity || 0) - Number(l.receivedQuantity || 0)),
-      getLineUnit: (l: any) => l.unit,
+      getLines: (p: SimplePurchase) => p.lines || [],
+      getLineProductId: (l: SimplePurchaseLine) => l.productId,
+      // For 'ordered' purchases, the remaining qty is the total quantity (not yet received)
+      // For 'received' purchases, they're already in inventory, so 0 remaining on order
+      getLineRemainingQty: (l: SimplePurchaseLine) => l.totalQuantity || (l.quantity * (l.packageSize || 1)),
+      getLineUnit: (l: SimplePurchaseLine) => l.packageUnit || l.normalizedUnit,
     },
   });
 
