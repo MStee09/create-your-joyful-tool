@@ -80,6 +80,8 @@ import { TemplatesView } from './components/farm/TemplatesView';
 import { AlertsView } from './components/farm/AlertsView';
 import { MarketPricesView } from './components/farm/MarketPricesView';
 import { AssistantView } from './components/farm/AssistantView';
+import { PurchasesView } from './components/farm/PurchasesView';
+import { PriceHistoryView } from './components/farm/PriceHistoryView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -138,53 +140,14 @@ const Sidebar: React.FC<{
   userEmail,
   onSignOut,
 }) => {
-  type Mode = 'plan' | 'buy' | 'inventory' | 'review';
-
-  const viewToMode = (view: string): Mode => {
-    if (['dashboard', 'crops'].includes(view)) return 'plan';
-
-    if (
-      view === 'buy-workflow' ||
-      view === 'procurement' ||
-      view === 'vendor-spend' ||
-      view === 'orders' ||
-      view === 'plan-readiness' ||
-      view === 'commodity-specs' ||
-      view === 'bid-events' ||
-      view === 'price-book' ||
-      view.startsWith('bid-event-')
-    ) return 'buy';
-
-    if (['products', 'vendors', 'inventory'].includes(view)) return 'inventory';
-    return 'review';
-  };
-
-  const mode = viewToMode(activeView);
-
-  const ModeButton = ({ id, label, icon: Icon, defaultView }: { id: Mode; label: string; icon: React.ElementType; defaultView: string }) => {
-    const active = mode === id;
-    return (
-      <button
-        onClick={() => onViewChange(defaultView)}
-        className={
-          'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ' +
-          (active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white')
-        }
-      >
-        <Icon className="w-5 h-5" />
-        <span className="font-semibold">{label}</span>
-      </button>
-    );
-  };
-
-  const SubButton = ({ id, label, icon: Icon }: { id: string; label: string; icon: React.ElementType }) => {
+  const NavButton = ({ id, label, icon: Icon }: { id: string; label: string; icon: React.ElementType }) => {
     const active = activeView === id;
     return (
       <button
         onClick={() => onViewChange(id)}
         className={
-          'w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm ' +
-          (active ? 'bg-stone-800 text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white')
+          'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ' +
+          (active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white')
         }
       >
         <Icon className="w-4 h-4" />
@@ -203,7 +166,7 @@ const Sidebar: React.FC<{
           </div>
           <div>
             <h1 className="font-bold text-lg tracking-tight">FarmCalc</h1>
-            <p className="text-xs text-stone-400">Inputs Command Center</p>
+            <p className="text-xs text-stone-400">Input Planning</p>
           </div>
         </div>
       </div>
@@ -247,67 +210,33 @@ const Sidebar: React.FC<{
         </select>
       </div>
 
-      {/* Mode Buttons */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        <div className="space-y-1">
-          <ModeButton id="plan" label="Plan" icon={ClipboardList} defaultView="dashboard" />
-          <ModeButton id="buy" label="Buy" icon={ShoppingCart} defaultView="buy-workflow" />
-          <ModeButton id="inventory" label="Inventory" icon={Warehouse} defaultView="inventory" />
-          <ModeButton id="review" label="Review" icon={BarChart3} defaultView="exports" />
+      {/* Navigation */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {/* PLAN section */}
+        <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Plan</div>
+        <NavButton id="dashboard" label="Dashboard" icon={BarChart3} />
+        <NavButton id="crops" label="Crop Plans" icon={Leaf} />
+        <NavButton id="procurement" label="Demand Summary" icon={ClipboardList} />
+
+        {/* PRODUCTS section */}
+        <div className="pt-4 mt-4 border-t border-stone-700">
+          <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Products</div>
+          <NavButton id="products" label="Product Catalog" icon={FlaskConical} />
+          <NavButton id="vendors" label="Vendors" icon={Building2} />
+          <NavButton id="price-history" label="Price History" icon={DollarSign} />
         </div>
 
-        {/* Sub navigation based on mode */}
-        <div className="pt-4 border-t border-stone-700 space-y-1">
-          {mode === 'plan' && (
-            <>
-              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Plan</div>
-              <SubButton id="dashboard" label="Dashboard" icon={BarChart3} />
-              <SubButton id="crops" label="Crop Plans" icon={Leaf} />
-            </>
-          )}
+        {/* INVENTORY section */}
+        <div className="pt-4 mt-4 border-t border-stone-700">
+          <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Inventory</div>
+          <NavButton id="inventory" label="On Hand" icon={Warehouse} />
+          <NavButton id="purchases" label="Purchases" icon={ShoppingCart} />
+        </div>
 
-          {mode === 'buy' && (
-            <>
-              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Buy</div>
-              <SubButton id="buy-workflow" label="Buy Workflow" icon={ShoppingCart} />
-              <SubButton id="plan-readiness" label="Plan Readiness" icon={ClipboardCheck} />
-              <SubButton id="orders" label="Orders" icon={Truck} />
-
-              <div className="pt-3 mt-3 border-t border-stone-700">
-                <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Advanced</div>
-                <SubButton id="procurement" label="Demand Rollup" icon={ClipboardList} />
-                <SubButton id="bid-events" label="Bid Events" icon={FileText} />
-                <SubButton id="price-book" label="Price Book" icon={FlaskConical} />
-                <SubButton id="vendor-spend" label="Vendor Spend" icon={BarChart3} />
-                <SubButton id="commodity-specs" label="Commodity Specs" icon={FileText} />
-              </div>
-            </>
-          )}
-
-          {mode === 'inventory' && (
-            <>
-              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Inventory</div>
-              <SubButton id="inventory" label="Inventory" icon={Warehouse} />
-              <SubButton id="products" label="Products" icon={FlaskConical} />
-              <SubButton id="vendors" label="Vendors" icon={Building2} />
-            </>
-          )}
-
-          {mode === 'review' && (
-            <>
-              <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
-              <SubButton id="alerts" label="Alerts" icon={Bell} />
-              <SubButton id="assistant" label="Assistant" icon={BarChart3} />
-              <SubButton id="variance" label="Variance (Product)" icon={BarChart3} />
-              <SubButton id="variance-by-pass" label="Variance (Crop/Pass)" icon={ClipboardList} />
-              <SubButton id="changes" label="What Changed" icon={FileText} />
-              <SubButton id="market-prices" label="Market Prices" icon={DollarSign} />
-              <SubButton id="import" label="Import Center" icon={Upload} />
-              <SubButton id="templates" label="Templates" icon={StickyNote} />
-              <SubButton id="exports" label="Export" icon={FileSpreadsheet} />
-              <SubButton id="settings" label="Settings" icon={Settings} />
-            </>
-          )}
+        {/* Bottom section */}
+        <div className="pt-4 mt-4 border-t border-stone-700">
+          <NavButton id="assistant" label="Assistant" icon={StickyNote} />
+          <NavButton id="settings" label="Settings" icon={Settings} />
         </div>
       </nav>
 
@@ -1452,6 +1381,26 @@ const AppContent: React.FC = () => {
         );
       case 'market-prices':
         return <MarketPricesView />;
+      case 'purchases':
+        return (
+          <PurchasesView
+            orders={state.orders || []}
+            vendors={state.vendors}
+            products={state.productMasters || []}
+            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+            onUpdateOrders={updateOrders}
+          />
+        );
+      case 'price-history':
+        return (
+          <PriceHistoryView
+            priceRecords={state.priceRecords || []}
+            products={state.productMasters || []}
+            vendors={state.vendors}
+            currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+            onAddPriceRecord={addPriceRecord}
+          />
+        );
       case 'assistant':
         return (
           <AssistantView
