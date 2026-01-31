@@ -857,6 +857,7 @@ const AppContent: React.FC = () => {
     priceBook,
     orders,
     invoices,
+    priceRecords,
     currentSeasonId,
     loading: supabaseLoading,
     error: supabaseError,
@@ -877,6 +878,7 @@ const AppContent: React.FC = () => {
     addOrder,
     updateInvoices,
     addInvoice,
+    addPriceRecord,
     refetch,
   } = supabaseData;
 
@@ -1394,9 +1396,9 @@ const AppContent: React.FC = () => {
       case 'price-history':
         return (
           <PriceHistoryView
-            priceRecords={state.priceRecords || []}
-            products={state.productMasters || []}
-            vendors={state.vendors}
+            priceRecords={priceRecords || []}
+            products={productMasters || []}
+            vendors={vendors}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPriceRecord={addPriceRecord}
           />
