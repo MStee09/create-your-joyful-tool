@@ -92,6 +92,12 @@ export default {
           DEFAULT: "hsl(var(--purple))",
           100: "hsl(var(--purple-100))",
         },
+        sky: {
+          DEFAULT: "hsl(var(--sky))",
+          100: "hsl(var(--sky-100))",
+          500: "hsl(var(--sky-500))",
+          700: "hsl(var(--sky-700))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
