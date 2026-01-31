@@ -51,12 +51,16 @@ import type { ProductPurpose, ProductRole, RoleSuggestion } from '@/types/produc
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
+import { ProductPriceHistory } from './ProductPriceHistory';
 interface ProductDetailViewProps {
   product: ProductMaster;
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
   inventory: InventoryItem[];
   commoditySpecs?: CommoditySpec[];
+  priceRecords?: PriceRecord[];
+  currentSeasonYear?: number;
   onUpdateProduct: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
@@ -64,6 +68,7 @@ interface ProductDetailViewProps {
   onDeleteProduct: (productId: string) => void;
   onBack: () => void;
   onNavigateToVendor?: (vendorId: string) => void;
+  onAddPriceRecord?: (record: NewPriceRecord) => Promise<any>;
 }
 
 export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
@@ -72,6 +77,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   vendors,
   inventory,
   commoditySpecs = [],
+  priceRecords = [],
+  currentSeasonYear = new Date().getFullYear(),
   onUpdateProduct,
   onUpdateOfferings,
   onUpdateInventory,
@@ -79,6 +86,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onDeleteProduct,
   onBack,
   onNavigateToVendor,
+  onAddPriceRecord,
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'purpose' | 'notes'>('details');
   const [editingDensity, setEditingDensity] = useState(false);
@@ -1378,6 +1386,17 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               onNavigateToVendor={onNavigateToVendor}
             />
           </div>
+
+          {/* Price History */}
+          {onAddPriceRecord && (
+            <ProductPriceHistory
+              product={product}
+              priceRecords={priceRecords}
+              vendors={vendors}
+              currentSeasonYear={currentSeasonYear}
+              onAddPriceRecord={onAddPriceRecord}
+            />
+          )}
 
           {/* Purpose & Roles Card */}
           <div className="bg-card rounded-xl border border-border p-6">

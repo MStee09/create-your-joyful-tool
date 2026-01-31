@@ -27,3 +27,5 @@ export { MarketPricesView } from './MarketPricesView';
 export { AssistantView } from './AssistantView';
 export { CropPlanPrintView } from './CropPlanPrintView';
 export { ExportPdfButton } from './ExportPdfButton';
+export { AddProductToVendorModal } from './AddProductToVendorModal';
+export { ProductPriceHistory } from './ProductPriceHistory';
