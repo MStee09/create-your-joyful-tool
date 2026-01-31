@@ -1,90 +1,136 @@
 
 
-# Update Small Grains Feekes Scale with Groupings
+# Add Total Physical Quantity to Pass Headers
 
 ## Overview
-Based on your Feekes scale diagram, I'll:
-1. Fix the F8 and F9 descriptions ("Flag leaf" instead of "Last leaf")
-2. Add Feekes phase groupings to organize the stages visually in dropdowns
+Add a display of total physical product volume/weight at the pass level, showing how much actual product is being applied in each pass (e.g., "115 lbs dry + 3.5 gal liquid").
 
 ---
 
-## Changes to Stage Descriptions
+## Current State
+Looking at your screenshot, the pass header shows:
+- **N 45.7 | P 0.0 | K 25.0 | S 27.0** (nutrient lbs/ac)
+- **$53.90/ac** and **$7,007.00 total**
 
-| Stage | Current Description | Updated Description |
-|-------|---------------------|---------------------|
-| F8 | Last leaf just visible | Flag leaf just visible |
-| F9 | Ligule of last leaf visible | Ligule of flag leaf visible |
-
----
-
-## Feekes Groupings (from your diagram)
-
-| Group | Stages | Description |
-|-------|--------|-------------|
-| **Seedling** | F1 | One shoot |
-| **Tillering** | F2-F3 | Tillering begins through tillers formed |
-| **Stem Extension** | F4-F5 | Leaf sheaths lengthen/erected (sometimes grouped with Jointing) |
-| **Jointing** | F6-F7 | First and second node visible |
-| **Boot** | F8-F10 | Flag leaf visible through in boot |
-| **Heading** | F10.1-F10.5.2 | Head emergence through flowering |
-| **Ripening** | F11-F11.4 | Milk through harvest ready |
+Individual products show their rate (e.g., "50.0 lbs", "65.0 lbs") but the pass header doesn't aggregate these into a total.
 
 ---
 
-## Implementation Approach
+## Proposed Display
 
-### Option 1: Add `group` field to stage objects (Recommended)
-Add a `group` property to each stage that can be used for display grouping:
+Add a line to the pass header showing:
+
+```
+• 115 lbs dry · 0 gal liquid
+```
+
+Or simplified when only one form is present:
+```
+• 115 lbs dry
+```
+
+For the pass in your screenshot (SOP 50 lbs + Urea 65 lbs + AMS ~65 lbs assumed):
+```
+• ~180 lbs dry
+```
+
+---
+
+## Implementation
+
+### 1. Add Physical Quantities to PassSummary Interface
+
+**File: `src/lib/cropCalculations.ts`**
+
+Add new fields to track total physical product:
 
 ```typescript
-interface GrowthStage {
-  stage: string;
-  description: string;
-  order: number;
-  group?: string; // NEW: Feekes grouping
+export interface PassSummary {
+  // ... existing fields
+  physicalQuantity: {
+    totalDryLbs: number;    // Total lbs of dry product per acre
+    totalLiquidGal: number; // Total gallons of liquid product per acre
+  };
 }
-
-// Example:
-{ stage: 'F1', description: 'One shoot', order: 0, group: 'Seedling' },
-{ stage: 'F2', description: 'Tillering begins', order: 1, group: 'Tillering' },
-{ stage: 'F6', description: 'First node visible', order: 5, group: 'Jointing' },
-{ stage: 'F8', description: 'Flag leaf just visible', order: 7, group: 'Boot' },
 ```
 
-### Update Dropdown UI
-Show group headers in the Select dropdown:
+### 2. Calculate Quantities in Pass Summary Functions
 
+**File: `src/lib/cropCalculations.ts`**
+
+In `calculatePassSummary()` and `calculatePassSummaryWithPriceBook()`:
+
+```typescript
+// Track physical quantities (per acre rates)
+const physicalQuantity = { totalDryLbs: 0, totalLiquidGal: 0 };
+
+applications.forEach(app => {
+  const product = products.find(p => p.id === app.productId);
+  if (!product) return;
+  
+  if (product.form === 'liquid') {
+    // Convert rate to gallons
+    physicalQuantity.totalLiquidGal += convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+  } else {
+    // Convert rate to pounds
+    physicalQuantity.totalDryLbs += convertToPounds(app.rate, app.rateUnit as DryUnit);
+  }
+});
+
+// Include in return
+return {
+  // ...existing fields
+  physicalQuantity,
+};
 ```
-── Seedling ──
-F1 - One shoot
 
-── Tillering ──
-F2 - Tillering begins
-F3 - Tillers formed
+### 3. Display in PassCard Header
 
-── Stem Extension ──
-F4 - Leaf sheaths lengthen
-F5 - Leaf sheaths strongly erected
+**File: `src/components/farm/PassCard.tsx`**
 
-── Jointing ──
-F6 - First node visible
-F7 - Second node visible
+Add after the nutrient summary line:
 
-── Boot ──
-F8 - Flag leaf just visible
-F9 - Ligule of flag leaf visible
-F10 - In boot
+```tsx
+{/* Physical quantity summary */}
+{(summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
+  <span className="text-sm text-muted-foreground">
+    • {summary.physicalQuantity.totalDryLbs > 0 && (
+      <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
+    )}
+    {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && (
+      <> · </>
+    )}
+    {summary.physicalQuantity.totalLiquidGal > 0 && (
+      <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
+    )}
+  </span>
+)}
+```
 
-── Heading ──
-F10.1 - Heading
-F10.5 - Flowering
-...
+---
 
-── Ripening ──
-F11 - Ripening
-F11.1 - Milk
-...
+## Visual Result
+
+**Before:**
+```
+PREPLANT DRY BROADCAST
+  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
+                   Ratios N:S 1.7:1 · N:K 1.8:1
+```
+
+**After:**
+```
+PREPLANT DRY BROADCAST
+  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
+                   Ratios N:S 1.7:1 · N:K 1.8:1 · 180 lbs
+```
+
+Or displayed on its own line for clarity:
+```
+PREPLANT DRY BROADCAST
+  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
+                   Ratios N:S 1.7:1 · N:K 1.8:1
+                   180 lbs dry product/ac
 ```
 
 ---
@@ -93,88 +139,26 @@ F11.1 - Milk
 
 | File | Changes |
 |------|---------|
-| `src/lib/growthStages.ts` | Update F8/F9 descriptions, add `group` field to GrowthStage interface, add groups to small_grains stages |
-| `src/components/farm/TimingEditorPopover.tsx` | Update dropdown to show group headers for small grains (only when groups are present) |
+| `src/lib/cropCalculations.ts` | Add `physicalQuantity` to `PassSummary` interface, calculate in both `calculatePassSummary()` and `calculatePassSummaryWithPriceBook()` |
+| `src/components/farm/PassCard.tsx` | Display the physical quantity in the pass header |
 
 ---
 
-## Complete Updated Small Grains Data
+## Edge Cases
 
-```typescript
-small_grains: [
-  // Seedling
-  { stage: 'F1', description: 'One shoot', order: 0, group: 'Seedling' },
-  
-  // Tillering
-  { stage: 'F2', description: 'Tillering begins', order: 1, group: 'Tillering' },
-  { stage: 'F3', description: 'Tillers formed', order: 2, group: 'Tillering' },
-  
-  // Stem Extension
-  { stage: 'F4', description: 'Leaf sheaths lengthen', order: 3, group: 'Stem Extension' },
-  { stage: 'F5', description: 'Leaf sheaths strongly erected', order: 4, group: 'Stem Extension' },
-  
-  // Jointing
-  { stage: 'F6', description: 'First node visible', order: 5, group: 'Jointing' },
-  { stage: 'F7', description: 'Second node visible', order: 6, group: 'Jointing' },
-  
-  // Boot
-  { stage: 'F8', description: 'Flag leaf just visible', order: 7, group: 'Boot' },
-  { stage: 'F9', description: 'Ligule of flag leaf visible', order: 8, group: 'Boot' },
-  { stage: 'F10', description: 'In boot', order: 9, group: 'Boot' },
-  
-  // Heading
-  { stage: 'F10.1', description: 'Heading', order: 10, group: 'Heading' },
-  { stage: 'F10.5', description: 'Flowering', order: 11, group: 'Heading' },
-  { stage: 'F10.5.1', description: 'Beginning flowering', order: 12, group: 'Heading' },
-  { stage: 'F10.5.2', description: 'Flowering complete', order: 13, group: 'Heading' },
-  
-  // Ripening
-  { stage: 'F11', description: 'Ripening', order: 14, group: 'Ripening' },
-  { stage: 'F11.1', description: 'Milk', order: 15, group: 'Ripening' },
-  { stage: 'F11.2', description: 'Soft dough', order: 16, group: 'Ripening' },
-  { stage: 'F11.3', description: 'Hard dough', order: 17, group: 'Ripening' },
-  { stage: 'F11.4', description: 'Harvest ready', order: 18, group: 'Ripening' },
-]
-```
+| Scenario | Display |
+|----------|---------|
+| Only dry products | "180 lbs" |
+| Only liquid products | "5.2 gal" |
+| Mixed dry + liquid | "115 lbs · 2.5 gal" |
+| No products | (hidden) |
 
 ---
 
-## Visual Result
+## Technical Notes
 
-The dropdown for Small Grains will show organized groups:
-
-**Before:**
-```
-F1 - One shoot
-F2 - Tillering begins
-F3 - Tillers formed
-F4 - Leaf sheaths lengthen
-...
-```
-
-**After:**
-```
-── Seedling ──
-F1 - One shoot
-
-── Tillering ──
-F2 - Tillering begins
-F3 - Tillers formed
-
-── Stem Extension ──
-F4 - Leaf sheaths lengthen
-F5 - Leaf sheaths strongly erected
-
-── Jointing ──
-F6 - First node visible
-F7 - Second node visible
-
-── Boot ──
-F8 - Flag leaf just visible
-F9 - Ligule of flag leaf visible
-F10 - In boot
-...
-```
-
-This makes it much easier to find the right stage, especially for users less familiar with Feekes numbering.
+- Quantities are **per-acre rates** (matching how individual product rates are displayed)
+- Uses existing `convertToGallons()` and `convertToPounds()` functions
+- Handles all rate units (oz, lbs, g, ton, qt, gal)
+- Does NOT account for acres percentage (shows raw per-acre amount) - this matches how individual product rates are displayed
 
