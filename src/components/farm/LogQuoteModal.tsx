@@ -93,7 +93,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
         price,
         unit,
         normalizedPrice,
-        packageType: packageType || undefined,
+        packageType: packageType && packageType !== 'none' ? packageType : undefined,
         packageSize: packageSize || undefined,
         packageUnit: packageSize ? packageUnit : undefined,
         date: quoteDate,
@@ -199,7 +199,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {PACKAGE_TYPES.map(pt => (
                       <SelectItem key={pt} value={pt}>{pt}</SelectItem>
                     ))}

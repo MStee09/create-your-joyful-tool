@@ -653,15 +653,15 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         
         {/* Compare by Nutrient dropdown */}
         <Select 
-          value={compareNutrient || ''} 
-          onValueChange={(val) => setCompareNutrient(val || null)}
+          value={compareNutrient || 'normal'} 
+          onValueChange={(val) => setCompareNutrient(val === 'normal' ? null : val)}
         >
           <SelectTrigger className="w-48">
             <FlaskConical className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Compare by Nutrient" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Normal View</SelectItem>
+            <SelectItem value="normal">Normal View</SelectItem>
             {NUTRIENT_OPTIONS.map(opt => (
               <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
             ))}
