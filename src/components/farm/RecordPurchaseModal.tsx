@@ -5,11 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, Droplets, Weight } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
 import type { SimplePurchase, SimplePurchaseLine, NewSimplePurchase } from '@/types/simplePurchase';
-import type { NewPriceRecord } from '@/types/priceRecord';
-import type { Vendor, ProductMaster } from '@/types';
+import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
+import type { Vendor, ProductMaster, VendorOffering } from '@/types';
 
 interface PurchaseLineInput {
   id: string;
@@ -28,12 +28,25 @@ interface RecordPurchaseModalProps {
   onCreatePriceRecords: (records: NewPriceRecord[]) => Promise<void>;
   vendors: Vendor[];
   products: ProductMaster[];
+  vendorOfferings: VendorOffering[];
+  priceRecords: PriceRecord[];
   currentSeasonId: string;
   currentSeasonYear: number;
   editingPurchase?: SimplePurchase;
 }
 
-const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Bulk'];
+const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Pail', 'Bulk'];
+
+// Package size defaults for auto-filling
+const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: 'gal' | 'lbs' }> = {
+  'Tote': { size: 275, unit: 'gal' },
+  'Twin-pack': { size: 5, unit: 'gal' },
+  'Jug': { size: 2.5, unit: 'gal' },
+  'Drum': { size: 30, unit: 'gal' },
+  'Pail': { size: 5, unit: 'gal' },
+  'Bag': { size: 50, unit: 'lbs' },
+  'Bulk': { size: 1, unit: 'gal' },
+};
 
 export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   isOpen,
@@ -42,6 +55,8 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   onCreatePriceRecords,
   vendors,
   products,
+  vendorOfferings,
+  priceRecords,
   currentSeasonId,
   currentSeasonYear,
   editingPurchase,
@@ -57,6 +72,47 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   const [freightNotes, setFreightNotes] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Filter products based on selected vendor
+  const vendorProducts = useMemo(() => {
+    if (!vendorId) return [];
+    const productIds = new Set(
+      vendorOfferings
+        .filter(o => o.vendorId === vendorId)
+        .map(o => o.productId)
+    );
+    return products.filter(p => productIds.has(p.id));
+  }, [vendorId, vendorOfferings, products]);
+
+  // Get last price for a product+vendor combo
+  const getLastPrice = (productId: string, currentVendorId: string): number => {
+    // Find most recent price record for this product+vendor
+    const records = priceRecords
+      .filter(r => r.productId === productId && r.vendorId === currentVendorId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    if (records.length > 0) {
+      return records[0].price; // Package price, not normalized
+    }
+    
+    // Fallback: check vendor offering
+    const offering = vendorOfferings.find(
+      o => o.productId === productId && o.vendorId === currentVendorId
+    );
+    if (offering) return offering.price;
+    
+    // Fallback: product estimated price
+    const product = products.find(p => p.id === productId);
+    return product?.estimatedPrice || 0;
+  };
+
+  // Handle vendor change - clear lines if vendor changes
+  const handleVendorChange = (newVendorId: string) => {
+    if (lines.length > 0 && newVendorId !== vendorId) {
+      setLines([]);
+    }
+    setVendorId(newVendorId);
+  };
 
   // Initialize form when editing
   useEffect(() => {
@@ -125,6 +181,11 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     return line.unitPrice / line.packageSize;
   };
 
+  // Calculate total volume for a line
+  const calculateTotalVolume = (line: PurchaseLineInput) => {
+    return line.quantity * line.packageSize;
+  };
+
   // Calculate totals
   const subtotal = useMemo(() => 
     lines.reduce((sum, line) => sum + calculateLineTotal(line), 0),
@@ -177,7 +238,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       
       if (savedPurchase) {
         // Create price records for each line
-        const priceRecords: NewPriceRecord[] = purchaseLines.map(line => ({
+        const priceRecordsToCreate: NewPriceRecord[] = purchaseLines.map(line => ({
           productId: line.productId,
           vendorId,
           price: line.unitPrice,
@@ -193,7 +254,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
           purchaseId: savedPurchase.id,
         }));
 
-        await onCreatePriceRecords(priceRecords);
+        await onCreatePriceRecords(priceRecordsToCreate);
       }
 
       onClose();
@@ -209,9 +270,31 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     return products.find(p => p.id === productId);
   };
 
+  // Handle package type change with auto-defaults
+  const handlePackageTypeChange = (lineId: string, packageType: string, productId: string) => {
+    const defaults = PACKAGE_SIZE_DEFAULTS[packageType];
+    const product = getProductInfo(productId);
+    updateLine(lineId, { 
+      packageType,
+      packageSize: defaults?.size ?? 1,
+      packageUnit: product?.form === 'dry' ? 'lbs' : (defaults?.unit ?? 'gal'),
+    });
+  };
+
+  // Handle product selection with price pre-fill
+  const handleProductChange = (lineId: string, productId: string) => {
+    const prod = products.find(p => p.id === productId);
+    const lastPrice = getLastPrice(productId, vendorId);
+    updateLine(lineId, { 
+      productId,
+      packageUnit: prod?.form === 'liquid' ? 'gal' : 'lbs',
+      unitPrice: lastPrice,
+    });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {editingPurchase ? 'Edit Purchase' : 'Record Purchase'}
@@ -223,7 +306,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Vendor *</Label>
-              <Select value={vendorId} onValueChange={setVendorId}>
+              <Select value={vendorId} onValueChange={handleVendorChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select vendor" />
                 </SelectTrigger>
@@ -293,13 +376,14 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
           <div className="space-y-3">
             <Label className="text-base font-semibold">Line Items</Label>
             
-            {/* Header */}
-            <div className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_1fr_1fr_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
+            {/* Header - added Total Vol column */}
+            <div className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_0.75fr_1fr_1fr_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
               <div>Product</div>
               <div>Package</div>
               <div>Qty</div>
               <div>Size</div>
               <div>Unit</div>
+              <div>Total Vol</div>
               <div>Price</div>
               <div>Total</div>
               <div></div>
@@ -309,30 +393,39 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
             {lines.map(line => {
               const product = getProductInfo(line.productId);
               return (
-                <div key={line.id} className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_1fr_1fr_auto] gap-2 items-center">
+                <div key={line.id} className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_0.75fr_1fr_1fr_auto] gap-2 items-center">
                   <Select 
                     value={line.productId} 
-                    onValueChange={val => {
-                      const prod = products.find(p => p.id === val);
-                      updateLine(line.id, { 
-                        productId: val,
-                        packageUnit: prod?.form === 'liquid' ? 'gal' : 'lbs',
-                      });
-                    }}
+                    onValueChange={val => handleProductChange(line.id, val)}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
+                      {vendorProducts.length === 0 ? (
+                        <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                          No products for this vendor
+                        </div>
+                      ) : (
+                        vendorProducts.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="flex items-center gap-2">
+                              {p.form === 'liquid' ? (
+                                <Droplets className="h-3 w-3 text-blue-500" />
+                              ) : (
+                                <Weight className="h-3 w-3 text-amber-600" />
+                              )}
+                              {p.name}
+                            </span>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
 
                   <Select 
                     value={line.packageType} 
-                    onValueChange={val => updateLine(line.id, { packageType: val })}
+                    onValueChange={val => handlePackageTypeChange(line.id, val, line.productId)}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
@@ -374,6 +467,11 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                     </SelectContent>
                   </Select>
 
+                  {/* Total Volume Column */}
+                  <div className="text-sm text-muted-foreground text-right pr-1">
+                    {calculateTotalVolume(line).toFixed(1)} {line.packageUnit}
+                  </div>
+
                   <div className="relative">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                     <Input
@@ -403,9 +501,13 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
               );
             })}
 
+            {/* Empty state with vendor hint */}
             {lines.length === 0 && (
               <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-                No items added. Click below to add a line item.
+                {vendorId 
+                  ? 'No items added. Click below to add a line item.'
+                  : 'Select a vendor first to add products.'
+                }
               </div>
             )}
 
@@ -414,6 +516,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
               variant="outline"
               onClick={addLine}
               className="w-full"
+              disabled={!vendorId}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Line
