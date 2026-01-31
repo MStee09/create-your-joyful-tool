@@ -7,14 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/calculations';
 import type { Vendor, ProductMaster } from '@/types';
-import type { PriceRecord } from '@/types/priceRecord';
+import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
+import { LogQuoteModal } from './LogQuoteModal';
 
 interface PriceHistoryViewProps {
   priceRecords: PriceRecord[];
   products: ProductMaster[];
   vendors: Vendor[];
   currentSeasonYear: number;
-  onAddPriceRecord: (record: any) => Promise<any>;
+  onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
 }
 
 export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
@@ -27,6 +28,7 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('3');
+  const [showLogQuoteModal, setShowLogQuoteModal] = useState(false);
 
   // Get unique categories
   const categories = useMemo(() => {
@@ -145,7 +147,10 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
           <h2 className="text-3xl font-bold text-stone-800">Price History</h2>
           <p className="text-stone-500 mt-1">Track price trends across all products</p>
         </div>
-        <Button className="bg-emerald-600 hover:bg-emerald-700">
+        <Button 
+          className="bg-emerald-600 hover:bg-emerald-700"
+          onClick={() => setShowLogQuoteModal(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Log Quote
         </Button>
@@ -293,6 +298,16 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Log Quote Modal */}
+      <LogQuoteModal
+        isOpen={showLogQuoteModal}
+        onClose={() => setShowLogQuoteModal(false)}
+        onSave={onAddPriceRecord}
+        products={products}
+        vendors={vendors}
+        currentSeasonYear={currentSeasonYear}
+      />
     </div>
   );
 };

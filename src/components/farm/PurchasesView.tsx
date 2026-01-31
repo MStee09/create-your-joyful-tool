@@ -4,63 +4,84 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/calculations';
-import type { Vendor, ProductMaster, Order } from '@/types';
+import type { Vendor, ProductMaster } from '@/types';
+import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
+import type { NewPriceRecord } from '@/types/priceRecord';
+import { RecordPurchaseModal } from './RecordPurchaseModal';
 
 interface PurchasesViewProps {
-  orders: Order[];
+  purchases: SimplePurchase[];
   vendors: Vendor[];
   products: ProductMaster[];
+  currentSeasonId: string;
   currentSeasonYear: number;
-  onUpdateOrders: (orders: Order[]) => Promise<void>;
+  onAddPurchase: (purchase: NewSimplePurchase) => Promise<SimplePurchase | null>;
+  onUpdatePurchase: (id: string, updates: Partial<SimplePurchase>) => Promise<boolean>;
+  onDeletePurchase: (id: string) => Promise<boolean>;
+  onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
 }
 
 export const PurchasesView: React.FC<PurchasesViewProps> = ({
-  orders,
+  purchases,
   vendors,
   products,
+  currentSeasonId,
   currentSeasonYear,
-  onUpdateOrders,
+  onAddPurchase,
+  onUpdatePurchase,
+  onDeletePurchase,
+  onAddPriceRecord,
 }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<SimplePurchase | null>(null);
+
   // Filter to current season
-  const seasonOrders = useMemo(() => 
-    orders.filter(o => o.seasonYear === currentSeasonYear),
-    [orders, currentSeasonYear]
+  const seasonPurchases = useMemo(() => 
+    purchases.filter(p => p.seasonId === currentSeasonId),
+    [purchases, currentSeasonId]
   );
 
   // Split by status
-  const awaitingDelivery = seasonOrders.filter(o => 
-    o.status === 'ordered' || o.status === 'draft' || o.status === 'confirmed'
-  );
-  const received = seasonOrders.filter(o => 
-    o.status === 'complete' || o.status === 'partial'
-  );
+  const awaitingDelivery = seasonPurchases.filter(p => p.status === 'ordered');
+  const received = seasonPurchases.filter(p => p.status === 'received');
 
   // Calculate summaries
-  const totalSpent = seasonOrders.reduce((sum, o) => sum + o.subtotal, 0);
-  const receivedTotal = received.reduce((sum, o) => sum + o.subtotal, 0);
-  const awaitingTotal = awaitingDelivery.reduce((sum, o) => sum + o.subtotal, 0);
+  const totalSpent = seasonPurchases.reduce((sum, p) => sum + p.total, 0);
+  const receivedTotal = received.reduce((sum, p) => sum + p.total, 0);
+  const awaitingTotal = awaitingDelivery.reduce((sum, p) => sum + p.total, 0);
+  const freightTotal = seasonPurchases.reduce((sum, p) => sum + (p.freightCost || 0), 0);
 
   const getVendorName = (vendorId: string) => 
     vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
 
-  const getProductNames = (lineItems: any[]) => {
-    if (!lineItems || lineItems.length === 0) return 'No items';
-    const names = lineItems.slice(0, 3).map(item => {
+  const getProductNames = (lines: any[]) => {
+    if (!lines || lines.length === 0) return 'No items';
+    const names = lines.slice(0, 3).map(item => {
       const product = products.find(p => p.id === item.productId);
       return product?.name || 'Unknown';
     });
-    const suffix = lineItems.length > 3 ? `, +${lineItems.length - 3} more` : '';
+    const suffix = lines.length > 3 ? `, +${lines.length - 3} more` : '';
     return names.join(', ') + suffix;
+  };
+
+  const handleMarkReceived = async (purchase: SimplePurchase) => {
+    await onUpdatePurchase(purchase.id, {
+      status: 'received',
+      receivedDate: new Date().toISOString().split('T')[0],
+    });
   };
 
   return (
     <div className="p-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-stone-800">Purchases</h2>
-          <p className="text-stone-500 mt-1">Track orders and deliveries for {currentSeasonYear}</p>
+          <h2 className="text-3xl font-bold text-foreground">Purchases</h2>
+          <p className="text-muted-foreground mt-1">Track orders and deliveries for {currentSeasonYear}</p>
         </div>
-        <Button className="bg-emerald-600 hover:bg-emerald-700">
+        <Button 
+          className="bg-emerald-600 hover:bg-emerald-700"
+          onClick={() => setShowAddModal(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Record Purchase
         </Button>
@@ -70,41 +91,41 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       <div className="grid grid-cols-4 gap-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-stone-500">Total Spent</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-stone-800">{formatCurrency(totalSpent)}</div>
-            <p className="text-xs text-stone-500">{currentSeasonYear} season</p>
+            <div className="text-2xl font-bold text-foreground">{formatCurrency(totalSpent)}</div>
+            <p className="text-xs text-muted-foreground">{currentSeasonYear} season</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-stone-500">Received</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Received</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{formatCurrency(receivedTotal)}</div>
-            <p className="text-xs text-stone-500">{received.length} purchases</p>
+            <p className="text-xs text-muted-foreground">{received.length} purchases</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-stone-500">Awaiting Delivery</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Awaiting Delivery</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{formatCurrency(awaitingTotal)}</div>
-            <p className="text-xs text-stone-500">{awaitingDelivery.length} purchases</p>
+            <p className="text-xs text-muted-foreground">{awaitingDelivery.length} purchases</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-stone-500">Freight (YTD)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Freight (YTD)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-stone-600">$0</div>
-            <p className="text-xs text-stone-500">Not tracked yet</p>
+            <div className="text-2xl font-bold text-muted-foreground">{formatCurrency(freightTotal)}</div>
+            <p className="text-xs text-muted-foreground">Tracked separately</p>
           </CardContent>
         </Card>
       </div>
@@ -112,29 +133,47 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       {/* Awaiting Delivery */}
       {awaitingDelivery.length > 0 && (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold text-stone-700 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Truck className="w-5 h-5 text-amber-500" />
             Awaiting Delivery
           </h3>
           <div className="space-y-3">
-            {awaitingDelivery.map(order => (
-              <Card key={order.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            {awaitingDelivery.map(purchase => (
+              <Card key={purchase.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-stone-500">
-                          {new Date(order.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(purchase.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
-                        <span className="font-semibold text-stone-800">{getVendorName(order.vendorId)}</span>
-                        <span className="font-bold text-stone-900">{formatCurrency(order.subtotal)}</span>
+                        <span className="font-semibold text-foreground">{getVendorName(purchase.vendorId)}</span>
+                        <span className="font-bold text-foreground">{formatCurrency(purchase.total)}</span>
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                           Ordered
                         </Badge>
                       </div>
-                      <p className="text-sm text-stone-500 mt-1">{getProductNames(order.lineItems)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{getProductNames(purchase.lines)}</p>
                     </div>
-                    <Button variant="outline" size="sm">Details</Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleMarkReceived(purchase)}
+                      >
+                        Mark Received
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingPurchase(purchase);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        Details
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -146,30 +185,39 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       {/* Received */}
       {received.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-stone-700 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-emerald-500" />
             Received
           </h3>
           <div className="space-y-3">
-            {received.map(order => (
-              <Card key={order.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            {received.map(purchase => (
+              <Card key={purchase.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-stone-500">
-                          {new Date(order.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(purchase.receivedDate || purchase.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
-                        <span className="font-semibold text-stone-800">{getVendorName(order.vendorId)}</span>
-                        <span className="font-bold text-stone-900">{formatCurrency(order.subtotal)}</span>
+                        <span className="font-semibold text-foreground">{getVendorName(purchase.vendorId)}</span>
+                        <span className="font-bold text-foreground">{formatCurrency(purchase.total)}</span>
                         <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Received
                         </Badge>
                       </div>
-                      <p className="text-sm text-stone-500 mt-1">{getProductNames(order.lineItems)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{getProductNames(purchase.lines)}</p>
                     </div>
-                    <Button variant="outline" size="sm">Details</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setEditingPurchase(purchase);
+                        setShowAddModal(true);
+                      }}
+                    >
+                      Details
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -179,19 +227,42 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       )}
 
       {/* Empty State */}
-      {seasonOrders.length === 0 && (
+      {seasonPurchases.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="p-12 text-center">
-            <Package className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-stone-600 mb-2">No purchases recorded</h3>
-            <p className="text-stone-500 mb-4">Record your first purchase to start tracking orders and prices.</p>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Package className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No purchases recorded</h3>
+            <p className="text-muted-foreground mb-4">Record your first purchase to start tracking orders and prices.</p>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setShowAddModal(true)}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Record Purchase
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Modal */}
+      <RecordPurchaseModal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingPurchase(null);
+        }}
+        onSave={onAddPurchase}
+        onCreatePriceRecords={async (records) => {
+          for (const record of records) {
+            await onAddPriceRecord(record);
+          }
+        }}
+        vendors={vendors}
+        products={products}
+        currentSeasonId={currentSeasonId}
+        currentSeasonYear={currentSeasonYear}
+        editingPurchase={editingPurchase || undefined}
+      />
     </div>
   );
 };

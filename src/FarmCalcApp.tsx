@@ -879,6 +879,11 @@ const AppContent: React.FC = () => {
     updateInvoices,
     addInvoice,
     addPriceRecord,
+    // New SimplePurchase operations
+    simplePurchases,
+    addSimplePurchase,
+    updateSimplePurchase,
+    deleteSimplePurchase,
     refetch,
   } = supabaseData;
 
@@ -1386,11 +1391,15 @@ const AppContent: React.FC = () => {
       case 'purchases':
         return (
           <PurchasesView
-            orders={state.orders || []}
-            vendors={state.vendors}
-            products={state.productMasters || []}
+            purchases={simplePurchases || []}
+            vendors={vendors}
+            products={productMasters || []}
+            currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdateOrders={updateOrders}
+            onAddPurchase={addSimplePurchase}
+            onUpdatePurchase={updateSimplePurchase}
+            onDeletePurchase={deleteSimplePurchase}
+            onAddPriceRecord={addPriceRecord}
           />
         );
       case 'price-history':

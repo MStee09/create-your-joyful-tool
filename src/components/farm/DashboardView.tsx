@@ -123,7 +123,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }`}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">Plan Readiness</h3>
+            <h3 className="font-semibold text-foreground">Order Status</h3>
             {readiness.blockingCount > 0 ? (
               <AlertTriangle className="w-5 h-5 text-red-500" />
             ) : (
@@ -149,17 +149,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           
           {/* Legend */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>{readiness.readyCount} Ready</span>
+            <span>{readiness.readyCount} On Hand</span>
             <span>•</span>
-            <span>{readiness.onOrderCount} On Order</span>
+            <span>{readiness.onOrderCount} Ordered</span>
             <span>•</span>
-            <span>{readiness.blockingCount} Blocking</span>
+            <span>{readiness.blockingCount} Need to Order</span>
           </div>
           
-          {/* Blocking Warning */}
+          {/* Need to Order Warning */}
           {readiness.blockingCount > 0 && (
             <p className="text-sm text-red-600 mt-2 font-medium">
-              {readiness.blockingCount} item{readiness.blockingCount !== 1 ? 's' : ''} blocking plan execution
+              {readiness.blockingCount} product{readiness.blockingCount !== 1 ? 's' : ''} still need to be ordered
             </p>
           )}
         </div>
