@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight, List, Droplets, Weight, ChevronsUpDown } from 'lucide-react';
 import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
@@ -85,6 +85,12 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [newTimingName, setNewTimingName] = useState('');
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [showInsights, setShowInsights] = useState(false);
+
+  // Sync acresValue when crop changes
+  useEffect(() => {
+    setAcresValue(crop.totalAcres);
+    setEditingAcres(false);
+  }, [crop.id, crop.totalAcres]);
 
   // Timeline state
   const [viewMode, setViewMode] = useState<'full' | 'focus' | 'compact'>('full');
