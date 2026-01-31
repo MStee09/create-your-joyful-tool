@@ -298,7 +298,7 @@ export const calculateCoverageGroups = (
 
   // Convert to array and sort by acres descending
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum, nutrients }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, nutrients }]) => ({
       // This is the *display* percentage bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
@@ -311,7 +311,8 @@ export const calculateCoverageGroups = (
       // Economics MUST be computed using actual application percentages.
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
-      acresTreated: acresTreatedSum,
+      // Acres treated is the physical field area for this coverage tier, NOT sum of per-product acres
+      acresTreated: crop.totalAcres * (acresPercentage / 100),
       nutrients,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
@@ -548,7 +549,7 @@ export const calculateCoverageGroupsWithPriceBook = (
   });
 
   return Array.from(groupMap.entries())
-    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, acresTreatedSum, nutrients }]) => ({
+    .map(([acresPercentage, { apps, treatedCostSum, fieldCostSum, nutrients }]) => ({
       // Display bucket.
       acresPercentage,
       tierLabel: getTierLabel(acresPercentage),
@@ -567,7 +568,8 @@ export const calculateCoverageGroupsWithPriceBook = (
       // Economics from actual %.
       costPerTreatedAcre: treatedCostSum,
       costPerFieldAcre: fieldCostSum,
-      acresTreated: acresTreatedSum,
+      // Acres treated is the physical field area for this coverage tier, NOT sum of per-product acres
+      acresTreated: crop.totalAcres * (acresPercentage / 100),
       nutrients,
     }))
     .sort((a, b) => b.acresPercentage - a.acresPercentage);
