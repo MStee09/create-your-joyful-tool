@@ -1,131 +1,74 @@
 
+# Bug Fix: Incorrect Acres Display in Pass Coverage Groups
 
-# Improve Physical Quantity Visual Organization
+## Problem Identified
 
-## The Problem
-The lbs/gal values currently blend into the nutrient analysis line:
+The issue is in `src/lib/cropCalculations.ts` where the `acresTreated` value for coverage groups is being **incorrectly accumulated** by summing each product's treated acres.
+
+**Current buggy logic (lines 289 and 540):**
+```typescript
+group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
 ```
-• N 67.0 | P 0.0 | K 22.0 | S 27.6 · 240 lbs · 0.0 gal
-```
 
-Everything uses the same color, size, and weight - your eyes can't distinguish between nutrient analysis (lbs N/P/K/S per acre) and total physical product (lbs and gal of actual product).
+This sums acres across all products in the tier. With 5 products at 100% on 130 acres:
+- 130 + 130 + 130 + 130 + 130 = **650 ac** (displayed incorrectly)
+
+**Correct logic:**
+The "treated acres" for a coverage tier should be the physical field area receiving that coverage level:
+- 130 acres at 100% = **130 ac**
 
 ---
 
-## Proposed Solution: Separate Visual Block
+## Impact Assessment
 
-Move physical quantities to their own distinct display, styled differently from nutrients.
-
-### Visual Hierarchy (Before vs After)
-
-**Before:**
-```
-Core 5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6 · 240 lbs · 0.0 gal
-                   Ratios N:S 2.4:1 · N:K 3.0:1
-```
-
-**After:**
-```
-Core 5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6
-                   Ratios N:S 2.4:1 · N:K 3.0:1
-
-                   [240 lbs]   (dry)   [— gal]   (liquid)
-                   └── styled as pills/badges with distinct color
-```
+| Area | Affected? | Details |
+|------|-----------|---------|
+| PassCard tier display | YES | Shows wrong acres (e.g., "650 ac" instead of "130 ac") |
+| Cost calculations | NO | Costs use separate correct per-product logic |
+| Nutrient calculations | NO | Uses separate weighting logic |
+| All crops / all passes | YES | Bug is in shared calculation functions |
+| ProductRowReadable | NO | Calculates its own `acresTreated` correctly |
 
 ---
 
-## Design Options
+## Technical Solution
 
-### Option A: Pill/Badge Style (Recommended)
-Display as small colored badges, similar to the tier badges (Core/Building/Trial):
+### Fix Location
+`src/lib/cropCalculations.ts` - Two functions need updating:
+1. `calculateCoverageGroups()` (lines 250-318)
+2. `calculateCoverageGroupsWithPriceBook()` (lines 495-574)
 
-```
-                   ┌─────────────────┐
-  240 lbs  dry     │  bg-stone-100   │  ← warm neutral for dry
-                   └─────────────────┘
-  12.5 gal liquid  │  bg-sky-100     │  ← cool blue for liquid
-                   └─────────────────┘
-```
+### Change Details
 
-- **Dry products**: Stone/warm neutral badge (`bg-stone-100/50 text-stone-700`)
-- **Liquid products**: Sky/water blue badge (`bg-sky-100/50 text-sky-700`)
-- Only show non-zero values (hide `0.0 gal` if no liquid products)
-- Position: Below the nutrient ratios line, or inline after ratios with clear separation
+**Remove the accumulation loop for acresTreatedSum** since it's producing the wrong value, and instead compute it correctly when building the result array:
 
-### Option B: Inline with Icon Differentiation
-Keep inline but add icons and bolder styling:
-```
-• N 67.0 | P 0.0 | K 22.0 | S 27.6
-  Ratios N:S 2.4:1 · N:K 3.0:1  •  📦 240 lbs  •  💧 12.5 gal
+1. Remove lines that accumulate `acresTreatedSum` inside the forEach loop
+2. In the final `.map()`, calculate `acresTreated` directly from the bucket percentage:
+
+```typescript
+// BEFORE (wrong):
+acresTreated: acresTreatedSum,
+
+// AFTER (correct):
+acresTreated: crop.totalAcres * (acresPercentage / 100),
 ```
 
-### Option C: Side-aligned Summary Block
-Position on the right side of the header, vertically stacked:
-```
-                                                    240 lbs
-                                                    12.5 gal
-```
-
----
-
-## Recommended Implementation (Option A)
-
-### Visual Treatment
-```tsx
-{/* Physical quantity badges - separate from nutrient line */}
-<div className="flex items-center gap-2 mt-1">
-  {summary.physicalQuantity.totalDryLbs > 0 && (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-xs font-medium">
-      <span className="font-semibold">{formatNumber(totalDryLbs, 0)}</span>
-      <span className="text-stone-500">lbs</span>
-    </span>
-  )}
-  {summary.physicalQuantity.totalLiquidGal > 0 && (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-xs font-medium">
-      <span className="font-semibold">{formatNumber(totalLiquidGal, 1)}</span>
-      <span className="text-sky-500">gal</span>
-    </span>
-  )}
-</div>
-```
-
-### Key Changes
-1. **Remove** the inline physical quantity from the nutrient line (lines 361-372)
-2. **Add** a new row below the ratios line with distinct badge styling
-3. **Only show non-zero** values (no more "0.0 gal" clutter)
-4. **Color coding**: Stone/brown for dry (earthy), Sky/blue for liquid (water)
-5. **Font weight**: Make the number bold, unit muted
+Where `acresPercentage` is the display bucket (100, 60, 25, etc.).
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/farm/PassCard.tsx` | Remove inline display, add new badge-style display below nutrients |
+| File | Change |
+|------|--------|
+| `src/lib/cropCalculations.ts` | Fix `acresTreated` calculation in both coverage group functions |
 
 ---
 
-## Result Preview
+## Verification Checklist
 
-```
-TOPDRESS
-V5 → V6 ⏱
-
-Uniform   Uptake   Water / Adj   ⏰ 4                    $65.28/ac
-                                                        $8,617.33 total
-Core  5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6
-                    Ratios N:S 2.4:1 · N:K 3.0:1
-                    
-                    [240 lbs]     ← stone/warm badge
-```
-
-When there's both dry and liquid:
-```
-                    [180 lbs]  [12.5 gal]
-                    ↑ stone    ↑ sky blue
-```
-
-This creates clear visual separation - nutrients are analysis data (N-P-K-S contributions), physical quantities are logistics data (what you're actually hauling/mixing).
-
+After fix, confirm:
+- [ ] Barley (130 ac) shows "Core 100% · 130 ac" in pass headers
+- [ ] All crops display correct tier acres matching `crop.totalAcres × percentage`
+- [ ] Costs and nutrients remain unchanged (already using correct logic)
+- [ ] Multi-tier passes (e.g., Core + Trial) each show their correct acre footprint
