@@ -67,7 +67,8 @@ const TIER_LABEL_STYLES: Record<string, { bg: string; text: string }> = {
 const CoverageDistribution: React.FC<{ 
   coverageGroups: CoverageGroup[]; 
   totalProducts: number;
-}> = ({ coverageGroups, totalProducts }) => {
+  totalAcres: number;
+}> = ({ coverageGroups, totalProducts, totalAcres }) => {
   if (coverageGroups.length === 0) return null;
   
   // Aggregate products by tier label (not by exact percentage)
@@ -77,9 +78,14 @@ const CoverageDistribution: React.FC<{
     return acc;
   }, {} as Record<string, number>);
   
+  // Get max acres treated from coverage groups
+  const maxAcresTreated = coverageGroups.length > 0 
+    ? Math.max(...coverageGroups.map(g => g.acresTreated))
+    : totalAcres;
+  
   const tiers = Object.entries(tierCounts) as [string, number][];
   
-  // Single tier - simple display
+  // Single tier - simple display with acres
   if (tiers.length === 1) {
     const [label, count] = tiers[0];
     const style = TIER_LABEL_STYLES[label];
@@ -88,7 +94,7 @@ const CoverageDistribution: React.FC<{
         <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
           {label}
         </span>
-        {count} product{count !== 1 ? 's' : ''}
+        {count} product{count !== 1 ? 's' : ''} · {formatNumber(maxAcresTreated, 0)} ac
       </span>
     );
   }
@@ -112,6 +118,7 @@ const CoverageDistribution: React.FC<{
           </span>
         );
       })}
+      <span>· {formatNumber(maxAcresTreated, 0)} ac</span>
     </span>
   );
 };
@@ -352,6 +359,7 @@ export const PassCard: React.FC<PassCardProps> = ({
               <CoverageDistribution 
                 coverageGroups={summary.coverageGroups} 
                 totalProducts={summary.applications.length}
+                totalAcres={crop.totalAcres}
               />
               {hasNutrients && (
                 <div className="flex flex-col gap-0.5">
@@ -465,8 +473,8 @@ export const PassCard: React.FC<PassCardProps> = ({
                                         group.nutrients.k > 0.1 || group.nutrients.s > 0.1;
               return (
               <div key={group.acresPercentage} className="space-y-2">
-                {/* Group Header - only show if multiple groups */}
-                {summary.coverageGroups.length > 1 && (
+                {/* Group Header - always show for acres visibility */}
+                {(
                   <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
