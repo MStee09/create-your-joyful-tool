@@ -4,15 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/calculations';
-import type { Vendor, ProductMaster } from '@/types';
+import type { Vendor, ProductMaster, VendorOffering } from '@/types';
 import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
-import type { NewPriceRecord } from '@/types/priceRecord';
+import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
 import { RecordPurchaseModal } from './RecordPurchaseModal';
 
 interface PurchasesViewProps {
   purchases: SimplePurchase[];
   vendors: Vendor[];
   products: ProductMaster[];
+  vendorOfferings: VendorOffering[];
+  priceRecords: PriceRecord[];
   currentSeasonId: string;
   currentSeasonYear: number;
   onAddPurchase: (purchase: NewSimplePurchase) => Promise<SimplePurchase | null>;
@@ -25,6 +27,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   purchases,
   vendors,
   products,
+  vendorOfferings,
+  priceRecords,
   currentSeasonId,
   currentSeasonYear,
   onAddPurchase,
@@ -259,6 +263,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         }}
         vendors={vendors}
         products={products}
+        vendorOfferings={vendorOfferings}
+        priceRecords={priceRecords}
         currentSeasonId={currentSeasonId}
         currentSeasonYear={currentSeasonYear}
         editingPurchase={editingPurchase || undefined}

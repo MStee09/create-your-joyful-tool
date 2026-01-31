@@ -1226,6 +1226,8 @@ const AppContent: React.FC = () => {
             purchases={simplePurchases || []}
             vendors={vendors}
             products={productMasters || []}
+            vendorOfferings={vendorOfferings || []}
+            priceRecords={priceRecords || []}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPurchase={addSimplePurchase}
@@ -1367,6 +1369,8 @@ const AppContent: React.FC = () => {
             purchases={simplePurchases || []}
             vendors={vendors}
             products={productMasters || []}
+            vendorOfferings={vendorOfferings || []}
+            priceRecords={priceRecords || []}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPurchase={addSimplePurchase}
