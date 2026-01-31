@@ -171,9 +171,10 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setLines(lines.filter(line => line.id !== id));
   };
 
-  // Calculate line totals
+  // Calculate line totals (Total Vol × Price per unit)
   const calculateLineTotal = (line: PurchaseLineInput) => {
-    return line.quantity * line.unitPrice;
+    const totalVolume = line.quantity * line.packageSize;
+    return totalVolume * line.unitPrice;
   };
 
   const calculateNormalizedPrice = (line: PurchaseLineInput) => {
