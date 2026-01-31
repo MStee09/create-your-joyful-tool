@@ -1,137 +1,101 @@
 
 
-# Add Total Physical Quantity to Pass Headers
+# Improve Physical Quantity Visual Organization
 
-## Overview
-Add a display of total physical product volume/weight at the pass level, showing how much actual product is being applied in each pass (e.g., "115 lbs dry + 3.5 gal liquid").
+## The Problem
+The lbs/gal values currently blend into the nutrient analysis line:
+```
+• N 67.0 | P 0.0 | K 22.0 | S 27.6 · 240 lbs · 0.0 gal
+```
+
+Everything uses the same color, size, and weight - your eyes can't distinguish between nutrient analysis (lbs N/P/K/S per acre) and total physical product (lbs and gal of actual product).
 
 ---
 
-## Current State
-Looking at your screenshot, the pass header shows:
-- **N 45.7 | P 0.0 | K 25.0 | S 27.0** (nutrient lbs/ac)
-- **$53.90/ac** and **$7,007.00 total**
+## Proposed Solution: Separate Visual Block
 
-Individual products show their rate (e.g., "50.0 lbs", "65.0 lbs") but the pass header doesn't aggregate these into a total.
+Move physical quantities to their own distinct display, styled differently from nutrients.
 
----
-
-## Proposed Display
-
-Add a line to the pass header showing:
-
-```
-• 115 lbs dry · 0 gal liquid
-```
-
-Or simplified when only one form is present:
-```
-• 115 lbs dry
-```
-
-For the pass in your screenshot (SOP 50 lbs + Urea 65 lbs + AMS ~65 lbs assumed):
-```
-• ~180 lbs dry
-```
-
----
-
-## Implementation
-
-### 1. Add Physical Quantities to PassSummary Interface
-
-**File: `src/lib/cropCalculations.ts`**
-
-Add new fields to track total physical product:
-
-```typescript
-export interface PassSummary {
-  // ... existing fields
-  physicalQuantity: {
-    totalDryLbs: number;    // Total lbs of dry product per acre
-    totalLiquidGal: number; // Total gallons of liquid product per acre
-  };
-}
-```
-
-### 2. Calculate Quantities in Pass Summary Functions
-
-**File: `src/lib/cropCalculations.ts`**
-
-In `calculatePassSummary()` and `calculatePassSummaryWithPriceBook()`:
-
-```typescript
-// Track physical quantities (per acre rates)
-const physicalQuantity = { totalDryLbs: 0, totalLiquidGal: 0 };
-
-applications.forEach(app => {
-  const product = products.find(p => p.id === app.productId);
-  if (!product) return;
-  
-  if (product.form === 'liquid') {
-    // Convert rate to gallons
-    physicalQuantity.totalLiquidGal += convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-  } else {
-    // Convert rate to pounds
-    physicalQuantity.totalDryLbs += convertToPounds(app.rate, app.rateUnit as DryUnit);
-  }
-});
-
-// Include in return
-return {
-  // ...existing fields
-  physicalQuantity,
-};
-```
-
-### 3. Display in PassCard Header
-
-**File: `src/components/farm/PassCard.tsx`**
-
-Add after the nutrient summary line:
-
-```tsx
-{/* Physical quantity summary */}
-{(summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
-  <span className="text-sm text-muted-foreground">
-    • {summary.physicalQuantity.totalDryLbs > 0 && (
-      <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
-    )}
-    {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && (
-      <> · </>
-    )}
-    {summary.physicalQuantity.totalLiquidGal > 0 && (
-      <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
-    )}
-  </span>
-)}
-```
-
----
-
-## Visual Result
+### Visual Hierarchy (Before vs After)
 
 **Before:**
 ```
-PREPLANT DRY BROADCAST
-  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
-                   Ratios N:S 1.7:1 · N:K 1.8:1
+Core 5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6 · 240 lbs · 0.0 gal
+                   Ratios N:S 2.4:1 · N:K 3.0:1
 ```
 
 **After:**
 ```
-PREPLANT DRY BROADCAST
-  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
-                   Ratios N:S 1.7:1 · N:K 1.8:1 · 180 lbs
+Core 5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6
+                   Ratios N:S 2.4:1 · N:K 3.0:1
+
+                   [240 lbs]   (dry)   [— gal]   (liquid)
+                   └── styled as pills/badges with distinct color
 ```
 
-Or displayed on its own line for clarity:
+---
+
+## Design Options
+
+### Option A: Pill/Badge Style (Recommended)
+Display as small colored badges, similar to the tier badges (Core/Building/Trial):
+
 ```
-PREPLANT DRY BROADCAST
-  Core 3 products  • N 45.7 | P 0.0 | K 25.0 | S 27.0
-                   Ratios N:S 1.7:1 · N:K 1.8:1
-                   180 lbs dry product/ac
+                   ┌─────────────────┐
+  240 lbs  dry     │  bg-stone-100   │  ← warm neutral for dry
+                   └─────────────────┘
+  12.5 gal liquid  │  bg-sky-100     │  ← cool blue for liquid
+                   └─────────────────┘
 ```
+
+- **Dry products**: Stone/warm neutral badge (`bg-stone-100/50 text-stone-700`)
+- **Liquid products**: Sky/water blue badge (`bg-sky-100/50 text-sky-700`)
+- Only show non-zero values (hide `0.0 gal` if no liquid products)
+- Position: Below the nutrient ratios line, or inline after ratios with clear separation
+
+### Option B: Inline with Icon Differentiation
+Keep inline but add icons and bolder styling:
+```
+• N 67.0 | P 0.0 | K 22.0 | S 27.6
+  Ratios N:S 2.4:1 · N:K 3.0:1  •  📦 240 lbs  •  💧 12.5 gal
+```
+
+### Option C: Side-aligned Summary Block
+Position on the right side of the header, vertically stacked:
+```
+                                                    240 lbs
+                                                    12.5 gal
+```
+
+---
+
+## Recommended Implementation (Option A)
+
+### Visual Treatment
+```tsx
+{/* Physical quantity badges - separate from nutrient line */}
+<div className="flex items-center gap-2 mt-1">
+  {summary.physicalQuantity.totalDryLbs > 0 && (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-xs font-medium">
+      <span className="font-semibold">{formatNumber(totalDryLbs, 0)}</span>
+      <span className="text-stone-500">lbs</span>
+    </span>
+  )}
+  {summary.physicalQuantity.totalLiquidGal > 0 && (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-xs font-medium">
+      <span className="font-semibold">{formatNumber(totalLiquidGal, 1)}</span>
+      <span className="text-sky-500">gal</span>
+    </span>
+  )}
+</div>
+```
+
+### Key Changes
+1. **Remove** the inline physical quantity from the nutrient line (lines 361-372)
+2. **Add** a new row below the ratios line with distinct badge styling
+3. **Only show non-zero** values (no more "0.0 gal" clutter)
+4. **Color coding**: Stone/brown for dry (earthy), Sky/blue for liquid (water)
+5. **Font weight**: Make the number bold, unit muted
 
 ---
 
@@ -139,26 +103,29 @@ PREPLANT DRY BROADCAST
 
 | File | Changes |
 |------|---------|
-| `src/lib/cropCalculations.ts` | Add `physicalQuantity` to `PassSummary` interface, calculate in both `calculatePassSummary()` and `calculatePassSummaryWithPriceBook()` |
-| `src/components/farm/PassCard.tsx` | Display the physical quantity in the pass header |
+| `src/components/farm/PassCard.tsx` | Remove inline display, add new badge-style display below nutrients |
 
 ---
 
-## Edge Cases
+## Result Preview
 
-| Scenario | Display |
-|----------|---------|
-| Only dry products | "180 lbs" |
-| Only liquid products | "5.2 gal" |
-| Mixed dry + liquid | "115 lbs · 2.5 gal" |
-| No products | (hidden) |
+```
+TOPDRESS
+V5 → V6 ⏱
 
----
+Uniform   Uptake   Water / Adj   ⏰ 4                    $65.28/ac
+                                                        $8,617.33 total
+Core  5 products  • N 67.0 | P 0.0 | K 22.0 | S 27.6
+                    Ratios N:S 2.4:1 · N:K 3.0:1
+                    
+                    [240 lbs]     ← stone/warm badge
+```
 
-## Technical Notes
+When there's both dry and liquid:
+```
+                    [180 lbs]  [12.5 gal]
+                    ↑ stone    ↑ sky blue
+```
 
-- Quantities are **per-acre rates** (matching how individual product rates are displayed)
-- Uses existing `convertToGallons()` and `convertToPounds()` functions
-- Handles all rate units (oz, lbs, g, ton, qt, gal)
-- Does NOT account for acres percentage (shows raw per-acre amount) - this matches how individual product rates are displayed
+This creates clear visual separation - nutrients are analysis data (N-P-K-S contributions), physical quantities are logistics data (what you're actually hauling/mixing).
 
