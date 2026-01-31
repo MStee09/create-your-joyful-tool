@@ -43,6 +43,11 @@ export interface PassSummary {
   dominantAcres: number;
   costPerTreatedAcre: number;
   costPerFieldAcre: number;
+  // Physical quantity totals (per acre)
+  physicalQuantity: {
+    totalDryLbs: number;
+    totalLiquidGal: number;
+  };
 }
 
 export interface IntensityBreakdown {
@@ -348,6 +353,7 @@ export const calculatePassSummary = (
   let totalCost = 0;
   let totalAcresPercentage = 0;
   const nutrients = { n: 0, p: 0, k: 0, s: 0 };
+  const physicalQuantity = { totalDryLbs: 0, totalLiquidGal: 0 };
 
   applications.forEach(app => {
     const product = products.find(p => p.id === app.productId);
@@ -364,6 +370,15 @@ export const calculatePassSummary = (
     nutrients.p += appNutrients.p * weight;
     nutrients.k += appNutrients.k * weight;
     nutrients.s += appNutrients.s * weight;
+    
+    // Accumulate physical quantities (per acre rate)
+    if (product) {
+      if (product.form === 'liquid') {
+        physicalQuantity.totalLiquidGal += convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      } else {
+        physicalQuantity.totalDryLbs += convertToPounds(app.rate, app.rateUnit as DryUnit);
+      }
+    }
   });
 
   // Calculate coverage groups
@@ -391,6 +406,7 @@ export const calculatePassSummary = (
     dominantAcres: dominantGroup?.acresPercentage || 100,
     costPerTreatedAcre: totalCostPerTreated,
     costPerFieldAcre: totalCostPerField,
+    physicalQuantity,
   };
 };
 
@@ -412,6 +428,7 @@ export const calculatePassSummaryWithPriceBook = (
   let totalCost = 0;
   let totalAcresPercentage = 0;
   const nutrients = { n: 0, p: 0, k: 0, s: 0 };
+  const physicalQuantity = { totalDryLbs: 0, totalLiquidGal: 0 };
 
   applications.forEach(app => {
     const product = products.find(p => p.id === app.productId);
@@ -436,6 +453,15 @@ export const calculatePassSummaryWithPriceBook = (
     nutrients.p += appNutrients.p * weight;
     nutrients.k += appNutrients.k * weight;
     nutrients.s += appNutrients.s * weight;
+    
+    // Accumulate physical quantities (per acre rate)
+    if (product) {
+      if (product.form === 'liquid') {
+        physicalQuantity.totalLiquidGal += convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      } else {
+        physicalQuantity.totalDryLbs += convertToPounds(app.rate, app.rateUnit as DryUnit);
+      }
+    }
   });
 
   // Calculate coverage groups with price book
@@ -461,6 +487,7 @@ export const calculatePassSummaryWithPriceBook = (
     dominantAcres: dominantGroup?.acresPercentage || 100,
     costPerTreatedAcre: totalCostPerTreated,
     costPerFieldAcre: totalCostPerField,
+    physicalQuantity,
   };
 };
 

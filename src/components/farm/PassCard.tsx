@@ -347,7 +347,7 @@ export const PassCard: React.FC<PassCardProps> = ({
               )}
             </div>
             
-            {/* Coverage distribution + nutrients */}
+            {/* Coverage distribution + nutrients + physical quantity */}
             <div className="flex items-center gap-2 mt-0.5">
               <CoverageDistribution 
                 coverageGroups={summary.coverageGroups} 
@@ -357,6 +357,19 @@ export const PassCard: React.FC<PassCardProps> = ({
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm text-muted-foreground">
                     • N {formatNumber(summary.nutrients.n, 1)} | P {formatNumber(summary.nutrients.p, 1)} | K {formatNumber(summary.nutrients.k, 1)} | S {formatNumber(summary.nutrients.s, 1)}
+                    {/* Physical quantity inline */}
+                    {(summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
+                      <>
+                        {' · '}
+                        {summary.physicalQuantity.totalDryLbs > 0 && (
+                          <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
+                        )}
+                        {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && ' · '}
+                        {summary.physicalQuantity.totalLiquidGal > 0 && (
+                          <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
+                        )}
+                      </>
+                    )}
                   </span>
                   {(summary.nutrients.s > 0 || summary.nutrients.k > 0) && (
                     <span className="text-xs text-muted-foreground ml-2">
@@ -371,6 +384,18 @@ export const PassCard: React.FC<PassCardProps> = ({
                     </span>
                   )}
                 </div>
+              )}
+              {/* Physical quantity when no nutrients */}
+              {!hasNutrients && (summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
+                <span className="text-sm text-muted-foreground">
+                  • {summary.physicalQuantity.totalDryLbs > 0 && (
+                    <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
+                  )}
+                  {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && ' · '}
+                  {summary.physicalQuantity.totalLiquidGal > 0 && (
+                    <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
+                  )}
+                </span>
               )}
             </div>
           </div>
