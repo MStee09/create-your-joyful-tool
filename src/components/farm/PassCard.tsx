@@ -357,19 +357,6 @@ export const PassCard: React.FC<PassCardProps> = ({
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm text-muted-foreground">
                     • N {formatNumber(summary.nutrients.n, 1)} | P {formatNumber(summary.nutrients.p, 1)} | K {formatNumber(summary.nutrients.k, 1)} | S {formatNumber(summary.nutrients.s, 1)}
-                    {/* Physical quantity inline */}
-                    {(summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
-                      <>
-                        {' · '}
-                        {summary.physicalQuantity.totalDryLbs > 0 && (
-                          <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
-                        )}
-                        {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && ' · '}
-                        {summary.physicalQuantity.totalLiquidGal > 0 && (
-                          <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
-                        )}
-                      </>
-                    )}
                   </span>
                   {(summary.nutrients.s > 0 || summary.nutrients.k > 0) && (
                     <span className="text-xs text-muted-foreground ml-2">
@@ -383,19 +370,41 @@ export const PassCard: React.FC<PassCardProps> = ({
                       )}
                     </span>
                   )}
+                  {/* Physical quantity badges - separate visual block */}
+                  {(summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
+                    <div className="flex items-center gap-2 mt-1 ml-2">
+                      {summary.physicalQuantity.totalDryLbs > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-xs font-medium">
+                          <span className="font-semibold">{formatNumber(summary.physicalQuantity.totalDryLbs, 0)}</span>
+                          <span className="text-stone-500">lbs</span>
+                        </span>
+                      )}
+                      {summary.physicalQuantity.totalLiquidGal > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-xs font-medium">
+                          <span className="font-semibold">{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)}</span>
+                          <span className="text-sky-500">gal</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
-              {/* Physical quantity when no nutrients */}
+              {/* Physical quantity badges when no nutrients */}
               {!hasNutrients && (summary.physicalQuantity.totalDryLbs > 0 || summary.physicalQuantity.totalLiquidGal > 0) && (
-                <span className="text-sm text-muted-foreground">
-                  • {summary.physicalQuantity.totalDryLbs > 0 && (
-                    <>{formatNumber(summary.physicalQuantity.totalDryLbs, 0)} lbs</>
+                <div className="flex items-center gap-2">
+                  {summary.physicalQuantity.totalDryLbs > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-xs font-medium">
+                      <span className="font-semibold">{formatNumber(summary.physicalQuantity.totalDryLbs, 0)}</span>
+                      <span className="text-stone-500">lbs</span>
+                    </span>
                   )}
-                  {summary.physicalQuantity.totalDryLbs > 0 && summary.physicalQuantity.totalLiquidGal > 0 && ' · '}
                   {summary.physicalQuantity.totalLiquidGal > 0 && (
-                    <>{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)} gal</>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-xs font-medium">
+                      <span className="font-semibold">{formatNumber(summary.physicalQuantity.totalLiquidGal, 1)}</span>
+                      <span className="text-sky-500">gal</span>
+                    </span>
                   )}
-                </span>
+                </div>
               )}
             </div>
           </div>
