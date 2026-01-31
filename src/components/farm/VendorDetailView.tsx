@@ -30,6 +30,8 @@ import type {
 import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
 import { generateId, formatCurrency, formatNumber, CATEGORY_LABELS } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AddProductToVendorModal } from './AddProductToVendorModal';
 
 interface VendorDetailViewProps {
   vendor: Vendor;
@@ -39,6 +41,9 @@ interface VendorDetailViewProps {
   onUpdateVendor: (vendor: Vendor) => void;
   onNavigateToProduct: (productId: string) => void;
   onBack: () => void;
+  onAddProduct?: (product: ProductMaster) => void;
+  onAddVendorOffering?: (offering: VendorOffering) => void;
+  onUpdateOfferings?: (offerings: VendorOffering[]) => void;
 }
 
 const TAG_LABELS: Record<VendorTag, string> = {
@@ -58,7 +63,11 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
   onUpdateVendor,
   onNavigateToProduct,
   onBack,
+  onAddProduct,
+  onAddVendorOffering,
+  onUpdateOfferings,
 }) => {
+  const [showAddProduct, setShowAddProduct] = useState(false);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [editName, setEditName] = useState(vendor.name);
   const [editWebsite, setEditWebsite] = useState(vendor.website || '');
@@ -402,8 +411,23 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
 
           {/* Products Table */}
           <div className="bg-card rounded-xl border border-border">
-            <div className="px-6 py-4 border-b border-border">
-              <h3 className="font-semibold text-foreground">Products from this Vendor</h3>
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">Products from this Vendor</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {stats.productCount} products • {stats.preferredCount} preferred
+                </p>
+              </div>
+              {onAddProduct && onAddVendorOffering && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowAddProduct(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Product
+                </Button>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -797,6 +821,33 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Add Product to Vendor Modal */}
+      {onAddProduct && onAddVendorOffering && (
+        <AddProductToVendorModal
+          isOpen={showAddProduct}
+          onClose={() => setShowAddProduct(false)}
+          vendor={vendor}
+          existingProducts={productMasters}
+          existingOfferings={vendorOfferings}
+          onAddOffering={(offering) => {
+            onAddVendorOffering(offering);
+            // If setting as preferred, unset other offerings for this product
+            if (offering.isPreferred && onUpdateOfferings) {
+              const updated = vendorOfferings.map(o => 
+                o.productId === offering.productId && o.id !== offering.id
+                  ? { ...o, isPreferred: false }
+                  : o
+              );
+              onUpdateOfferings(updated);
+            }
+          }}
+          onAddProduct={(product, offering) => {
+            onAddProduct(product);
+            onAddVendorOffering(offering);
+          }}
+        />
+      )}
     </div>
   );
 };

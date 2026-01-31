@@ -283,13 +283,16 @@ const ProductsViewNew: React.FC<{
   inventory: InventoryItem[];
   commoditySpecs: CommoditySpec[];
   currentSeason: Season | null;
+  priceRecords?: any[];
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
   onAddProduct: (product: ProductMaster) => void;
   onUpdateProductMaster: (product: ProductMaster) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
+  onAddVendorOffering?: (offering: VendorOffering) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
+  onAddPriceRecord?: (record: any) => Promise<any>;
 }> = ({ 
   productMasters, 
   vendorOfferings, 
@@ -297,13 +300,16 @@ const ProductsViewNew: React.FC<{
   inventory,
   commoditySpecs,
   currentSeason,
+  priceRecords = [],
   onUpdateProductMasters,
   onAddProduct,
   onUpdateProductMaster,
   onUpdateOfferings,
+  onAddVendorOffering,
   onUpdateInventory,
   onUpdateSpecs,
   onNavigateToVendor,
+  onAddPriceRecord,
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
     const saved = sessionStorage.getItem('farmcalc-selected-product');
@@ -320,10 +326,8 @@ const ProductsViewNew: React.FC<{
     ? productMasters.find(p => p.id === selectedProductId) 
     : null;
 
-  // If the product no longer exists (deleted or not yet loaded), clear selection
   useEffect(() => {
     if (selectedProductId && !selectedProduct) selectProduct(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productMasters, selectedProductId]);
 
   const handleAddProduct = (product: ProductMaster) => {
@@ -336,7 +340,6 @@ const ProductsViewNew: React.FC<{
 
   const handleDeleteProduct = (productId: string) => {
     onUpdateProductMasters(productMasters.filter(p => p.id !== productId));
-    // Also remove related offerings and inventory
     onUpdateOfferings(vendorOfferings.filter(o => o.productId !== productId));
     onUpdateInventory(inventory.filter(i => i.productId !== productId));
     selectProduct(null);
@@ -350,6 +353,8 @@ const ProductsViewNew: React.FC<{
         vendors={vendors}
         inventory={inventory}
         commoditySpecs={commoditySpecs}
+        priceRecords={priceRecords}
+        currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
         onUpdateProduct={handleUpdateProduct}
         onUpdateOfferings={onUpdateOfferings}
         onUpdateInventory={onUpdateInventory}
@@ -357,6 +362,7 @@ const ProductsViewNew: React.FC<{
         onDeleteProduct={handleDeleteProduct}
         onBack={() => selectProduct(null)}
         onNavigateToVendor={onNavigateToVendor}
+        onAddPriceRecord={onAddPriceRecord}
       />
     );
   }
@@ -370,6 +376,7 @@ const ProductsViewNew: React.FC<{
       currentSeason={currentSeason}
       onSelectProduct={selectProduct}
       onAddProduct={handleAddProduct}
+      onAddVendorOffering={onAddVendorOffering}
     />
   );
 };
@@ -1176,13 +1183,16 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             commoditySpecs={state.commoditySpecs || []}
             currentSeason={currentSeason}
+            priceRecords={priceRecords || []}
             onUpdateProductMasters={handleUpdateProductMasters}
             onAddProduct={handleAddProduct}
             onUpdateProductMaster={handleUpdateProductMaster}
             onUpdateOfferings={handleUpdateVendorOfferings}
+            onAddVendorOffering={(offering) => handleUpdateVendorOfferings([...(state.vendorOfferings || []), offering])}
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
+            onAddPriceRecord={addPriceRecord}
           />
         );
       case 'vendors':
