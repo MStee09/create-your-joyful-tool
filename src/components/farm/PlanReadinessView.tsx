@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
-import type { Order } from '@/types/orderInvoice';
+import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
 import { ExplainMathDrawer } from './ExplainMathDrawer';
@@ -14,7 +14,7 @@ interface PlanReadinessViewProps {
   products: Product[];
   vendors: Vendor[];
   season: Season | null;
-  orders: Order[];
+  purchases: SimplePurchase[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
@@ -27,9 +27,9 @@ const fmt = (n: number, decimals = 1) =>
   });
 
 function statusPill(status: ReadinessStatus) {
-  if (status === 'READY') return { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
-  if (status === 'ON_ORDER') return { label: 'On Order', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
-  return { label: 'Blocking', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
+  if (status === 'READY') return { label: 'On Hand', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
+  if (status === 'ON_ORDER') return { label: 'Ordered', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
+  return { label: 'Need to Order', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
 }
 
 export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
@@ -37,7 +37,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   products,
   vendors,
   season,
-  orders,
+  purchases,
   onUpdateInventory,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
@@ -76,31 +76,38 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     });
   }, [plannedUsage, products]);
 
-  // 3) Compute readiness with canonical aggregation (FIXED: no inventory.find() bug)
+  // 3) Filter purchases to current season with 'ordered' status
+  const scopedPurchases = useMemo(() => {
+    return (purchases || []).filter(p => {
+      if (season?.id && p.seasonId !== season.id) return false;
+      return p.status === 'ordered';
+    });
+  }, [purchases, season]);
+
+  // 4) Compute readiness with canonical aggregation
   //    This properly sums ALL inventory rows for each product and includes on-order quantities
   const readiness = useMemo(() => {
     return computeReadiness({
       planned: plannedForEngine,
       inventory,
-      orders: orders || [],
+      orders: scopedPurchases,
       inventoryAccessors: {
         getProductId: (row: InventoryItem) => row.productId,
         getQty: (row: InventoryItem) => row.quantity,
         getContainerCount: (row: InventoryItem) => row.containerCount,
       },
       orderAccessors: {
-        orders: orders || [],
-        getOrderId: (o: Order) => o.id,
-        getOrderStatus: (o: Order) => o.status,
-        getVendorName: (o: Order) => vendors.find(v => v.id === o.vendorId)?.name ?? undefined,
-        getLines: (o: Order) => o.lineItems || [],
-        getLineProductId: (l) => l.productId,
-        getLineRemainingQty: (l: any) =>
-          l.remainingQuantity ?? (Number(l.orderedQuantity || 0) - Number(l.receivedQuantity || 0)),
-        getLineUnit: (l) => l.unit,
+        orders: scopedPurchases,
+        getOrderId: (p: SimplePurchase) => p.id,
+        getOrderStatus: (p: SimplePurchase) => p.status,
+        getVendorName: (p: SimplePurchase) => vendors.find(v => v.id === p.vendorId)?.name ?? undefined,
+        getLines: (p: SimplePurchase) => p.lines || [],
+        getLineProductId: (l: SimplePurchaseLine) => l.productId,
+        getLineRemainingQty: (l: SimplePurchaseLine) => l.totalQuantity || (l.quantity * (l.packageSize || 1)),
+        getLineUnit: (l: SimplePurchaseLine) => l.packageUnit || l.normalizedUnit,
       },
     });
-  }, [plannedForEngine, inventory, orders, vendors]);
+  }, [plannedForEngine, inventory, scopedPurchases, vendors]);
 
   // Helper: get usages detail for a product (so we can show "used in")
   const usageMap = useMemo(() => {
@@ -222,9 +229,9 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-stone-800">Plan Readiness</h2>
+            <h2 className="text-2xl font-bold text-stone-800">Order Status</h2>
             <p className="text-sm text-stone-500 mt-1">
-              Track inventory coverage for your crop plans. Inventory is summed across all rows per product.
+              Product availability for your {season?.year || 'current'} crop plans
             </p>
           </div>
         </div>
@@ -250,7 +257,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               </div>
               <div>
                 <p className="text-2xl font-bold text-emerald-600">{readiness.readyCount}</p>
-                <p className="text-sm text-stone-500">Ready</p>
+                <p className="text-sm text-stone-500">On Hand</p>
               </div>
             </div>
           </div>
@@ -262,7 +269,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               </div>
               <div>
                 <p className="text-2xl font-bold text-amber-600">{readiness.onOrderCount}</p>
-                <p className="text-sm text-stone-500">On Order</p>
+                <p className="text-sm text-stone-500">Ordered</p>
               </div>
             </div>
           </div>
@@ -274,7 +281,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               </div>
               <div>
                 <p className="text-2xl font-bold text-rose-600">{readiness.blockingCount}</p>
-                <p className="text-sm text-stone-500">Blocking</p>
+                <p className="text-sm text-stone-500">Need to Order</p>
               </div>
             </div>
           </div>
@@ -294,15 +301,15 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
           <div className="mt-3 flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-              <span className="text-stone-600">Ready ({readiness.readyCount})</span>
+              <span className="text-stone-600">On Hand ({readiness.readyCount})</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-amber-500 rounded-full" />
-              <span className="text-stone-600">On Order ({readiness.onOrderCount})</span>
+              <span className="text-stone-600">Ordered ({readiness.onOrderCount})</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-rose-500 rounded-full" />
-              <span className="text-stone-600">Blocking ({readiness.blockingCount})</span>
+              <span className="text-stone-600">Need to Order ({readiness.blockingCount})</span>
             </div>
           </div>
         </div>
@@ -312,9 +319,9 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <div className="flex flex-wrap gap-2">
         {([
           { id: 'all', label: 'All', count: readiness.totalCount },
-          { id: 'blocking', label: 'Blocking', count: readiness.blockingCount },
-          { id: 'on-order', label: 'On Order', count: readiness.onOrderCount },
-          { id: 'ready', label: 'Ready', count: readiness.readyCount },
+          { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
+          { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
+          { id: 'ready', label: 'On Hand', count: readiness.readyCount },
         ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
           <button
             key={t.id}

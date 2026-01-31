@@ -216,7 +216,14 @@ const Sidebar: React.FC<{
         <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Plan</div>
         <NavButton id="dashboard" label="Dashboard" icon={BarChart3} />
         <NavButton id="crops" label="Crop Plans" icon={Leaf} />
-        <NavButton id="procurement" label="Demand Summary" icon={ClipboardList} />
+
+        {/* PROCUREMENT section */}
+        <div className="pt-4 mt-4 border-t border-stone-700">
+          <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Procurement</div>
+          <NavButton id="plan-readiness" label="Order Status" icon={ClipboardCheck} />
+          <NavButton id="purchases" label="Purchases" icon={ShoppingCart} />
+          <NavButton id="vendor-spend" label="Vendor Spend" icon={DollarSign} />
+        </div>
 
         {/* PRODUCTS section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
@@ -230,7 +237,6 @@ const Sidebar: React.FC<{
         <div className="pt-4 mt-4 border-t border-stone-700">
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Inventory</div>
           <NavButton id="inventory" label="On Hand" icon={Warehouse} />
-          <NavButton id="purchases" label="Purchases" icon={ShoppingCart} />
         </div>
 
         {/* Bottom section */}
@@ -1256,6 +1262,16 @@ const AppContent: React.FC = () => {
         );
       // 'orders' case handled above in legacy redirect block
       case 'plan-readiness':
+        return (
+          <PlanReadinessView
+            inventory={state.inventory}
+            products={legacyProducts}
+            vendors={state.vendors}
+            season={currentSeason}
+            purchases={simplePurchases || []}
+            onUpdateInventory={handleUpdateInventory}
+          />
+        );
       case 'variance':
       case 'variance-by-pass':
       case 'alerts':
