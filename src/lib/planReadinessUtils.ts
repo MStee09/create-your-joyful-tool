@@ -23,6 +23,11 @@ export function calculateReadinessSummary(
   inventory: InventoryItem[],
   purchases: SimplePurchase[] = []
 ): ReadinessSummary {
+  const scopedPurchases = (purchases || []).filter(p => {
+    if (season?.id && p.seasonId !== season.id) return false;
+    return p.status === 'ordered';
+  });
+
   const plannedUsage = calculatePlannedUsage(season, products);
 
   const plannedForEngine: PlannedUsage[] = plannedUsage.map((u: PlannedUsageItem) => {
@@ -43,14 +48,14 @@ export function calculateReadinessSummary(
   const readiness = computeReadiness({
     planned: plannedForEngine,
     inventory,
-    orders: purchases,
+    orders: scopedPurchases,
     inventoryAccessors: {
       getProductId: (row: InventoryItem) => row.productId,
       getQty: (row: InventoryItem) => row.quantity,
       getContainerCount: (row: InventoryItem) => row.containerCount,
     },
     orderAccessors: {
-      orders: purchases,
+      orders: scopedPurchases,
       getOrderId: (p: SimplePurchase) => p.id,
       getOrderStatus: (p: SimplePurchase) => p.status,
       getVendorName: () => undefined, // dashboard doesn't need vendor names

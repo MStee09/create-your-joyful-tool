@@ -305,6 +305,29 @@ export function useSupabaseData(user: User | null) {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }));
+
+      // Map simple purchases (same underlying table, newer columns)
+      const simplePurchases: SimplePurchase[] = (purchasesRes.data || [])
+        .filter((row: any) => !!row.season_id)
+        .map((row: any) => ({
+          id: row.id,
+          userId: row.user_id,
+          seasonId: row.season_id,
+          vendorId: row.vendor_id,
+          status: (row.status || 'ordered') as 'ordered' | 'received',
+          orderDate: row.order_date || row.date,
+          expectedDeliveryDate: row.expected_delivery_date || undefined,
+          receivedDate: row.received_date || undefined,
+          lines: (Array.isArray(row.line_items) ? row.line_items : []) as unknown as SimplePurchaseLine[],
+          freightCost: Number(row.freight_cost) || 0,
+          freightNotes: row.freight_notes || undefined,
+          subtotal: Number(row.subtotal) || 0,
+          total: Number(row.total) || 0,
+          notes: row.notes || undefined,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }))
+        .sort((a, b) => new Date((b.receivedDate || b.orderDate) as string).getTime() - new Date((a.receivedDate || a.orderDate) as string).getTime());
       
       // Map inventory transactions
       const inventoryTransactions: InventoryTransaction[] = (transactionsRes.data || []).map((row: any) => ({
@@ -425,7 +448,7 @@ export function useSupabaseData(user: User | null) {
         orders,
         invoices,
         priceRecords,
-        simplePurchases: [],
+        simplePurchases,
         currentSeasonId,
         loading: false,
         error: null,
