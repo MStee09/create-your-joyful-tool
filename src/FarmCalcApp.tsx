@@ -1158,7 +1158,7 @@ const AppContent: React.FC = () => {
             priceBook={state.priceBook || []}
             seasonYear={currentSeason?.year || new Date().getFullYear()}
             inventory={state.inventory}
-            orders={state.orders}
+            purchases={simplePurchases || []}
             onViewChange={setActiveView}
           />
         );
@@ -1268,7 +1268,7 @@ const AppContent: React.FC = () => {
             priceBook={state.priceBook || []}
             seasonYear={currentSeason?.year}
             inventory={state.inventory}
-            orders={state.orders || []}
+            purchases={simplePurchases || []}
             onViewChange={setActiveView}
           />
         );

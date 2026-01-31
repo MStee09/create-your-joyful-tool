@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
-import type { Order } from '@/types/orderInvoice';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
@@ -15,7 +15,7 @@ interface DashboardViewProps {
   priceBook?: PriceBookEntry[];
   seasonYear?: number;
   inventory?: InventoryItem[];
-  orders?: Order[];
+  purchases?: SimplePurchase[];
   onViewChange?: (view: string) => void;
 }
 
@@ -26,7 +26,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   priceBook = [],
   seasonYear = new Date().getFullYear(),
   inventory = [],
-  orders = [],
+  purchases = [],
   onViewChange,
 }) => {
   // Build price book context for consistent cost calculations
@@ -89,10 +89,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return null;
   };
 
-  // Calculate plan readiness - NOW WITH ORDERS!
+  // Calculate plan readiness using SimplePurchases
   const readiness = useMemo(() => 
-    calculateReadinessSummary(season, products, inventory, orders),
-    [season, products, inventory, orders]
+    calculateReadinessSummary(season, products, inventory, purchases),
+    [season, products, inventory, purchases]
   );
 
   return (
