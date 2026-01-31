@@ -132,6 +132,27 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
     };
   }, [vendorOfferingsFiltered, productsWithOfferings]);
 
+  // Group products by category
+  const productsByCategory = useMemo(() => {
+    const grouped: Record<string, typeof productsWithOfferings> = {};
+    
+    productsWithOfferings.forEach(item => {
+      if (!item) return;
+      const category = CATEGORY_LABELS[item.product.category as keyof typeof CATEGORY_LABELS] || 'Other';
+      if (!grouped[category]) grouped[category] = [];
+      grouped[category].push(item);
+    });
+    
+    // Sort categories alphabetically, but put "Other" last
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b);
+    });
+    
+    return { grouped, sortedCategories };
+  }, [productsWithOfferings]);
+
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Vendors', onClick: onBack },
     { label: vendor.name },
@@ -409,7 +430,7 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Products Table */}
+          {/* Products by Category */}
           <div className="bg-card rounded-xl border border-border">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
               <div>
@@ -429,73 +450,74 @@ export const VendorDetailView: React.FC<VendorDetailViewProps> = ({
                 </Button>
               )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Product</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Category</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Form</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">lbs/gal</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">$/lb</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Preferred</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">On Hand</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {productsWithOfferings.map((item) => {
-                    if (!item) return null;
-                    const { product, offering, totalOnHand, unit, costPerLb } = item;
-                    return (
-                      <tr
-                        key={offering.id}
-                        className="hover:bg-muted/30 cursor-pointer"
-                        onClick={() => onNavigateToProduct(product.id)}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground">{product.name}</span>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            
+            <div className="p-4 space-y-6">
+              {productsByCategory.sortedCategories.map(category => {
+                const items = productsByCategory.grouped[category];
+                return (
+                  <div key={category}>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {category} ({items.length})
+                    </h4>
+                    <div className="bg-muted/30 rounded-lg border border-border divide-y divide-border">
+                      {items.map(item => {
+                        if (!item) return null;
+                        const { product, offering, totalOnHand, unit, costPerLb } = item;
+                        return (
+                          <div
+                            key={offering.id}
+                            onClick={() => onNavigateToProduct(product.id)}
+                            className="px-4 py-3 flex items-center gap-4 hover:bg-muted/50 cursor-pointer"
+                          >
+                            {/* Preferred star */}
+                            <div className="w-5 flex-shrink-0">
+                              {offering.isPreferred && (
+                                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                              )}
+                            </div>
+                            
+                            {/* Product name */}
+                            <span className="font-medium text-foreground flex-1 min-w-0 truncate">
+                              {product.name}
+                            </span>
+                            
+                            {/* Form icon */}
+                            {product.form === 'liquid' ? (
+                              <Droplets className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            ) : (
+                              <Weight className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                            )}
+                            
+                            {/* Price */}
+                            <span className="text-sm text-muted-foreground w-24 text-right flex-shrink-0">
+                              {formatCurrency(offering.price)}/{offering.priceUnit}
+                            </span>
+                            
+                            {/* Cost per lb */}
+                            <span className="text-sm font-medium text-primary w-20 text-right flex-shrink-0">
+                              {costPerLb ? `${formatCurrency(costPerLb)}/lb` : '—'}
+                            </span>
+                            
+                            {/* On hand */}
+                            <span className="text-sm text-muted-foreground w-20 text-right flex-shrink-0">
+                              {totalOnHand > 0 ? `${formatNumber(totalOnHand, 0)} ${unit}` : '—'}
+                            </span>
+                            
+                            {/* Arrow */}
+                            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {CATEGORY_LABELS[product.category] || product.category}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {product.form === 'liquid' ? (
-                            <Droplets className="w-4 h-4 text-blue-500 mx-auto" />
-                          ) : (
-                            <Weight className="w-4 h-4 text-amber-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm">
-                          {formatCurrency(offering.price)}/{offering.priceUnit}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-                          {product.densityLbsPerGal ? formatNumber(product.densityLbsPerGal, 2) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm font-medium text-primary">
-                          {costPerLb ? formatCurrency(costPerLb) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {offering.isPreferred && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 mx-auto" />}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-                          {totalOnHand > 0 ? `${formatNumber(totalOnHand, 1)} ${unit}` : '-'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {productsWithOfferings.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                        No products from this vendor yet
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {productsByCategory.sortedCategories.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No products from this vendor yet
+                </div>
+              )}
             </div>
           </div>
         </div>

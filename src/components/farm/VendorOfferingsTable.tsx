@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Star, Trash2, Edit2, Check, X, Calendar } from 'lucide-react';
+import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle } from 'lucide-react';
 import type { VendorOffering, Vendor, ProductMaster } from '@/types';
 import { formatCurrency, generateId, calculateCostPerPound } from '@/lib/calculations';
 
@@ -21,6 +21,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<VendorOffering>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const productOfferings = offerings.filter(o => o.productId === product.id);
 
@@ -91,6 +92,17 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
     );
     setEditingId(null);
     setFormData({});
+  };
+
+  const handleDeleteClick = (id: string) => {
+    // Check if this is the last offering for this product
+    if (productOfferings.length <= 1) {
+      // Show confirmation dialog
+      setDeleteConfirmId(id);
+    } else {
+      // Safe to delete directly
+      handleDelete(id);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -373,7 +385,10 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDelete(offering.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(offering.id);
+                              }}
                               className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -545,6 +560,44 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
             >
               Add Offering
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Last Vendor Confirmation Dialog */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-xl shadow-xl p-6 max-w-md mx-4 border border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-lg text-foreground">
+                Remove Last Vendor?
+              </h3>
+            </div>
+            <p className="text-muted-foreground mb-4">
+              This is the only vendor for <strong className="text-foreground">{product.name}</strong>. 
+              Removing it will leave the product without any vendor or pricing information.
+            </p>
+            <p className="text-sm text-amber-600 mb-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+              ⚠️ Products without vendors cannot be used in crop plans for cost calculations.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+              >
+                Keep Vendor
+              </button>
+              <button
+                onClick={() => {
+                  handleDelete(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg font-medium hover:bg-destructive/90"
+              >
+                Remove Anyway
+              </button>
+            </div>
           </div>
         </div>
       )}
