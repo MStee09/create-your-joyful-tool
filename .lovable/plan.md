@@ -1,74 +1,70 @@
 
-# Bug Fix: Incorrect Acres Display in Pass Coverage Groups
 
-## Problem Identified
+# Fix: Consistent Acres Display Across All Passes
 
-The issue is in `src/lib/cropCalculations.ts` where the `acresTreated` value for coverage groups is being **incorrectly accumulated** by summing each product's treated acres.
+## Problem
 
-**Current buggy logic (lines 289 and 540):**
-```typescript
-group.acresTreatedSum += crop.totalAcres * (actualAcresPercentage / 100);
+Acres are only shown in passes that have multiple coverage tiers (e.g., Core + Trial). Single-tier passes (where all products are at 100% or all at 25%) hide the tier header entirely, which means acres are never displayed.
+
+## Solution
+
+Two changes to `src/components/farm/PassCard.tsx`:
+
+### 1. Add Acres to Collapsed Header
+
+Update the `CoverageDistribution` component to include acreage after the product count. This makes acres visible without expanding the pass.
+
+**Current (lines 83-93):**
+```tsx
+return (
+  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+    <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+      {label}
+    </span>
+    {count} product{count !== 1 ? 's' : ''}
+  </span>
+);
 ```
 
-This sums acres across all products in the tier. With 5 products at 100% on 130 acres:
-- 130 + 130 + 130 + 130 + 130 = **650 ac** (displayed incorrectly)
-
-**Correct logic:**
-The "treated acres" for a coverage tier should be the physical field area receiving that coverage level:
-- 130 acres at 100% = **130 ac**
-
----
-
-## Impact Assessment
-
-| Area | Affected? | Details |
-|------|-----------|---------|
-| PassCard tier display | YES | Shows wrong acres (e.g., "650 ac" instead of "130 ac") |
-| Cost calculations | NO | Costs use separate correct per-product logic |
-| Nutrient calculations | NO | Uses separate weighting logic |
-| All crops / all passes | YES | Bug is in shared calculation functions |
-| ProductRowReadable | NO | Calculates its own `acresTreated` correctly |
-
----
-
-## Technical Solution
-
-### Fix Location
-`src/lib/cropCalculations.ts` - Two functions need updating:
-1. `calculateCoverageGroups()` (lines 250-318)
-2. `calculateCoverageGroupsWithPriceBook()` (lines 495-574)
-
-### Change Details
-
-**Remove the accumulation loop for acresTreatedSum** since it's producing the wrong value, and instead compute it correctly when building the result array:
-
-1. Remove lines that accumulate `acresTreatedSum` inside the forEach loop
-2. In the final `.map()`, calculate `acresTreated` directly from the bucket percentage:
-
-```typescript
-// BEFORE (wrong):
-acresTreated: acresTreatedSum,
-
-// AFTER (correct):
-acresTreated: crop.totalAcres * (acresPercentage / 100),
+**Updated:**
+```tsx
+return (
+  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+    <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
+      {label}
+    </span>
+    {count} product{count !== 1 ? 's' : ''} · {acresTreated} ac
+  </span>
+);
 ```
 
-Where `acresPercentage` is the display bucket (100, 60, 25, etc.).
+This requires passing `crop.totalAcres` and the coverage groups to the component to calculate the max treated acres.
 
----
+### 2. Always Show Tier Header in Expanded View
 
-## Files to Modify
+Remove the conditional `{summary.coverageGroups.length > 1 && ...}` so the tier header (with acres) is always visible.
 
-| File | Change |
-|------|--------|
-| `src/lib/cropCalculations.ts` | Fix `acresTreated` calculation in both coverage group functions |
+**Current (line 469):**
+```tsx
+{summary.coverageGroups.length > 1 && (
+```
 
----
+**Updated:**
+```tsx
+{/* Always show tier header with acres */}
+{(
+```
 
-## Verification Checklist
+## Changes Summary
 
-After fix, confirm:
-- [ ] Barley (130 ac) shows "Core 100% · 130 ac" in pass headers
-- [ ] All crops display correct tier acres matching `crop.totalAcres × percentage`
-- [ ] Costs and nutrients remain unchanged (already using correct logic)
-- [ ] Multi-tier passes (e.g., Core + Trial) each show their correct acre footprint
+| Location | Change |
+|----------|--------|
+| `CoverageDistribution` component (lines 67-117) | Add `totalAcres` prop and display calculated acres |
+| Expanded view tier header (line 469) | Remove `coverageGroups.length > 1` condition |
+
+## Result
+
+- **Collapsed pass**: Shows "Core 5 products · 130 ac"
+- **Expanded pass**: Always shows tier header with "Core 100% · 130 ac"
+- Works for single-tier and multi-tier passes alike
+
