@@ -10,8 +10,10 @@ import {
   Filter,
   LayoutList,
   List,
+  ArrowLeft,
+  FlaskConical,
 } from 'lucide-react';
-import type { ProductMaster, VendorOffering, Vendor, InventoryItem, ProductCategory, Season } from '@/types';
+import type { ProductMaster, VendorOffering, Vendor, InventoryItem, ProductCategory, Season, NutrientAnalysis } from '@/types';
 import { 
   formatCurrency, 
   generateId, 
@@ -24,6 +26,32 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+// Nutrient options for comparison mode
+const NUTRIENT_OPTIONS = [
+  { key: 'n', label: 'Nitrogen (N)' },
+  { key: 'p', label: 'Phosphorus (P)' },
+  { key: 'k', label: 'Potassium (K)' },
+  { key: 's', label: 'Sulfur (S)' },
+  { key: 'ca', label: 'Calcium (Ca)' },
+  { key: 'mg', label: 'Magnesium (Mg)' },
+  { key: 'b', label: 'Boron (B)' },
+  { key: 'zn', label: 'Zinc (Zn)' },
+  { key: 'mn', label: 'Manganese (Mn)' },
+  { key: 'fe', label: 'Iron (Fe)' },
+  { key: 'cu', label: 'Copper (Cu)' },
+  { key: 'mo', label: 'Molybdenum (Mo)' },
+  { key: 'co', label: 'Cobalt (Co)' },
+];
 
 interface ProductsListViewProps {
   productMasters: ProductMaster[];
@@ -62,6 +90,35 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
   const [viewDensity, setViewDensity] = useState<ViewDensity>(() => {
     return (localStorage.getItem('productsViewDensity') as ViewDensity) || 'compact';
   });
+  const [compareNutrient, setCompareNutrient] = useState<string | null>(null);
+
+  // Helper function to calculate $/lb of nutrient
+  const calculateCostPerLbNutrient = (
+    product: ProductMaster,
+    nutrientKey: string,
+    price: number,
+    priceUnit: string
+  ): number | null => {
+    const analysis = product.analysis;
+    if (!analysis || !analysis[nutrientKey as keyof typeof analysis]) return null;
+    
+    const nutrientPercent = analysis[nutrientKey as keyof typeof analysis] as number;
+    if (!nutrientPercent || nutrientPercent <= 0) return null;
+    
+    let pricePerLb: number;
+    if (priceUnit === 'lbs') {
+      pricePerLb = price;
+    } else if (priceUnit === 'ton') {
+      pricePerLb = price / 2000;
+    } else if (priceUnit === 'gal') {
+      const density = product.densityLbsPerGal || 10;
+      pricePerLb = price / density;
+    } else {
+      return null;
+    }
+    
+    return pricePerLb / (nutrientPercent / 100);
+  };
 
   // Auto-focus search on mount
   useEffect(() => {
@@ -353,6 +410,111 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     </button>
   );
 
+  // Nutrient Comparison View
+  if (compareNutrient) {
+    const nutrientLabel = NUTRIENT_OPTIONS.find(o => o.key === compareNutrient)?.label || compareNutrient;
+    const nutrientName = nutrientLabel.split(' ')[0];
+    
+    const productsWithNutrient = productMasters
+      .map(product => {
+        const offering = vendorOfferings.find(o => o.productId === product.id && o.isPreferred) 
+          || vendorOfferings.find(o => o.productId === product.id);
+        const vendor = offering ? vendors.find(v => v.id === offering.vendorId) : null;
+        const price = offering?.price || 0;
+        const priceUnit = offering?.priceUnit || 'gal';
+        const costPerLb = calculateCostPerLbNutrient(product, compareNutrient, price, priceUnit);
+        const nutrientPercent = product.analysis?.[compareNutrient as keyof NutrientAnalysis] as number;
+        
+        if (!costPerLb || !nutrientPercent) return null;
+        
+        return {
+          product,
+          vendor,
+          price,
+          priceUnit,
+          nutrientPercent,
+          costPerLb,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (a?.costPerLb || 0) - (b?.costPerLb || 0)) as Array<{
+        product: ProductMaster;
+        vendor: Vendor | null | undefined;
+        price: number;
+        priceUnit: string;
+        nutrientPercent: number;
+        costPerLb: number;
+      }>;
+    
+    return (
+      <div className="p-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Products Containing {nutrientLabel}</h2>
+            <p className="text-muted-foreground">Sorted by cost per pound of {nutrientName}</p>
+          </div>
+          <Button variant="outline" onClick={() => setCompareNutrient(null)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Catalog
+          </Button>
+        </div>
+        
+        <Card>
+          <CardContent className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left p-4 font-medium">Product</th>
+                  <th className="text-right p-4 font-medium">{nutrientName} %</th>
+                  <th className="text-right p-4 font-medium">Price</th>
+                  <th className="text-right p-4 font-medium">$/lb {nutrientName}</th>
+                  <th className="text-left p-4 font-medium">Vendor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productsWithNutrient.map(item => (
+                  <tr 
+                    key={item.product.id} 
+                    className="border-b hover:bg-muted/30 cursor-pointer transition-colors" 
+                    onClick={() => onSelectProduct(item.product.id)}
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {item.product.form === 'liquid' ? (
+                          <Droplets className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <Weight className="w-4 h-4 text-amber-500" />
+                        )}
+                        <span className="font-medium">{item.product.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-right">{item.nutrientPercent.toFixed(1)}%</td>
+                    <td className="p-4 text-right text-muted-foreground">
+                      {formatCurrency(item.price)}/{item.priceUnit}
+                    </td>
+                    <td className="p-4 text-right font-semibold text-emerald-600">
+                      ${item.costPerLb.toFixed(2)}
+                    </td>
+                    <td className="p-4 text-muted-foreground">{item.vendor?.name || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {productsWithNutrient.length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">
+                No products found with {nutrientLabel} in their analysis.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <p className="mt-4 text-sm text-muted-foreground">
+          Note: $/lb calculation uses raw nutrient content percentage. Actual plant availability may vary by product formulation.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -409,6 +571,23 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
             Detailed
           </button>
         </div>
+        
+        {/* Compare by Nutrient dropdown */}
+        <Select 
+          value={compareNutrient || ''} 
+          onValueChange={(val) => setCompareNutrient(val || null)}
+        >
+          <SelectTrigger className="w-48">
+            <FlaskConical className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Compare by Nutrient" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Normal View</SelectItem>
+            {NUTRIENT_OPTIONS.map(opt => (
+              <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         
         <button
           onClick={() => setShowFilters(!showFilters)}

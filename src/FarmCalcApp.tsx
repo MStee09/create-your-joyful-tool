@@ -1207,21 +1207,21 @@ const AppContent: React.FC = () => {
             onUpdateInventory={handleUpdateInventory}
           />
         );
+      // Legacy route redirects - redirect to new simplified views
       case 'buy-workflow':
+      case 'orders':
+        // Redirect procurement-related views to Purchases
         return (
-          <BuyWorkflowView
-            season={currentSeason}
-            products={legacyProducts}
-            vendors={state.vendors}
-            inventory={state.inventory}
-            orders={state.orders}
-            onAddOrder={addOrder}
-            onNavigate={(viewId) => setActiveView(viewId)}
-            productMasters={state.productMasters || []}
-            commoditySpecs={state.commoditySpecs || []}
-            bidEvents={state.bidEvents || []}
-            onUpdateBidEvents={updateBidEvents}
+          <PurchasesView
+            purchases={simplePurchases || []}
+            vendors={vendors}
+            products={productMasters || []}
+            currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+            onAddPurchase={addSimplePurchase}
+            onUpdatePurchase={updateSimplePurchase}
+            onDeletePurchase={deleteSimplePurchase}
+            onAddPriceRecord={addPriceRecord}
           />
         );
       case 'procurement':
@@ -1242,30 +1242,22 @@ const AppContent: React.FC = () => {
             vendors={state.vendors}
           />
         );
-      case 'orders':
-        return (
-          <OrdersView
-            orders={state.orders || []}
-            vendors={state.vendors}
-            products={legacyProducts}
-            inventory={state.inventory}
-            seasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdateOrders={updateOrders}
-            onUpdateInventory={handleUpdateInventory}
-            priceBook={state.priceBook || []}
-            onUpdatePriceBook={updatePriceBook}
-            onAddInvoice={addInvoice}
-          />
-        );
+      // 'orders' case handled above in legacy redirect block
       case 'plan-readiness':
+      case 'variance':
+      case 'variance-by-pass':
+      case 'alerts':
+        // Redirect analysis views to Dashboard
         return (
-          <PlanReadinessView
-            inventory={state.inventory}
-            products={legacyProducts}
-            vendors={state.vendors}
+          <DashboardView
             season={currentSeason}
-            orders={state.orders}
-            onUpdateInventory={handleUpdateInventory}
+            products={legacyProducts}
+            productMasters={productMasters}
+            priceBook={state.priceBook || []}
+            seasonYear={currentSeason?.year}
+            inventory={state.inventory}
+            orders={state.orders || []}
+            onViewChange={setActiveView}
           />
         );
       case 'commodity-specs':
@@ -1292,16 +1284,15 @@ const AppContent: React.FC = () => {
           />
         );
       case 'price-book':
+      case 'market-prices':
+        // Redirect price views to Price History
         return (
-          <PriceBookView
-            priceBook={state.priceBook || []}
-            productMasters={state.productMasters || []}
-            vendors={state.vendors}
-            bidEvents={state.bidEvents || []}
-            commoditySpecs={state.commoditySpecs || []}
+          <PriceHistoryView
+            priceRecords={priceRecords || []}
+            products={productMasters || []}
+            vendors={vendors}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onUpdatePriceBook={updatePriceBook}
-            onBack={() => setActiveView('procurement')}
+            onAddPriceRecord={addPriceRecord}
           />
         );
       case 'exports':
@@ -1322,24 +1313,8 @@ const AppContent: React.FC = () => {
             onResetData={handleResetData}
           />
         );
-      case 'variance':
-        return (
-          <VarianceView
-            season={currentSeason}
-            products={legacyProducts}
-            invoices={state.invoices || []}
-            priceBook={state.priceBook || []}
-          />
-        );
-      case 'variance-by-pass':
-        return (
-          <VarianceByPassView
-            season={currentSeason}
-            products={legacyProducts}
-            invoices={state.invoices || []}
-            priceBook={state.priceBook || []}
-          />
-        );
+      // 'variance' case handled above in legacy redirect block
+      // 'variance-by-pass' case handled above in legacy redirect block
       case 'changes':
         return (
           <ChangeLogView
@@ -1374,20 +1349,8 @@ const AppContent: React.FC = () => {
             onUpdateSeason={handleUpdateSeason}
           />
         );
-      case 'alerts':
-        return (
-          <AlertsView
-            season={currentSeason}
-            products={legacyProducts}
-            inventory={state.inventory}
-            orders={state.orders || []}
-            invoices={state.invoices || []}
-            priceBook={state.priceBook || []}
-            onNavigate={setActiveView}
-          />
-        );
-      case 'market-prices':
-        return <MarketPricesView />;
+      // 'alerts' case handled above in legacy redirect block
+      // 'market-prices' case handled above in price-book redirect block
       case 'purchases':
         return (
           <PurchasesView
