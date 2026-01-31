@@ -547,9 +547,76 @@ export type Database = {
           },
         ]
       }
+      price_records: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          normalized_price: number
+          notes: string | null
+          package_size: number | null
+          package_type: string | null
+          package_unit: string | null
+          price: number
+          product_id: string
+          purchase_id: string | null
+          quantity_purchased: number | null
+          season_year: number
+          type: string
+          unit: string
+          updated_at: string | null
+          user_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          normalized_price: number
+          notes?: string | null
+          package_size?: number | null
+          package_type?: string | null
+          package_unit?: string | null
+          price: number
+          product_id: string
+          purchase_id?: string | null
+          quantity_purchased?: number | null
+          season_year: number
+          type?: string
+          unit?: string
+          updated_at?: string | null
+          user_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          normalized_price?: number
+          notes?: string | null
+          package_size?: number | null
+          package_type?: string | null
+          package_unit?: string | null
+          price?: number
+          product_id?: string
+          purchase_id?: string | null
+          quantity_purchased?: number | null
+          season_year?: number
+          type?: string
+          unit?: string
+          updated_at?: string | null
+          user_id?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
       product_masters: {
         Row: {
           analysis: Json | null
+          baseline_price: number | null
+          baseline_price_date: string | null
+          baseline_price_unit: string | null
+          baseline_price_vendor_id: string | null
           category: string | null
           commodity_spec_id: string | null
           created_at: string
@@ -562,6 +629,7 @@ export type Database = {
           general_notes: string | null
           id: string
           is_bid_eligible: boolean
+          is_commodity: boolean | null
           label_file_name: string | null
           mixing_notes: string | null
           name: string
@@ -573,6 +641,10 @@ export type Database = {
         }
         Insert: {
           analysis?: Json | null
+          baseline_price?: number | null
+          baseline_price_date?: string | null
+          baseline_price_unit?: string | null
+          baseline_price_vendor_id?: string | null
           category?: string | null
           commodity_spec_id?: string | null
           created_at?: string
@@ -585,6 +657,7 @@ export type Database = {
           general_notes?: string | null
           id?: string
           is_bid_eligible?: boolean
+          is_commodity?: boolean | null
           label_file_name?: string | null
           mixing_notes?: string | null
           name: string
@@ -596,6 +669,10 @@ export type Database = {
         }
         Update: {
           analysis?: Json | null
+          baseline_price?: number | null
+          baseline_price_date?: string | null
+          baseline_price_unit?: string | null
+          baseline_price_vendor_id?: string | null
           category?: string | null
           commodity_spec_id?: string | null
           created_at?: string
@@ -608,6 +685,7 @@ export type Database = {
           general_notes?: string | null
           id?: string
           is_bid_eligible?: boolean
+          is_commodity?: boolean | null
           label_file_name?: string | null
           mixing_notes?: string | null
           name?: string

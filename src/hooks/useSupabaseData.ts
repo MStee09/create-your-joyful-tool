@@ -21,6 +21,8 @@ import type {
   Invoice,
 } from '@/types';
 import type { PriceHistory } from '@/types/farm';
+import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
+import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -38,6 +40,9 @@ interface SupabaseDataState {
   priceHistory: PriceHistory[];
   orders: Order[];
   invoices: Invoice[];
+  // New simplified types
+  priceRecords: PriceRecord[];
+  simplePurchases: SimplePurchase[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -211,6 +216,8 @@ export function useSupabaseData(user: User | null) {
     priceHistory: [],
     orders: [],
     invoices: [],
+    priceRecords: [],
+    simplePurchases: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -253,6 +260,7 @@ export function useSupabaseData(user: User | null) {
         priceHistoryRes,
         ordersRes,
         invoicesRes,
+        priceRecordsRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -269,6 +277,7 @@ export function useSupabaseData(user: User | null) {
         supabase.from('price_history').select('*').order('date', { ascending: false }),
         supabase.from('orders').select('*').order('order_date', { ascending: false }),
         supabase.from('invoices').select('*').order('received_date', { ascending: false }),
+        supabase.from('price_records').select('*').order('date', { ascending: false }),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -373,6 +382,28 @@ export function useSupabaseData(user: User | null) {
         notes: row.notes,
       }));
 
+      // Map price records (new simplified type)
+      const priceRecords: PriceRecord[] = (priceRecordsRes.data || []).map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        productId: row.product_id,
+        vendorId: row.vendor_id,
+        price: Number(row.price) || 0,
+        unit: row.unit || 'gal',
+        normalizedPrice: Number(row.normalized_price) || 0,
+        packageType: row.package_type,
+        packageSize: row.package_size ? Number(row.package_size) : undefined,
+        packageUnit: row.package_unit,
+        quantityPurchased: row.quantity_purchased ? Number(row.quantity_purchased) : undefined,
+        date: row.date,
+        seasonYear: row.season_year,
+        type: row.type || 'purchased',
+        purchaseId: row.purchase_id,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
       // Get saved current season ID or use first season
       const savedSeasonId = localStorage.getItem('farmcalc-current-season');
       const currentSeasonId = seasons.find(s => s.id === savedSeasonId)?.id || seasons[0]?.id || null;
@@ -393,6 +424,8 @@ export function useSupabaseData(user: User | null) {
         priceHistory,
         orders,
         invoices,
+        priceRecords,
+        simplePurchases: [],
         currentSeasonId,
         loading: false,
         error: null,
@@ -1098,6 +1131,128 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, invoices: [...prev.invoices, invoice] }));
   }, [user]);
 
+  // =============================================
+  // PRICE RECORDS CRUD (New simplified price tracking)
+  // =============================================
+  
+  const addPriceRecord = useCallback(async (record: NewPriceRecord): Promise<PriceRecord | null> => {
+    if (!user) return null;
+    
+    const id = crypto.randomUUID();
+    const { data, error } = await supabase
+      .from('price_records')
+      .insert({
+        id,
+        user_id: user.id,
+        product_id: record.productId,
+        vendor_id: record.vendorId,
+        price: record.price,
+        unit: record.unit,
+        normalized_price: record.normalizedPrice,
+        package_type: record.packageType,
+        package_size: record.packageSize,
+        package_unit: record.packageUnit,
+        quantity_purchased: record.quantityPurchased,
+        date: record.date,
+        season_year: record.seasonYear,
+        type: record.type,
+        purchase_id: record.purchaseId,
+        notes: record.notes,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding price record:', error);
+      toast.error('Failed to save price record');
+      return null;
+    }
+    
+    const newRecord: PriceRecord = {
+      id: data.id,
+      userId: data.user_id,
+      productId: data.product_id,
+      vendorId: data.vendor_id,
+      price: Number(data.price),
+      unit: data.unit as 'gal' | 'lbs' | 'ton',
+      normalizedPrice: Number(data.normalized_price),
+      packageType: data.package_type,
+      packageSize: data.package_size ? Number(data.package_size) : undefined,
+      packageUnit: data.package_unit as 'gal' | 'lbs' | undefined,
+      quantityPurchased: data.quantity_purchased ? Number(data.quantity_purchased) : undefined,
+      date: data.date,
+      seasonYear: data.season_year,
+      type: data.type as 'quote' | 'purchased',
+      purchaseId: data.purchase_id,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    setState(prev => ({ ...prev, priceRecords: [newRecord, ...prev.priceRecords] }));
+    return newRecord;
+  }, [user]);
+
+  const updatePriceRecord = useCallback(async (id: string, updates: Partial<PriceRecord>): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase
+      .from('price_records')
+      .update({
+        product_id: updates.productId,
+        vendor_id: updates.vendorId,
+        price: updates.price,
+        unit: updates.unit,
+        normalized_price: updates.normalizedPrice,
+        package_type: updates.packageType,
+        package_size: updates.packageSize,
+        package_unit: updates.packageUnit,
+        quantity_purchased: updates.quantityPurchased,
+        date: updates.date,
+        season_year: updates.seasonYear,
+        type: updates.type,
+        purchase_id: updates.purchaseId,
+        notes: updates.notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error updating price record:', error);
+      toast.error('Failed to update price record');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      priceRecords: prev.priceRecords.map(r => r.id === id ? { ...r, ...updates } : r),
+    }));
+    return true;
+  }, [user]);
+
+  const deletePriceRecord = useCallback(async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase
+      .from('price_records')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error deleting price record:', error);
+      toast.error('Failed to delete price record');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      priceRecords: prev.priceRecords.filter(r => r.id !== id),
+    }));
+    return true;
+  }, [user]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -1122,5 +1277,9 @@ export function useSupabaseData(user: User | null) {
     addOrder,
     updateInvoices,
     addInvoice,
+    // New price records operations
+    addPriceRecord,
+    updatePriceRecord,
+    deletePriceRecord,
   };
 }
