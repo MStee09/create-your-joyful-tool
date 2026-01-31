@@ -733,12 +733,20 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          expected_delivery_date: string | null
+          freight_cost: number | null
+          freight_notes: string | null
           id: string
           invoice_number: string | null
           line_items: Json
           notes: string | null
+          order_date: string | null
+          received_date: string | null
+          season_id: string | null
           season_year: number
           status: string
+          subtotal: number | null
+          total: number | null
           total_cost: number
           updated_at: string
           user_id: string
@@ -747,12 +755,20 @@ export type Database = {
         Insert: {
           created_at?: string
           date?: string
+          expected_delivery_date?: string | null
+          freight_cost?: number | null
+          freight_notes?: string | null
           id?: string
           invoice_number?: string | null
           line_items?: Json
           notes?: string | null
+          order_date?: string | null
+          received_date?: string | null
+          season_id?: string | null
           season_year: number
           status?: string
+          subtotal?: number | null
+          total?: number | null
           total_cost?: number
           updated_at?: string
           user_id: string
@@ -761,12 +777,20 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          expected_delivery_date?: string | null
+          freight_cost?: number | null
+          freight_notes?: string | null
           id?: string
           invoice_number?: string | null
           line_items?: Json
           notes?: string | null
+          order_date?: string | null
+          received_date?: string | null
+          season_id?: string | null
           season_year?: number
           status?: string
+          subtotal?: number | null
+          total?: number | null
           total_cost?: number
           updated_at?: string
           user_id?: string

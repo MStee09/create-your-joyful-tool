@@ -22,7 +22,7 @@ import type {
 } from '@/types';
 import type { PriceHistory } from '@/types/farm';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
-import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
+import type { SimplePurchase, NewSimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -871,7 +871,7 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, purchases }));
   }, [user]);
 
-  // Add a single purchase
+  // Add a single purchase (OLD - for backwards compatibility)
   const addPurchase = useCallback(async (purchase: Purchase) => {
     if (!user) return;
     
@@ -894,6 +894,129 @@ export function useSupabaseData(user: User | null) {
     }
     
     setState(prev => ({ ...prev, purchases: [...prev.purchases, purchase] }));
+  }, [user]);
+
+  // =============================================
+  // SIMPLE PURCHASE CRUD (New simplified system)
+  // =============================================
+  
+  const addSimplePurchase = useCallback(async (purchase: NewSimplePurchase): Promise<SimplePurchase | null> => {
+    if (!user) return null;
+    
+    const id = crypto.randomUUID();
+    const { data, error } = await supabase
+      .from('purchases')
+      .insert({
+        id,
+        user_id: user.id,
+        season_id: purchase.seasonId,
+        vendor_id: purchase.vendorId,
+        status: purchase.status,
+        order_date: purchase.orderDate,
+        expected_delivery_date: purchase.expectedDeliveryDate || null,
+        received_date: purchase.receivedDate || null,
+        line_items: purchase.lines as any,
+        freight_cost: purchase.freightCost || 0,
+        freight_notes: purchase.freightNotes || null,
+        subtotal: purchase.subtotal,
+        total: purchase.total,
+        notes: purchase.notes || null,
+        // Also set old columns for backwards compatibility
+        date: purchase.orderDate,
+        season_year: new Date().getFullYear(),
+        total_cost: purchase.total,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding simple purchase:', error);
+      toast.error('Failed to save purchase');
+      return null;
+    }
+    
+    const newPurchase: SimplePurchase = {
+      id: data.id,
+      userId: data.user_id,
+      seasonId: data.season_id,
+      vendorId: data.vendor_id,
+      status: data.status as 'ordered' | 'received',
+      orderDate: data.order_date,
+      expectedDeliveryDate: data.expected_delivery_date,
+      receivedDate: data.received_date,
+      lines: (Array.isArray(data.line_items) ? data.line_items : []) as unknown as SimplePurchaseLine[],
+      freightCost: Number(data.freight_cost) || 0,
+      freightNotes: data.freight_notes,
+      subtotal: Number(data.subtotal) || 0,
+      total: Number(data.total) || 0,
+      notes: data.notes,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    setState(prev => ({ ...prev, simplePurchases: [newPurchase, ...prev.simplePurchases] }));
+    toast.success('Purchase saved');
+    return newPurchase;
+  }, [user]);
+
+  const updateSimplePurchase = useCallback(async (id: string, updates: Partial<SimplePurchase>): Promise<boolean> => {
+    if (!user) return false;
+    
+    const dbUpdates: any = { updated_at: new Date().toISOString() };
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.orderDate !== undefined) dbUpdates.order_date = updates.orderDate;
+    if (updates.expectedDeliveryDate !== undefined) dbUpdates.expected_delivery_date = updates.expectedDeliveryDate;
+    if (updates.receivedDate !== undefined) dbUpdates.received_date = updates.receivedDate;
+    if (updates.lines !== undefined) dbUpdates.line_items = updates.lines;
+    if (updates.freightCost !== undefined) dbUpdates.freight_cost = updates.freightCost;
+    if (updates.freightNotes !== undefined) dbUpdates.freight_notes = updates.freightNotes;
+    if (updates.subtotal !== undefined) dbUpdates.subtotal = updates.subtotal;
+    if (updates.total !== undefined) dbUpdates.total = updates.total;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    
+    const { error } = await supabase
+      .from('purchases')
+      .update(dbUpdates)
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error updating simple purchase:', error);
+      toast.error('Failed to update purchase');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      simplePurchases: prev.simplePurchases.map(p => p.id === id ? { ...p, ...updates } : p),
+    }));
+    
+    toast.success('Purchase updated');
+    return true;
+  }, [user]);
+
+  const deleteSimplePurchase = useCallback(async (id: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error deleting simple purchase:', error);
+      toast.error('Failed to delete purchase');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      simplePurchases: prev.simplePurchases.filter(p => p.id !== id),
+    }));
+    
+    toast.success('Purchase deleted');
+    return true;
   }, [user]);
 
   // Add inventory transaction
@@ -1281,5 +1404,9 @@ export function useSupabaseData(user: User | null) {
     addPriceRecord,
     updatePriceRecord,
     deletePriceRecord,
+    // New simple purchase operations
+    addSimplePurchase,
+    updateSimplePurchase,
+    deleteSimplePurchase,
   };
 }
