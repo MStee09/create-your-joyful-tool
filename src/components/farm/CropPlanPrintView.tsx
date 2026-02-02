@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { Crop, Product, ApplicationTiming, TimingBucket } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose } from '@/types/productIntelligence';
+import type { Field, FieldAssignment, FieldCropOverride, FieldAssignmentExtended } from '@/types/field';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { 
   calculateSeasonSummaryWithPriceBook, 
@@ -12,6 +13,14 @@ import {
 } from '@/lib/cropCalculations';
 import { TIMING_BUCKET_INFO, getStageOrder } from '@/lib/growthStages';
 import { calculateApplicationNutrients } from '@/lib/calculations';
+import { 
+  calculateFieldEffectiveApplications, 
+  calculateFieldCostPerAcre, 
+  calculateFieldNutrients,
+  calculateVarianceFromAverage,
+  calculateCropWeightedAverage 
+} from '@/lib/fieldPlanCalculations';
+
 interface CropPlanPrintViewProps {
   crop: Crop;
   products: Product[];
@@ -19,6 +28,10 @@ interface CropPlanPrintViewProps {
   priceBook: PriceBookEntry[];
   seasonYear: number;
   purposes: Record<string, ProductPurpose>;
+  // Optional field data for By Field section
+  fields?: Field[];
+  fieldAssignments?: FieldAssignment[];
+  fieldOverrides?: FieldCropOverride[];
 }
 
 const PHASE_LABELS: Record<TimingBucket, string> = {
@@ -55,12 +68,61 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
   priceBook,
   seasonYear,
   purposes,
+  fields,
+  fieldAssignments,
+  fieldOverrides,
 }) => {
   const priceBookContext: PriceBookContext = useMemo(() => ({
     productMasters,
     priceBook,
     seasonYear,
   }), [productMasters, priceBook, seasonYear]);
+  
+  // Build extended field assignments with calculations for By Field section
+  const extendedAssignments: FieldAssignmentExtended[] = useMemo(() => {
+    if (!fields || !fieldAssignments) return [];
+    
+    const cropAssignments = fieldAssignments.filter(fa => fa.cropId === crop.id);
+    
+    return cropAssignments.map(fa => {
+      const field = fields.find(f => f.id === fa.fieldId);
+      const overrides = fieldOverrides?.filter(o => o.fieldAssignmentId === fa.id) || [];
+      
+      const effectiveApplications = calculateFieldEffectiveApplications(
+        crop.applications,
+        overrides,
+        productMasters
+      );
+      
+      const costPerAcre = calculateFieldCostPerAcre(
+        effectiveApplications,
+        productMasters,
+        priceBookContext
+      );
+      
+      const nutrients = calculateFieldNutrients(effectiveApplications, productMasters);
+      
+      return {
+        ...fa,
+        fieldName: field?.name || 'Unknown Field',
+        farm: field?.farm,
+        overrides,
+        effectiveApplications,
+        costPerAcre,
+        nutrients,
+      };
+    });
+  }, [crop, fields, fieldAssignments, fieldOverrides, productMasters, priceBookContext]);
+  
+  // Calculate crop averages if we have field data
+  const cropAverage = useMemo(() => {
+    if (extendedAssignments.length === 0) return null;
+    return {
+      costPerAcre: calculateCropWeightedAverage(extendedAssignments, 'cost'),
+      n: calculateCropWeightedAverage(extendedAssignments, 'n'),
+      totalAcres: extendedAssignments.reduce((sum, fa) => sum + (fa.plannedAcres ?? fa.acres), 0),
+    };
+  }, [extendedAssignments]);
 
   const summary = useMemo(() => 
     calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext),
@@ -326,6 +388,77 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
           );
         })}
       </section>
+
+      {/* By Field Summary (if field data provided) */}
+      {extendedAssignments.length > 0 && cropAverage && (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold mb-4">By Field Breakdown</h2>
+          
+          {/* Average summary */}
+          <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
+            <p className="text-sm">
+              <span className="font-semibold">Crop Average:</span>{' '}
+              {formatCurrency(cropAverage.costPerAcre, 2)}/ac across {formatNumber(cropAverage.totalAcres, 0)} acres
+            </p>
+          </div>
+          
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                <th className="px-3 py-2 border border-gray-200">Field</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">Acres</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">$/Acre</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">Variance</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">N</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">P</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">K</th>
+                <th className="px-3 py-2 border border-gray-200 text-right">S</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extendedAssignments.map(fa => {
+                const variance = calculateVarianceFromAverage(fa.costPerAcre || 0, cropAverage.costPerAcre);
+                const hasOverrides = fa.overrides.length > 0;
+                
+                return (
+                  <tr key={fa.id} className="border-t border-gray-100">
+                    <td className="px-3 py-2 border border-gray-200">
+                      <span className="font-medium">{fa.fieldName}</span>
+                      {fa.farm && <span className="text-gray-500 ml-1">({fa.farm})</span>}
+                      {hasOverrides && <span className="text-amber-600 ml-1">*</span>}
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right">
+                      {formatNumber(fa.plannedAcres ?? fa.acres, 0)}
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right font-medium">
+                      {formatCurrency(fa.costPerAcre || 0, 2)}
+                    </td>
+                    <td className={`px-3 py-2 border border-gray-200 text-right ${
+                      variance > 5 ? 'text-amber-600' : variance < -5 ? 'text-green-600' : ''
+                    }`}>
+                      {variance >= 0 ? '+' : ''}{formatNumber(variance, 1)}%
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right">
+                      {formatNumber(fa.nutrients?.n || 0, 1)}
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right">
+                      {formatNumber(fa.nutrients?.p || 0, 1)}
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right">
+                      {formatNumber(fa.nutrients?.k || 0, 1)}
+                    </td>
+                    <td className="px-3 py-2 border border-gray-200 text-right">
+                      {formatNumber(fa.nutrients?.s || 0, 1)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          
+          <p className="mt-2 text-xs text-gray-500">* Field has custom rate overrides</p>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">

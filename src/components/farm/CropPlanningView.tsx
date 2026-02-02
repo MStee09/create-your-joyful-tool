@@ -418,6 +418,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
               priceBook={priceBook}
               seasonYear={season.year}
               purposes={purposes}
+              fields={fields}
+              fieldAssignments={fieldAssignments.filter(fa => fa.seasonId === season.id)}
+              fieldOverrides={fieldCropOverrides}
             />
           </div>
         </div>

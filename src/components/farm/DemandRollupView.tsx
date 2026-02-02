@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, Package, Droplets, Weight, FileSpreadsheet, Settings } from 'lucide-react';
 import type { Season, ProductMaster, CommoditySpec } from '@/types';
+import type { FieldAssignment, FieldCropOverride } from '@/types/field';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
 import { downloadCSV } from '@/lib/calculations';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -10,6 +11,9 @@ interface DemandRollupViewProps {
   productMasters: ProductMaster[];
   commoditySpecs: CommoditySpec[];
   onNavigateToSpecs?: () => void;
+  // Optional field data for field-weighted calculations
+  fieldAssignments?: FieldAssignment[];
+  fieldOverrides?: FieldCropOverride[];
 }
 
 export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
@@ -17,12 +21,14 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
   productMasters,
   commoditySpecs,
   onNavigateToSpecs,
+  fieldAssignments,
+  fieldOverrides,
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   
   const demandRollup = useMemo(() => 
-    calculateDemandRollup(season, productMasters, commoditySpecs),
-    [season, productMasters, commoditySpecs]
+    calculateDemandRollup(season, productMasters, commoditySpecs, fieldAssignments, fieldOverrides),
+    [season, productMasters, commoditySpecs, fieldAssignments, fieldOverrides]
   );
   
   const toggleExpanded = (id: string) => {
