@@ -11,19 +11,19 @@ export interface SimplePurchaseLine {
   productId: string;
   
   // What was purchased
-  quantity: number;              // Number of packages
+  quantity: number;              // Number of packages/containers
   packageType?: string;          // "tote", "twin-pack", "jug", "bag", "bulk"
-  packageSize?: number;          // Size per package (e.g., 275 for tote, 900 for gram-based jug)
+  packageSize?: number;          // Size per package (e.g., 275 gal, 1800 g)
   packageUnit?: PackageUnitType; // Unit of package contents
   
-  // Pricing
-  unitPrice: number;             // Price per unit (per gal, per lb, per g, etc.)
-  totalPrice: number;            // totalQuantity × unitPrice
+  // Pricing - PRICE IS PER CONTAINER/PACKAGE
+  unitPrice: number;             // Price per container (e.g., $900/jug)
+  totalPrice: number;            // quantity × unitPrice (e.g., 2 jugs × $900 = $1800)
   
-  // Normalized (calculated)
-  totalQuantity: number;         // Total gal or lbs or g
+  // Normalized (calculated for comparison/tracking)
+  totalQuantity: number;         // Total volume: quantity × packageSize (e.g., 2 × 1800g = 3600g)
   normalizedUnit: PackageUnitType;
-  normalizedUnitPrice: number;   // $/gal or $/lb or $/g
+  normalizedUnitPrice: number;   // Price per unit: unitPrice / packageSize (e.g., $900/1800g = $0.50/g)
   
   // Notes
   notes?: string;
