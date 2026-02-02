@@ -1,12 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight, List, Droplets, Weight, ChevronsUpDown } from 'lucide-react';
-import type { Crop, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
+import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight, List, Droplets, Weight, ChevronsUpDown, MapPin } from 'lucide-react';
+import type { Crop, Season, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
 import { ExportPdfButton } from './ExportPdfButton';
+import { FieldAssignmentModal } from './FieldAssignmentModal';
+import { CropByFieldView } from './CropByFieldView';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
@@ -58,26 +63,36 @@ const PHASE_ORDER: TimingBucket[] = ['PRE_PLANT', 'AT_PLANTING', 'IN_SEASON', 'P
 
 interface CropPlanningViewProps {
   crop: Crop;
+  season: Season;
   products: Product[];
   vendors: Vendor[];
   inventory: InventoryItem[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
-  seasonYear: number;
+  fields: Field[];
+  fieldAssignments: FieldAssignment[];
+  fieldCropOverrides: FieldCropOverride[];
   onUpdate: (crop: Crop) => void;
   onDelete: () => void;
+  onUpdateFieldAssignments: (assignments: FieldAssignment[]) => void;
+  onUpdateFieldCropOverrides: (overrides: FieldCropOverride[]) => void;
 }
 
 export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   crop,
+  season,
   products,
   vendors,
   inventory,
   productMasters,
   priceBook,
-  seasonYear,
+  fields,
+  fieldAssignments,
+  fieldCropOverrides,
   onUpdate,
   onDelete,
+  onUpdateFieldAssignments,
+  onUpdateFieldCropOverrides,
 }) => {
   const [editingAcres, setEditingAcres] = useState(false);
   const [acresValue, setAcresValue] = useState(crop.totalAcres);
@@ -85,6 +100,8 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [newTimingName, setNewTimingName] = useState('');
   const [editingApplication, setEditingApplication] = useState<Application | null>(null);
   const [showInsights, setShowInsights] = useState(false);
+  const [showFieldAssignment, setShowFieldAssignment] = useState(false);
+  const [activeTab, setActiveTab] = useState<'passes' | 'by-field'>('passes');
 
   // Sync acresValue when crop changes
   useEffect(() => {
@@ -104,8 +121,8 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const priceBookContext: PriceBookContext = useMemo(() => ({
     productMasters,
     priceBook,
-    seasonYear,
-  }), [productMasters, priceBook, seasonYear]);
+    seasonYear: season.year,
+  }), [productMasters, priceBook, season.year]);
 
   const summary = useMemo(() => 
     calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext),
@@ -375,15 +392,34 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
             )}
           </div>
           
-          {/* Export PDF Button */}
-          <ExportPdfButton
-            crop={crop}
-            products={products}
-            productMasters={productMasters}
-            priceBook={priceBook}
-            seasonYear={seasonYear}
-            purposes={purposes}
-          />
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            {/* Assign Fields Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFieldAssignment(true)}
+              className="flex items-center gap-2"
+            >
+              <MapPin className="w-4 h-4" />
+              Assign Fields
+              {fieldAssignments.filter(fa => fa.cropId === crop.id).length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-muted rounded text-xs">
+                  {fieldAssignments.filter(fa => fa.cropId === crop.id).length}
+                </span>
+              )}
+            </Button>
+            
+            {/* Export PDF Button */}
+            <ExportPdfButton
+              crop={crop}
+              products={products}
+              productMasters={productMasters}
+              priceBook={priceBook}
+              seasonYear={season.year}
+              purposes={purposes}
+            />
+          </div>
         </div>
 
         {/* Horizontal Timeline */}
@@ -437,10 +473,17 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content with Tabs */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {/* Pass Cards */}
-        {crop.applicationTimings.length === 0 ? (
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'passes' | 'by-field')}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="passes">Passes</TabsTrigger>
+            <TabsTrigger value="by-field">By Field</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="passes">
+            {/* Pass Cards */}
+            {crop.applicationTimings.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">No application timings yet</p>
             <p className="text-sm text-muted-foreground mb-6">
@@ -494,13 +537,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                           purposes={purposes}
                           productMasters={productMasters}
                           priceBook={priceBook}
-                          seasonYear={seasonYear}
+                          seasonYear={season.year}
                           onEditApplication={setEditingApplication}
                           onAddApplication={handleAddApplication}
                           onDuplicateTiming={handleDuplicateTiming}
                           onDeleteTiming={handleDeleteTiming}
                           onUpdateTiming={handleUpdateTiming}
                           defaultExpanded={idx === 0}
+                          fieldOverrides={fieldCropOverrides}
                         />
                       ))}
                     </div>
@@ -734,13 +778,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                         purposes={purposes}
                         productMasters={productMasters}
                         priceBook={priceBook}
-                        seasonYear={seasonYear}
+                        seasonYear={season.year}
                         onEditApplication={setEditingApplication}
                         onAddApplication={handleAddApplication}
                         onDuplicateTiming={handleDuplicateTiming}
                         onDeleteTiming={handleDeleteTiming}
                         onUpdateTiming={handleUpdateTiming}
                         defaultExpanded={idx === 0}
+                        fieldOverrides={fieldCropOverrides}
                       />
                     ))}
                   </div>
@@ -812,6 +857,21 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
             Delete Crop
           </button>
         </div>
+          </TabsContent>
+          
+          <TabsContent value="by-field">
+            <CropByFieldView
+              crop={crop}
+              fields={fields}
+              fieldAssignments={fieldAssignments.filter(fa => fa.seasonId === season.id)}
+              fieldOverrides={fieldCropOverrides}
+              productMasters={productMasters}
+              priceBook={priceBook}
+              seasonYear={season.year}
+              onUpdateOverrides={onUpdateFieldCropOverrides}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Entry Mode Panel */}
@@ -825,6 +885,17 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
           onClose={() => setEditingApplication(null)}
         />
       )}
+      
+      {/* Field Assignment Modal */}
+      <FieldAssignmentModal
+        isOpen={showFieldAssignment}
+        onClose={() => setShowFieldAssignment(false)}
+        crop={crop}
+        season={season}
+        fields={fields}
+        fieldAssignments={fieldAssignments}
+        onSave={onUpdateFieldAssignments}
+      />
     </div>
   );
 };

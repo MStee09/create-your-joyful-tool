@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
 import { CropPlanningView } from './CropPlanningView';
@@ -13,7 +14,12 @@ interface CropPlannerViewProps {
   inventory: InventoryItem[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  fields: Field[];
+  fieldAssignments: FieldAssignment[];
+  fieldCropOverrides: FieldCropOverride[];
   onUpdateSeason: (season: Season) => void;
+  onUpdateFieldAssignments: (assignments: FieldAssignment[]) => void;
+  onUpdateFieldCropOverrides: (overrides: FieldCropOverride[]) => void;
 }
 
 export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
@@ -23,7 +29,12 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
   inventory,
   productMasters,
   priceBook,
+  fields,
+  fieldAssignments,
+  fieldCropOverrides,
   onUpdateSeason,
+  onUpdateFieldAssignments,
+  onUpdateFieldCropOverrides,
 }) => {
   const [activeCropId, setActiveCropId] = useState<string | null>(null);
   const [showAddCrop, setShowAddCrop] = useState(false);
@@ -153,17 +164,22 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
 
       {/* Crop Detail */}
       <div className="flex-1 overflow-y-auto">
-        {activeCrop ? (
+        {activeCrop && season ? (
           <CropPlanningView
             crop={activeCrop}
+            season={season}
             products={products}
             vendors={vendors}
             inventory={inventory}
             productMasters={productMasters}
             priceBook={priceBook}
-            seasonYear={season?.year || new Date().getFullYear()}
+            fields={fields}
+            fieldAssignments={fieldAssignments}
+            fieldCropOverrides={fieldCropOverrides}
             onUpdate={handleUpdateCrop}
             onDelete={() => handleDeleteCrop(activeCrop.id)}
+            onUpdateFieldAssignments={onUpdateFieldAssignments}
+            onUpdateFieldCropOverrides={onUpdateFieldCropOverrides}
           />
         ) : (
           <div className="flex items-center justify-center h-full">

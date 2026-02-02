@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
+import type { FieldCropOverride } from '@/types/field';
 import { formatCurrency, formatNumber } from '@/utils/farmUtils';
 import { ProductRowReadable } from './ProductRowReadable';
 import { calculatePassSummary, calculatePassSummaryWithPriceBook, getApplicationAcresPercentage, type CoverageGroup, type PassPattern, type PriceBookContext } from '@/lib/cropCalculations';
@@ -29,6 +30,7 @@ interface PassCardProps {
   onUpdateTiming?: (timing: ApplicationTiming) => void;
   onUpdateApplicationOverride?: (override: ApplicationOverride) => void;
   defaultExpanded?: boolean;
+  fieldOverrides?: FieldCropOverride[];
 }
 
 // Function category chip styles
@@ -140,6 +142,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   onUpdateTiming,
   onUpdateApplicationOverride,
   defaultExpanded = false,
+  fieldOverrides = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -213,6 +216,17 @@ export const PassCard: React.FC<PassCardProps> = ({
       missingRolesCount: missingCount,
     };
   }, [summary.applications, products, purposes]);
+
+  // Count fields with overrides for applications in this pass
+  const fieldOverrideCount = React.useMemo(() => {
+    const passAppIds = new Set(summary.applications.map(a => a.id));
+    const fieldsWithOverrides = new Set(
+      fieldOverrides
+        .filter(o => passAppIds.has(o.applicationId))
+        .map(o => o.fieldAssignmentId)
+    );
+    return fieldsWithOverrides.size;
+  }, [summary.applications, fieldOverrides]);
 
   const patternStyle = PATTERN_BADGE_STYLES[summary.passPattern];
 
@@ -350,6 +364,17 @@ export const PassCard: React.FC<PassCardProps> = ({
                 >
                   <AlertCircle className="w-3 h-3" />
                   {missingRolesCount}
+                </span>
+              )}
+              
+              {/* Field-specific overrides indicator */}
+              {fieldOverrideCount > 0 && (
+                <span 
+                  className="flex items-center gap-1 px-2 py-0.5 bg-violet-500/10 text-violet-600 rounded-full text-xs"
+                  title={`${fieldOverrideCount} field${fieldOverrideCount !== 1 ? 's' : ''} have specific overrides`}
+                >
+                  <Zap className="w-3 h-3" />
+                  {fieldOverrideCount} field{fieldOverrideCount !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
