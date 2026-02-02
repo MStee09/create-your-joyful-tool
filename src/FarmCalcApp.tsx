@@ -1786,6 +1786,7 @@ const AppContent: React.FC = () => {
           productMasters={productMasters || []}
           inventory={inventory || []}
           equipment={equipment || []}
+          applicationRecords={applicationRecords || []}
         />
       )}
     </div>
