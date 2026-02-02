@@ -35,6 +35,7 @@ import {
   Truck,
   Bell,
   MapPin,
+  GitCompare,
 } from 'lucide-react';
 
 // Import types
@@ -85,6 +86,7 @@ import { PurchasesView } from './components/farm/PurchasesView';
 import { PriceHistoryView } from './components/farm/PriceHistoryView';
 import { FieldsListView } from './components/farm/fields/FieldsListView';
 import { FieldDetailView } from './components/farm/fields/FieldDetailView';
+import { FieldComparisonView } from './components/farm/fields/FieldComparisonView';
 import { EquipmentListView } from './components/farm/equipment/EquipmentListView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
@@ -221,6 +223,7 @@ const Sidebar: React.FC<{
         <NavButton id="dashboard" label="Dashboard" icon={BarChart3} />
         <NavButton id="crops" label="Crop Plans" icon={Leaf} />
         <NavButton id="fields" label="Fields" icon={MapPin} />
+        <NavButton id="field-comparison" label="Field Comparison" icon={GitCompare} />
 
         {/* PROCUREMENT section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
@@ -1217,6 +1220,21 @@ const AppContent: React.FC = () => {
             onDeleteEquipment={deleteEquipment}
           />
         );
+      case 'field-comparison':
+        return (
+          <FieldComparisonView
+            fields={fields || []}
+            fieldAssignments={fieldAssignments || []}
+            seasons={seasons}
+            currentSeason={currentSeason}
+            products={legacyProducts}
+            productMasters={state.productMasters || []}
+            priceBook={state.priceBook || []}
+            onSelectField={(fieldId) => setActiveView(`field-${fieldId}`)}
+            onBack={() => setActiveView('fields')}
+          />
+        );
+      case 'products':
         return (
           <ProductsViewNew
             productMasters={state.productMasters || []}

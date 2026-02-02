@@ -1,11 +1,45 @@
 
-# Phase 1: Fields + Equipment Implementation
+# Phase 1: Fields + Equipment Implementation ✅ COMPLETE
 
 ## Overview
 
 This phase creates the foundation for field-level planning by implementing:
 1. **Fields** - Persistent field records with soil data, Harvest Profit import, and crop history tracking
 2. **Equipment** - Equipment profiles with tank sizes for Mix Calculator (Phase 3)
+
+---
+
+# Phase 2: Field Comparison View ✅ COMPLETE
+
+## Overview
+
+Compares costs, nutrients, and history across fields with the same crop assignment in the current season.
+
+## Features Implemented
+
+- **Filter by Crop**: Dropdown to filter fields by current season crop assignment
+- **Summary Cards**: Total fields, acres, avg $/ac, and total cost
+- **Crop Group Cards**: Fields grouped by crop with:
+  - Crop average stats ($/ac, total cost, N-P-K-S nutrients, N:S and N:K ratios)
+  - Field comparison table with: Field Name, Farm, Soil Type, Acres, $/ac, Variance %, Total Cost, Nutrients
+- **Variance Indicators**: Color-coded badges showing over/under crop average
+- **Navigation**: Click field row to navigate to Field Detail view
+
+## Files Created
+
+| File | Purpose |
+|------|---------|
+| `src/lib/fieldComparisonUtils.ts` | Calculation utilities for field-level costs, nutrients, and grouping |
+| `src/components/farm/fields/FieldComparisonView.tsx` | Main comparison view component |
+
+## Navigation
+
+- Added "Field Comparison" item to sidebar Plan section with GitCompare icon
+- Route: `field-comparison`
+
+---
+
+# Phase 1: Fields + Equipment Implementation (Details)
 
 ---
 
