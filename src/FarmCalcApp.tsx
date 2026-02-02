@@ -1218,6 +1218,10 @@ const AppContent: React.FC = () => {
             onUpdateSeason={handleUpdateSeason}
             onUpdateFieldAssignments={updateFieldAssignments}
             onUpdateFieldCropOverrides={updateFieldCropOverrides}
+            onNavigateToMixCalculator={(fieldId, acres) => {
+              // Navigate to mix calculator - could store context for pre-population
+              setActiveView('mix-calculator');
+            }}
           />
         );
       case 'fields':
@@ -1333,6 +1337,8 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             commoditySpecs={state.commoditySpecs || []}
             onNavigateToSpecs={() => setActiveView('commodity-specs')}
+            fieldAssignments={fieldAssignments || []}
+            fieldOverrides={fieldCropOverrides || []}
           />
         );
       case 'vendor-spend':

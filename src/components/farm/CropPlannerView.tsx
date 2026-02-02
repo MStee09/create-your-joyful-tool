@@ -20,6 +20,7 @@ interface CropPlannerViewProps {
   onUpdateSeason: (season: Season) => void;
   onUpdateFieldAssignments: (assignments: FieldAssignment[]) => void;
   onUpdateFieldCropOverrides: (overrides: FieldCropOverride[]) => void;
+  onNavigateToMixCalculator?: (fieldId: string, acres: number) => void;
 }
 
 export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
@@ -35,6 +36,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
   onUpdateSeason,
   onUpdateFieldAssignments,
   onUpdateFieldCropOverrides,
+  onNavigateToMixCalculator,
 }) => {
   const [activeCropId, setActiveCropId] = useState<string | null>(null);
   const [showAddCrop, setShowAddCrop] = useState(false);
@@ -180,6 +182,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
             onDelete={() => handleDeleteCrop(activeCrop.id)}
             onUpdateFieldAssignments={onUpdateFieldAssignments}
             onUpdateFieldCropOverrides={onUpdateFieldCropOverrides}
+            onNavigateToMixCalculator={onNavigateToMixCalculator}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
