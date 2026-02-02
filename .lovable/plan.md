@@ -95,5 +95,38 @@ Built a variance report comparing **recorded field applications** against **crop
 - `src/components/farm/ApplicationVarianceView.tsx` — UI component
 - Added to sidebar under **Review** section as "Actual vs. Plan"
 
+---
 
+## Nutrient Efficiency Report ✅ COMPLETED
 
+### Overview
+Built a report comparing **planned N-P-K-S nutrient delivery** against **actual nutrients applied** from recorded applications.
+
+---
+
+### What It Shows
+
+**Whole-Farm Summary:**
+- N-P-K-S cards showing planned vs actual lbs/ac
+- Weighted by crop acreage for accurate farm-level totals
+- Color-coded variance indicators
+
+**Per-Crop Table:**
+- Crop name and acres
+- Status badge: Not Started | Partial | On Target | Over
+- Planned and actual nutrients for N, P, K, S
+- Variance shown inline with color coding
+
+---
+
+### Status Logic
+- **On Target**: Actual N within ±5% of planned
+- **Partial**: Started but under target
+- **Over**: Actual N exceeds plan by >5%
+
+---
+
+### Implementation
+- `src/lib/nutrientEfficiencyUtils.ts` — Core calculation logic
+- `src/components/farm/NutrientEfficiencyView.tsx` — UI component
+- Added to sidebar under **Review** section as "Nutrient Efficiency"
