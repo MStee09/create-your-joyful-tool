@@ -1,194 +1,357 @@
 
-## Restriction Engine ✅ COMPLETED
 
-### Overview
-Built a validation engine that checks planned and recorded applications against agronomic constraints. Warnings act as a "thinking partner"—users can override with a recorded reason rather than being hard-stopped.
+# Chemical Product View & AI Extraction Improvements - Implementation Plan (Updated)
 
----
+## Overview
 
-### Restriction Types Checked
-
-1. **Rotation History** — Validates previous crops on the field against product rotation restrictions
-2. **Pre-Harvest Interval (PHI)** — Days required between application and harvest
-3. **Re-Entry Interval (REI)** — Worker safety timing (informational only)
-4. **Seasonal Maximum Rate** — Cumulative rate limits per product per season
-5. **Max Rate Per Application** — Single application rate limits
-6. **Max Applications Per Season** — Count limits per product
+This plan implements a dedicated product view for chemical products (herbicides, fungicides, insecticides) with:
+- **Separate UI** from fertility products with tabbed chemical-specific views
+- **Structured chemical data** (restrictions, rates, adjuvants, mixing) in queryable fields
+- **Manufacturer vs Vendor clarity** - products know who makes them; vendor relationships track who sells them
+- **Enhanced AI extraction** using label PDFs with a review flow
+- **Product comparison** by active ingredient and MOA group
 
 ---
 
-### How It Works
+## Current State Analysis
 
-- Restrictions are defined in `ChemicalData.restrictions` on each product
-- When recording an application, the system checks all products against all selected fields
-- **Errors** (PHI, max rate violations) block saving until acknowledged
-- **Warnings** (rotation, REI) show for review but don't block
-- Users must provide an override reason and confirm checkbox to proceed
-- Overridden warnings are saved with the application record for audit
+**What already exists:**
+- `ChemicalDataTab.tsx` - Basic chemical data display (active ingredients, restrictions, regulatory info, rotation restrictions)
+- `ChemicalData` type in `src/types/chemicalData.ts` - Core structure for pesticide data
+- `extract-label` edge function - Already extracts chemical data from PDFs
+- `ProductDetailView.tsx` - Single view for all products, includes ChemicalDataTab for pesticides
+- `isPesticideCategory()` helper function
+- `product_masters` table has `chemical_data` JSONB column
 
----
-
-### Implementation
-
-- `src/lib/restrictionEngine.ts` — Core validation logic
-- `src/components/farm/applications/RestrictionWarningPanel.tsx` — UI for displaying and overriding warnings
-- `RecordApplicationModal` — Integrated restriction checks on product/field selection
-
----
-
-## Inventory View: Add "Ordered" Section ✅ COMPLETED
-
-### Overview
-Enhanced the Inventory view to show products that are **ordered but not yet received** alongside the existing "On Hand" inventory.
+**What needs to be built:**
+1. Expanded `ChemicalProductData` type with rates, adjuvants, application requirements
+2. Manufacturer fields on ProductMaster with known manufacturers list
+3. Category-based routing to dedicated chemical vs fertility views
+4. New Chemical Product Detail View with 5 tabs
+5. Reusable table components for chemical data display
+6. Enhanced product list with data status indicators
+7. Product comparison features (MOA groups, active ingredient search)
 
 ---
 
-### What You'll See
+## Implementation Phases
 
-**Tab Layout:**
-- **All** — Combined view showing both On Hand + Ordered (default)
-- **On Hand** — Current physical inventory
-- **Ordered** — Products with pending deliveries
+### Phase 1: Data Model & Database Updates
 
----
+**1.1 Update `ChemicalData` type (`src/types/chemicalData.ts`)**
 
-### Implementation Complete
-- ✅ Added `purchases` prop to InventoryView (SimplePurchase[])
-- ✅ Filter purchases by `status === 'ordered'` and current season
-- ✅ Tab bar: All | On Hand | Ordered
-- ✅ Summary cards show On Hand value + Ordered value separately
+Expand to include:
+- Rate information (min, max, typical, unit)
+- Application requirements (carrier GPA, droplet size, spray pressure)
+- Adjuvant requirements (type, required vs recommended, rate, notes)
+- Enhanced rotation restrictions (interval unit, conditions)
+- Target pests/weeds
+- Subcategory field (e.g., "Post-emerge broadleaf")
 
----
+**1.2 Update `ProductMaster` type (`src/types.ts`)**
 
-## Actual vs. Planned Application Report ✅ COMPLETED
+Add manufacturer fields:
+- `manufacturer?: string` - Company name (BASF, Corteva, etc.)
+- `manufacturerWebsite?: string` - URL to product page
+- `epaRegistrationNumber?: string` - EPA Reg No.
+- `labelPdfUrl?: string` - Stored label URL
+- `sdsPdfUrl?: string` - Stored SDS URL
+- `extractionSource?: 'label-pdf' | 'sds-pdf' | 'manufacturer-website' | 'manual'`
+- `extractionConfidence?: 'high' | 'medium' | 'low'`
+- `lastExtractedAt?: string`
 
-### Overview
-Built a variance report comparing **recorded field applications** against **crop plan targets** by product, field, and timing.
+**1.3 Known Manufacturers List (`src/lib/manufacturers.ts`)**
 
----
+Create a reference list for autocomplete and label URL suggestions:
 
-### What It Shows
+```typescript
+export interface KnownManufacturer {
+  name: string;
+  urlPattern: string;
+  labelSearchUrl?: string;
+}
 
-**Summary Cards:**
-- Passes Planned — unique crop/timing combinations
-- Passes Started — at least one application recorded
-- Passes Complete — all products fully applied
-- Progress bar — percentage of passes complete
+export const KNOWN_MANUFACTURERS: KnownManufacturer[] = [
+  { name: 'BASF', urlPattern: 'agriculture.basf.us', labelSearchUrl: 'https://agriculture.basf.us/crop-protection/products.html' },
+  { name: 'Bayer', urlPattern: 'cropscience.bayer.us', labelSearchUrl: 'https://www.cropscience.bayer.us/products' },
+  { name: 'Corteva', urlPattern: 'corteva.us', labelSearchUrl: 'https://www.corteva.us/products-and-solutions.html' },
+  { name: 'Syngenta', urlPattern: 'syngenta-us.com', labelSearchUrl: 'https://www.syngenta-us.com/product-list' },
+  { name: 'FMC', urlPattern: 'fmc.com', labelSearchUrl: 'https://www.fmcagricultural.com/products' },
+  { name: 'AMVAC', urlPattern: 'amvac.com', labelSearchUrl: 'https://amvac.com/products' },
+  { name: 'Nufarm', urlPattern: 'nufarm.com' },
+  { name: 'UPL', urlPattern: 'upl-ltd.com' },
+  { name: 'Valent', urlPattern: 'valent.com' },
+  { name: 'Winfield United', urlPattern: 'winfieldunited.com' },
+];
 
-**Per-Product Row:**
-- Planned rate and total (from crop plan, weighted by tier)
-- Actual rate and total (from recorded applications)
-- Rate variance (actual - planned, with %)
-- Total variance (actual - planned, with %)
-- Status badge: Not Applied | Partial | Complete | Over Applied
+export function findManufacturerByUrl(url: string): KnownManufacturer | null {
+  return KNOWN_MANUFACTURERS.find(m => url.includes(m.urlPattern)) || null;
+}
 
----
+export function getManufacturerNames(): string[] {
+  return KNOWN_MANUFACTURERS.map(m => m.name);
+}
+```
 
-### Filters
-- Filter by status (Not Applied, Partial, Complete, Over Applied)
-- Filter by crop
+This enables:
+- Autocomplete when entering manufacturer name
+- Auto-detect manufacturer from pasted URLs
+- Suggest where to find labels for known manufacturers
 
----
+**1.4 Database Migration**
 
-### Implementation
-- `src/lib/applicationVarianceUtils.ts` — Core calculation logic
-- `src/components/farm/ApplicationVarianceView.tsx` — UI component
-- Added to sidebar under **Review** section as "Actual vs. Plan"
-
----
-
-## Nutrient Efficiency Report ✅ COMPLETED
-
-### Overview
-Built a report comparing **planned N-P-K-S nutrient delivery** against **actual nutrients applied** from recorded applications.
-
----
-
-### What It Shows
-
-**Whole-Farm Summary:**
-- N-P-K-S cards showing planned vs actual lbs/ac
-- Weighted by crop acreage for accurate farm-level totals
-- Color-coded variance indicators
-
-**Per-Crop Table:**
-- Crop name and acres
-- Status badge: Not Started | Partial | On Target | Over
-- Planned and actual nutrients for N, P, K, S
-- Variance shown inline with color coding
-
----
-
-### Status Logic
-- **On Target**: Actual N within ±5% of planned
-- **Partial**: Started but under target
-- **Over**: Actual N exceeds plan by >5%
+Add new columns to `product_masters` table:
+```sql
+ALTER TABLE product_masters 
+ADD COLUMN IF NOT EXISTS manufacturer TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer_website TEXT,
+ADD COLUMN IF NOT EXISTS epa_registration_number TEXT,
+ADD COLUMN IF NOT EXISTS label_pdf_url TEXT,
+ADD COLUMN IF NOT EXISTS sds_pdf_url TEXT,
+ADD COLUMN IF NOT EXISTS extraction_source TEXT,
+ADD COLUMN IF NOT EXISTS extraction_confidence TEXT,
+ADD COLUMN IF NOT EXISTS last_extracted_at TIMESTAMPTZ;
+```
 
 ---
 
-### Implementation
-- `src/lib/nutrientEfficiencyUtils.ts` — Core calculation logic
-- `src/components/farm/NutrientEfficiencyView.tsx` — UI component
-- Added to sidebar under **Review** section as "Nutrient Efficiency"
+### Phase 2: Reusable Table Components
+
+**2.1 Create `ActiveIngredientsTable.tsx`**
+
+Reusable component displaying active ingredients with:
+- Name, concentration, unit columns
+- MOA group with badge styling
+- Chemical family/class
+- Used in: Overview Tab, Extraction Review Modal, Product Comparison
+
+**2.2 Create `AdjuvantRequirementsTable.tsx`**
+
+Reusable component for adjuvant display:
+- Adjuvant type (MSO, COC, NIS, AMS)
+- Required vs Recommended badge
+- Rate and notes
+- Used in: Rates Tab, Extraction Review Modal
+
+**2.3 Create `RotationRestrictionsTable.tsx`**
+
+Reusable component for rotation display:
+- Crop name
+- Interval (days/months)
+- Conditions/notes
+- Used in: Restrictions Tab, Extraction Review Modal
 
 ---
 
-## Application History View ✅ COMPLETED
+### Phase 3: Product List View Updates
 
-### Overview
-Timeline view showing all recorded field applications with filtering by field and crop.
+**3.1 Add Category Filter Tabs**
 
----
+Update `ProductsListView.tsx` to add horizontal category filter tabs:
+- [All] [Fertilizer] [Herbicide] [Fungicide] [Insecticide] [Adjuvant]
+- Quick click to filter by category
 
-### Features
-- **Summary cards**: Total applications, fields covered, total acres treated
-- **Filters**: By field and by crop
-- **Grouped by date**: Most recent first with visual timeline
-- **Expandable cards**: Click to see product details, applicator, equipment, notes
-- **Export CSV**: Download full history as spreadsheet
+**3.2 Add Data Status Column**
 
----
+For chemical products, show data completeness:
+- Complete - chemicalData with activeIngredients + restrictions + rates
+- Needs Review - partial data or low confidence extraction
+- No Data - no chemicalData (for chemicals only)
 
-### Implementation
-- `src/components/farm/applications/ApplicationHistoryView.tsx` — UI component
-- Added to sidebar under **Review** section as "Application History"
+**3.3 Add Manufacturer Column**
 
----
-
-## Inventory Shortage Modal ✅ COMPLETED
-
-### Overview
-Modal that appears when recording an application with insufficient inventory.
+Display manufacturer name in product list for chemicals (distinct from vendor)
 
 ---
 
-### Resolution Options
-1. **Record Purchase** — Open purchase form to add incoming product
-2. **Add Carryover** — Add existing product from last season
-3. **Save Anyway** — Record application without deducting (shows negative balance)
+### Phase 4: Chemical Product Detail View - Structure
+
+**4.1 Create `ChemicalProductDetailView.tsx`**
+
+New dedicated component for herbicides/fungicides/insecticides with:
+- Header with signal word badge, EPA Reg number, formulation type
+- Active ingredient summary with MOA group
+- Tabbed layout: Overview | Rates & Application | Restrictions | Mixing | Documents
+
+**4.2 Update Category Routing**
+
+Modify `ProductDetailView.tsx` or parent routing to:
+- Route herbicide/fungicide/insecticide/seed-treatment to `ChemicalProductDetailView`
+- Route fertilizer/biological/micronutrient to existing fertility view
+- **Adjuvants**: Use the same `ChemicalProductDetailView` with conditional tab visibility
+  - Show: Overview (simplified), Documents
+  - Hide: Restrictions, Rates (or show minimal)
+  - This keeps MVP scope tight while allowing adjuvant expansion later
 
 ---
 
-### Implementation
-- `src/components/farm/applications/InventoryShortageModal.tsx` — Modal component
-- Can be integrated into RecordApplicationModal when shortages detected
+### Phase 5: Chemical Product View - Tab Components
+
+**5.1 Overview Tab (`ChemicalProductOverviewTab.tsx`)**
+- `ActiveIngredientsTable` component with MOA group badges
+- Quick reference cards: Rate, Carrier, PHI, Adjuvant, Max/Season, REI
+- Vendors & Pricing section (existing vendor offerings)
+
+**5.2 Rates & Application Tab (`ChemicalProductRatesTab.tsx`)**
+- Visual rate range slider (min/typical/max)
+- Carrier volume requirements
+- Droplet size recommendations
+- `AdjuvantRequirementsTable` component
+
+**5.3 Restrictions Tab (`ChemicalProductRestrictionsTab.tsx`)**
+- Application limits cards: PHI, REI, Max/App, Max/Season, Max Applications
+- `RotationRestrictionsTable` component with conditions
+- Environmental restrictions (buffer zones, groundwater, pollinator)
+
+**5.4 Mixing Tab (`ChemicalProductMixingTab.tsx`)**
+- Mixing order display with visual sequence
+- Water quality considerations (pH, hardness)
+- Tank mix warnings and compatibility notes
+
+**5.5 Documents Tab (`ChemicalProductDocumentsTab.tsx`)**
+- Label PDF upload/view/re-extract
+- SDS PDF upload/view
+- Data extraction status and confidence
+- Extraction source indicator
 
 ---
 
-## Report Exports ✅ COMPLETED
+### Phase 6: AI Extraction Flow Enhancements
 
-### Overview
-CSV export functionality for all variance and history reports.
+**6.1 Create Extraction Source Selection Modal**
+
+When adding chemical data, offer options:
+1. Upload Label PDF (recommended) - most accurate
+2. Use Manufacturer Website - scrape from URL (with autocomplete from KNOWN_MANUFACTURERS)
+3. Enter Manually - open edit forms
+4. Skip for Now - create product without chemical data
+
+**6.2 Create Extraction Review Modal (`ChemicalExtractionReviewModal.tsx`)**
+
+After AI extraction, show all extracted fields for review using reusable components:
+- `ActiveIngredientsTable` (editable mode)
+- `AdjuvantRequirementsTable` (editable mode)
+- `RotationRestrictionsTable` (editable mode)
+- Confidence indicators per field
+- Missing field warnings
+- Accept/Edit/Reject per section
+
+**6.3 Update Edge Function Prompt**
+
+Enhance `extract-label/index.ts` with:
+- Adjuvant requirements extraction
+- Rate range extraction (min/max/typical)
+- Carrier volume requirements
+- Enhanced target pest/weed extraction
 
 ---
 
-### Export Functions
-- `exportApplicationVarianceCsv()` — Actual vs. Plan report with all product rows
-- `exportNutrientEfficiencyCsv()` — N-P-K-S by crop with farm totals
-- `exportApplicationHistoryCsv()` — Full application history by date
+### Phase 7: Product Creation Flow Updates
+
+**7.1 Add Category Selection Modal (`AddProductCategoryModal.tsx`)**
+
+First step when adding product:
+- Visual category selection cards (Fertilizer, Herbicide, Fungicide, Insecticide, Adjuvant, Other)
+- Routes to appropriate creation flow
+
+**7.2 Chemical Product Creation Wizard**
+
+3-step flow:
+1. Basic info: Name, Manufacturer (with autocomplete from KNOWN_MANUFACTURERS), EPA Reg
+2. Data source: Upload label / Website / Manual / Skip
+3. Initial vendor offering (existing step 2)
 
 ---
 
-### Implementation
-- `src/lib/reportExportUtils.ts` — Export utility functions
-- Export buttons added to all three Review section views
+### Phase 8: Product Comparison Features
+
+**8.1 Find Similar Products by Active Ingredient**
+
+From product detail, button to "Find products with same active ingredient":
+- Query products by active ingredient name
+- Show comparison table with prices using `ActiveIngredientsTable`
+
+**8.2 MOA Group View (`MOAGroupView.tsx`)**
+
+New view accessible from Products section:
+- Group all herbicides/fungicides/insecticides by MOA group
+- Resistance management warning if multiple products in same group
+
+---
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/lib/manufacturers.ts` | Known manufacturers list with URL patterns |
+| `src/components/farm/ActiveIngredientsTable.tsx` | Reusable AI table component |
+| `src/components/farm/AdjuvantRequirementsTable.tsx` | Reusable adjuvant requirements table |
+| `src/components/farm/RotationRestrictionsTable.tsx` | Reusable rotation restrictions table |
+| `src/components/farm/ChemicalProductDetailView.tsx` | Main chemical product view with tabs |
+| `src/components/farm/ChemicalProductOverviewTab.tsx` | Overview tab content |
+| `src/components/farm/ChemicalProductRatesTab.tsx` | Rates & application tab |
+| `src/components/farm/ChemicalProductRestrictionsTab.tsx` | Restrictions tab |
+| `src/components/farm/ChemicalProductMixingTab.tsx` | Mixing & compatibility tab |
+| `src/components/farm/ChemicalProductDocumentsTab.tsx` | Documents & extraction tab |
+| `src/components/farm/ChemicalExtractionReviewModal.tsx` | Review extracted data |
+| `src/components/farm/AddProductCategoryModal.tsx` | Category selection for new products |
+| `src/components/farm/MOAGroupView.tsx` | View products by MOA group |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/types/chemicalData.ts` | Expand ChemicalProductData structure |
+| `src/types.ts` | Add manufacturer fields to ProductMaster |
+| `src/components/farm/ProductsListView.tsx` | Add category tabs, data status column, manufacturer column |
+| `src/components/farm/ProductDetailView.tsx` | Route chemicals to ChemicalProductDetailView |
+| `src/hooks/useSupabaseData.ts` | Handle new manufacturer fields |
+| `supabase/functions/extract-label/index.ts` | Enhanced extraction prompt |
+| `src/lib/restrictionEngine.ts` | Use expanded chemicalData structure |
+| `src/components/farm/Sidebar.tsx` | Add MOA Groups nav item under Products |
+
+---
+
+## Technical Notes
+
+### Adjuvant Handling (MVP)
+- Adjuvants use `ChemicalProductDetailView` with conditional rendering
+- Tabs shown for adjuvants: Overview (simplified), Documents
+- Tabs hidden/minimal: Restrictions, Rates (adjuvants don't have PHI/REI)
+- Future: Can create dedicated `AdjuvantDetailView` if complexity warrants
+
+### Manufacturer Autocomplete Integration
+- Text input with dropdown suggestions from `KNOWN_MANUFACTURERS`
+- When user pastes a URL, auto-detect manufacturer via `findManufacturerByUrl()`
+- Show "Find Label" button linking to manufacturer's product page for known manufacturers
+
+### Reusable Table Components
+- All three table components support both "display" and "editable" modes
+- Display mode: read-only with badges and formatting
+- Editable mode: inline editing with add/remove rows (for extraction review)
+- Prop: `editable?: boolean` toggles behavior
+
+### Backward Compatibility
+- Existing `chemicalData` structure is preserved; new fields are additive
+- Products without new fields continue to work
+- Migration populates new columns as nullable
+
+### Integration Points
+- **Restriction Engine** - Already reads from `chemicalData.restrictions`; will use new structured fields
+- **Mix Calculator** - Will use `chemicalData.mixing.mixingOrder` for tank mix sequence
+- **Tank Mix Templates** - Will surface adjuvant requirements from included products
+
+---
+
+## Estimated Scope
+
+- **Phase 1**: ~1 session (data model + manufacturers list + migration)
+- **Phase 2**: ~1 session (reusable table components)
+- **Phase 3**: ~1 session (product list updates)
+- **Phase 4-5**: ~3 sessions (chemical detail view + all tabs)
+- **Phase 6**: ~1 session (extraction flow)
+- **Phase 7**: ~1 session (creation flow)
+- **Phase 8**: ~1 session (comparison features)
+
+**Total: ~9 implementation sessions**
+
