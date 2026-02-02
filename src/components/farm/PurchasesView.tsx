@@ -255,7 +255,16 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           setShowAddModal(false);
           setEditingPurchase(null);
         }}
-        onSave={onAddPurchase}
+        onSave={async (purchase) => {
+          if (editingPurchase) {
+            // Update existing purchase
+            const success = await onUpdatePurchase(editingPurchase.id, purchase);
+            return success ? { ...editingPurchase, ...purchase } as SimplePurchase : null;
+          } else {
+            // Create new purchase
+            return onAddPurchase(purchase);
+          }
+        }}
         onCreatePriceRecords={async (records) => {
           for (const record of records) {
             await onAddPriceRecord(record);
