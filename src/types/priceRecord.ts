@@ -3,6 +3,8 @@
 // Tracks all prices over time (quotes and purchases)
 // =============================================
 
+import type { PackageUnitType } from './simplePurchase';
+
 export interface PriceRecord {
   id: string;
   userId?: string;
@@ -11,13 +13,13 @@ export interface PriceRecord {
   
   // Price information
   price: number;                 // Price as quoted/paid
-  unit: 'gal' | 'lbs' | 'ton';  // Unit for the price
+  unit: PackageUnitType;         // Unit for the price
   normalizedPrice: number;       // Calculated $/base unit
   
   // Package information (for normalization context)
   packageType?: string;          // "tote", "twin-pack", "jug", etc.
-  packageSize?: number;          // e.g., 275 (gal per tote)
-  packageUnit?: 'gal' | 'lbs';   // Unit of package contents
+  packageSize?: number;          // e.g., 275 (gal per tote), 900 (g per jug)
+  packageUnit?: PackageUnitType; // Unit of package contents
   quantityPurchased?: number;    // How many packages (if purchased)
   
   // Timing
@@ -44,7 +46,7 @@ export type NewPriceRecord = Omit<PriceRecord, 'id' | 'createdAt' | 'updatedAt'>
 // Baseline price info (calculated from price records)
 export interface BaselinePrice {
   price: number;
-  unit: 'gal' | 'lbs' | 'ton';
+  unit: PackageUnitType;
   date: string;
   vendorId: string;
   packageType?: string;

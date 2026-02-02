@@ -3,6 +3,9 @@
 // Replaces complex Order/Invoice system
 // =============================================
 
+// Supported unit types for packages
+export type PackageUnitType = 'gal' | 'lbs' | 'g' | 'oz' | 'qt' | 'pt' | 'ton';
+
 export interface SimplePurchaseLine {
   id: string;
   productId: string;
@@ -10,17 +13,17 @@ export interface SimplePurchaseLine {
   // What was purchased
   quantity: number;              // Number of packages
   packageType?: string;          // "tote", "twin-pack", "jug", "bag", "bulk"
-  packageSize?: number;          // Size per package (e.g., 275 for tote)
-  packageUnit?: 'gal' | 'lbs';   // Unit of package contents
+  packageSize?: number;          // Size per package (e.g., 275 for tote, 900 for gram-based jug)
+  packageUnit?: PackageUnitType; // Unit of package contents
   
   // Pricing
-  unitPrice: number;             // Price per package
-  totalPrice: number;            // quantity × unitPrice
+  unitPrice: number;             // Price per unit (per gal, per lb, per g, etc.)
+  totalPrice: number;            // totalQuantity × unitPrice
   
   // Normalized (calculated)
-  totalQuantity: number;         // Total gal or lbs
-  normalizedUnit: 'gal' | 'lbs' | 'ton';
-  normalizedUnitPrice: number;   // $/gal or $/lb or $/ton
+  totalQuantity: number;         // Total gal or lbs or g
+  normalizedUnit: PackageUnitType;
+  normalizedUnitPrice: number;   // $/gal or $/lb or $/g
   
   // Notes
   notes?: string;
@@ -67,9 +70,9 @@ export type NewSimplePurchaseLine = Omit<SimplePurchaseLine, 'id'>;
 export function calculateNormalizedPrice(
   unitPrice: number,
   packageSize: number | undefined,
-  packageUnit: 'gal' | 'lbs' | undefined,
+  packageUnit: PackageUnitType | undefined,
   productForm: 'liquid' | 'dry'
-): { normalizedPrice: number; normalizedUnit: 'gal' | 'lbs' } {
+): { normalizedPrice: number; normalizedUnit: PackageUnitType } {
   // If no package info, price is already normalized
   if (!packageSize || !packageUnit) {
     return { 
