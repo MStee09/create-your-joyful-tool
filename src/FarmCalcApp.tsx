@@ -36,6 +36,7 @@ import {
   Bell,
   MapPin,
   GitCompare,
+  Beaker,
 } from 'lucide-react';
 
 // Import types
@@ -88,6 +89,7 @@ import { FieldsListView } from './components/farm/fields/FieldsListView';
 import { FieldDetailView } from './components/farm/fields/FieldDetailView';
 import { FieldComparisonView } from './components/farm/fields/FieldComparisonView';
 import { EquipmentListView } from './components/farm/equipment/EquipmentListView';
+import { MixCalculatorView } from './components/farm/tankMix/MixCalculatorView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -247,9 +249,15 @@ const Sidebar: React.FC<{
           <NavButton id="inventory" label="On Hand" icon={Warehouse} />
         </div>
 
+        {/* TOOLS section */}
+        <div className="pt-4 mt-4 border-t border-stone-700">
+          <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Tools</div>
+          <NavButton id="mix-calculator" label="Mix Calculator" icon={Beaker} />
+          <NavButton id="equipment" label="Equipment" icon={Truck} />
+        </div>
+
         {/* Bottom section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
-          <NavButton id="equipment" label="Equipment" icon={Truck} />
           <NavButton id="assistant" label="Assistant" icon={StickyNote} />
           <NavButton id="settings" label="Settings" icon={Settings} />
         </div>
@@ -917,6 +925,10 @@ const AppContent: React.FC = () => {
     addEquipment,
     updateEquipmentItem,
     deleteEquipment,
+    // Tank mix recipes
+    tankMixRecipes,
+    addTankMixRecipe,
+    deleteTankMixRecipe,
     refetch,
   } = supabaseData;
 
@@ -1218,6 +1230,16 @@ const AppContent: React.FC = () => {
             onAddEquipment={addEquipment}
             onUpdateEquipment={updateEquipmentItem}
             onDeleteEquipment={deleteEquipment}
+          />
+        );
+      case 'mix-calculator':
+        return (
+          <MixCalculatorView
+            equipment={equipment || []}
+            products={state.productMasters || []}
+            recipes={tankMixRecipes || []}
+            onSaveRecipe={addTankMixRecipe}
+            onDeleteRecipe={deleteTankMixRecipe}
           />
         );
       case 'field-comparison':

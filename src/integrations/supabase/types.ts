@@ -983,6 +983,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tank_mix_recipes: {
+        Row: {
+          carrier_gpa: number
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          notes: string | null
+          products: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          carrier_gpa?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          products?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          carrier_gpa?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          products?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       vendor_offerings: {
         Row: {
           container_size: number | null

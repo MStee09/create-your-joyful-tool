@@ -24,6 +24,7 @@ import type { PriceHistory } from '@/types/farm';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import type { SimplePurchase, NewSimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import type { Field, FieldAssignment, Equipment } from '@/types/field';
+import type { TankMixRecipe, TankMixProduct } from '@/types/tankMix';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -48,6 +49,8 @@ interface SupabaseDataState {
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   equipment: Equipment[];
+  // Phase 3: Tank Mix Recipes
+  tankMixRecipes: TankMixRecipe[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -226,6 +229,7 @@ export function useSupabaseData(user: User | null) {
     fields: [],
     fieldAssignments: [],
     equipment: [],
+    tankMixRecipes: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -272,6 +276,7 @@ export function useSupabaseData(user: User | null) {
         fieldsRes,
         fieldAssignmentsRes,
         equipmentRes,
+        tankMixRecipesRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -292,6 +297,7 @@ export function useSupabaseData(user: User | null) {
         supabase.from('fields').select('*').order('name'),
         supabase.from('field_assignments').select('*'),
         supabase.from('equipment').select('*').order('name'),
+        supabase.from('tank_mix_recipes').select('*').order('name'),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -488,6 +494,18 @@ export function useSupabaseData(user: User | null) {
         updatedAt: row.updated_at,
       }));
 
+      // Map tank mix recipes
+      const tankMixRecipes: TankMixRecipe[] = (tankMixRecipesRes.data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        carrierGPA: Number(row.carrier_gpa) || 10,
+        products: (row.products || []) as TankMixProduct[],
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
       setState({
         seasons,
         vendors,
@@ -509,6 +527,7 @@ export function useSupabaseData(user: User | null) {
         fields,
         fieldAssignments,
         equipment,
+        tankMixRecipes,
         currentSeasonId,
         loading: false,
         error: null,
@@ -1651,6 +1670,63 @@ export function useSupabaseData(user: User | null) {
     return true;
   }, [user]);
 
+  // =============================================
+  // TANK MIX RECIPES CRUD
+  // =============================================
+  
+  const addTankMixRecipe = useCallback(async (
+    recipe: Omit<TankMixRecipe, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<TankMixRecipe | null> => {
+    if (!user) return null;
+    
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    
+    const { error } = await supabase.from('tank_mix_recipes').insert({
+      id,
+      user_id: user.id,
+      name: recipe.name,
+      description: recipe.description,
+      carrier_gpa: recipe.carrierGPA,
+      products: recipe.products as any,
+      notes: recipe.notes,
+    });
+    
+    if (error) {
+      console.error('Error adding tank mix recipe:', error);
+      toast.error('Failed to save recipe');
+      return null;
+    }
+    
+    const newRecipe: TankMixRecipe = {
+      ...recipe,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    setState(prev => ({ ...prev, tankMixRecipes: [...prev.tankMixRecipes, newRecipe] }));
+    return newRecipe;
+  }, [user]);
+
+  const deleteTankMixRecipe = useCallback(async (recipeId: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase.from('tank_mix_recipes').delete().eq('id', recipeId);
+    
+    if (error) {
+      console.error('Error deleting tank mix recipe:', error);
+      toast.error('Failed to delete recipe');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      tankMixRecipes: prev.tankMixRecipes.filter(r => r.id !== recipeId),
+    }));
+    return true;
+  }, [user]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -1692,5 +1768,8 @@ export function useSupabaseData(user: User | null) {
     addEquipment,
     updateEquipmentItem,
     deleteEquipment,
+    // Tank mix recipes operations
+    addTankMixRecipe,
+    deleteTankMixRecipe,
   };
 }
