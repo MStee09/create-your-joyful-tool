@@ -154,6 +154,20 @@ export interface ProductMaster {
   
   // Chemical/Pesticide data (for herbicides, fungicides, insecticides)
   chemicalData?: import('./types/chemicalData').ChemicalData;
+  
+  // Manufacturer info (distinct from vendor)
+  manufacturer?: string;
+  manufacturerWebsite?: string;
+  epaRegistrationNumber?: string;
+  
+  // Document URLs (cloud storage)
+  labelPdfUrl?: string;
+  sdsPdfUrl?: string;
+  
+  // AI Extraction metadata
+  extractionSource?: 'label-pdf' | 'sds-pdf' | 'manufacturer-website' | 'manual';
+  extractionConfidence?: 'high' | 'medium' | 'low';
+  lastExtractedAt?: string;
 }
 
 // LEGACY: Old Product interface for migration
