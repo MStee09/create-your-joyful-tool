@@ -92,6 +92,7 @@ import { EquipmentListView } from './components/farm/equipment/EquipmentListView
 import { MixCalculatorView } from './components/farm/tankMix/MixCalculatorView';
 import { RecordApplicationModal } from './components/farm/applications/RecordApplicationModal';
 import { ApplicationVarianceView } from './components/farm/ApplicationVarianceView';
+import { NutrientEfficiencyView } from './components/farm/NutrientEfficiencyView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -257,6 +258,7 @@ const Sidebar: React.FC<{
         <div className="pt-4 mt-4 border-t border-stone-700">
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
           <NavButton id="application-variance" label="Actual vs. Plan" icon={GitCompare} />
+          <NavButton id="nutrient-efficiency" label="Nutrient Efficiency" icon={Leaf} />
         </div>
 
         {/* TOOLS section */}
@@ -1709,6 +1711,14 @@ const AppContent: React.FC = () => {
       case 'application-variance':
         return (
           <ApplicationVarianceView
+            season={currentSeason}
+            products={legacyProducts}
+            applicationRecords={applicationRecords || []}
+          />
+        );
+      case 'nutrient-efficiency':
+        return (
+          <NutrientEfficiencyView
             season={currentSeason}
             products={legacyProducts}
             applicationRecords={applicationRecords || []}
