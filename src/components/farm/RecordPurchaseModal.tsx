@@ -173,18 +173,20 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setLines(lines.filter(line => line.id !== id));
   };
 
-  // Calculate line totals (Total Vol × Price per unit)
+  // Calculate line total: Price is per CONTAINER, not per unit
+  // Total = Qty (number of containers) × Price (per container)
   const calculateLineTotal = (line: PurchaseLineInput) => {
-    const totalVolume = line.quantity * line.packageSize;
-    return totalVolume * line.unitPrice;
+    return line.quantity * line.unitPrice;
   };
 
+  // Calculate normalized price per unit (e.g., $/g, $/gal)
+  // This is the per-unit cost derived from container price
   const calculateNormalizedPrice = (line: PurchaseLineInput) => {
     if (line.packageSize <= 0) return line.unitPrice;
     return line.unitPrice / line.packageSize;
   };
 
-  // Calculate total volume for a line
+  // Calculate total volume for a line (total units across all containers)
   const calculateTotalVolume = (line: PurchaseLineInput) => {
     return line.quantity * line.packageSize;
   };
@@ -428,7 +430,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
           <div className="space-y-3">
             <Label className="text-base font-semibold">Line Items</Label>
             
-            {/* Header - added Total Vol column */}
+            {/* Header */}
             <div className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_0.75fr_1fr_1fr_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
               <div>Product</div>
               <div>Package</div>
@@ -436,7 +438,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
               <div>Size</div>
               <div>Unit</div>
               <div>Total Vol</div>
-              <div>Price</div>
+              <div>$/Pkg</div>
               <div>Total</div>
               <div></div>
             </div>
