@@ -60,7 +60,53 @@ Return a JSON object with the following structure:
   "cautions": "<string cautions, precautions, or safety notes>",
   "manufacturer": "<company/manufacturer name>",
   "extractionConfidence": "<high | medium | low>",
-  "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"]
+  "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"],
+  
+  "chemicalData": {
+    "activeIngredients": [
+      {
+        "name": "<active ingredient name>",
+        "concentration": "<e.g., 41%, 4 lb/gal>",
+        "unit": "<'ae' | 'ai' | 'lbs/gal' | '%'>",
+        "chemicalClass": "<e.g., Group 9, glycine>",
+        "moaGroup": "<Mode of Action group number if stated>"
+      }
+    ],
+    "restrictions": {
+      "phiDays": <pre-harvest interval in days or null>,
+      "rotationRestrictions": [
+        {
+          "crop": "<crop name>",
+          "days": <days or null>,
+          "months": <months or null>,
+          "notes": "<any additional info>"
+        }
+      ],
+      "maxRatePerApplication": { "value": <number>, "unit": "<oz/ac, pt/ac, etc>" },
+      "maxRatePerSeason": { "value": <number>, "unit": "<oz/ac, pt/ac, etc>" },
+      "maxApplicationsPerSeason": <number or null>,
+      "reiHours": <Restricted Entry Interval in hours or null>,
+      "bufferZoneFeet": <buffer zone distance or null>,
+      "groundwaterAdvisory": <true if groundwater advisory mentioned, else null>,
+      "pollinator": "<pollinator protection statement or null>",
+      "notes": "<any other restriction notes>"
+    },
+    "mixingOrder": {
+      "priority": <1-10 based on formulation type>,
+      "category": "<'water-conditioner' | 'compatibility-agent' | 'dry-flowable' | 'wettable-powder' | 'suspension' | 'emulsifiable-concentrate' | 'solution' | 'surfactant' | 'drift-retardant' | 'other'>",
+      "notes": "<mixing order instructions from label>"
+    },
+    "compatibility": {
+      "antagonists": ["<products that reduce efficacy>"],
+      "synergists": ["<products that enhance efficacy>"],
+      "incompatible": ["<products causing physical incompatibility>"],
+      "jarTest": <true if jar test recommended>,
+      "notes": "<compatibility notes>"
+    },
+    "signalWord": "<'danger' | 'warning' | 'caution' | 'none'>",
+    "epaRegNumber": "<EPA registration number>",
+    "formulationType": "<'EC' | 'SC' | 'SL' | 'WDG' | 'DF' | 'WP' | 'ME' | 'SE' | 'G' | 'L' | other>"
+  }
 }
 
 Rules:
@@ -78,6 +124,16 @@ Rules:
 - Extract safety info from SDS documents into cautions field
 - For secondary nutrients (Ca, Mg, C), look for Calcium, Magnesium, Carbon, Organic Matter percentages
 - For micros, look for trace element percentages - they are often listed as small decimals like 0.05%
+
+PESTICIDE-SPECIFIC EXTRACTION (for herbicides, fungicides, insecticides):
+- Look for "Active Ingredient(s)" or "Active Ingredients" section for detailed ingredient data
+- PHI (Pre-Harvest Interval) is often in "Directions for Use" or "Restrictions" section
+- REI (Restricted Entry Interval) is usually stated in hours
+- Rotational crop restrictions are in "Rotational Crop Restrictions" or "Crop Rotation" section
+- EPA Reg. No. is usually on the front of the label
+- Signal word (DANGER, WARNING, CAUTION) is prominently displayed
+- Formulation type (EC, SC, WDG, etc.) is often in the product name or near active ingredients
+- For mixing order priority: EC=6, SC/F=5, SL/S=7, WDG/DF=3, WP=4
 
 IMPORTANT: Return ONLY valid JSON, no markdown code blocks, no explanation. Just the JSON object.`;
 
@@ -284,9 +340,15 @@ serve(async (req) => {
         sourceFileName: fileName,
       },
       suggestedRoles: extracted.suggestedRoles || [],
+      
+      // Chemical/Pesticide data (for herbicides, fungicides, insecticides)
+      chemicalData: extracted.chemicalData || null,
     };
 
     console.log('Successfully extracted product data:', result.productName);
+    if (result.chemicalData) {
+      console.log('Chemical data extracted:', JSON.stringify(result.chemicalData).substring(0, 200));
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

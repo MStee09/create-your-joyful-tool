@@ -151,6 +151,9 @@ export interface ProductMaster {
   // Estimated pricing for non-bid products
   estimatedPrice?: number;
   estimatedPriceUnit?: 'gal' | 'lbs' | 'ton';
+  
+  // Chemical/Pesticide data (for herbicides, fungicides, insecticides)
+  chemicalData?: import('./types/chemicalData').ChemicalData;
 }
 
 // LEGACY: Old Product interface for migration

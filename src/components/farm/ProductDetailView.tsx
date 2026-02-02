@@ -53,6 +53,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import { ProductPriceHistory } from './ProductPriceHistory';
+import { ChemicalDataTab } from './ChemicalDataTab';
+import { isPesticideCategory, type ChemicalData } from '@/types/chemicalData';
 interface ProductDetailViewProps {
   product: ProductMaster;
   vendorOfferings: VendorOffering[];
@@ -1444,6 +1446,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               />
             )}
           </div>
+
+          {/* Chemical Data Section - only for pesticides */}
+          {isPesticideCategory(product.category || '') && (
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h3 className="font-semibold text-foreground mb-4">Chemical Data</h3>
+              <ChemicalDataTab
+                chemicalData={product.chemicalData}
+                category={product.category || ''}
+                onUpdate={(data: ChemicalData) => onUpdateProduct({ ...product, chemicalData: data })}
+              />
+            </div>
+          )}
 
           {/* Inventory Lots */}
           <div className="bg-card rounded-xl border border-border p-6">

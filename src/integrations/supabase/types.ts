@@ -762,6 +762,7 @@ export type Database = {
           baseline_price_unit: string | null
           baseline_price_vendor_id: string | null
           category: string | null
+          chemical_data: Json | null
           commodity_spec_id: string | null
           created_at: string
           crop_rate_notes: string | null
@@ -790,6 +791,7 @@ export type Database = {
           baseline_price_unit?: string | null
           baseline_price_vendor_id?: string | null
           category?: string | null
+          chemical_data?: Json | null
           commodity_spec_id?: string | null
           created_at?: string
           crop_rate_notes?: string | null
@@ -818,6 +820,7 @@ export type Database = {
           baseline_price_unit?: string | null
           baseline_price_vendor_id?: string | null
           category?: string | null
+          chemical_data?: Json | null
           commodity_spec_id?: string | null
           created_at?: string
           crop_rate_notes?: string | null
