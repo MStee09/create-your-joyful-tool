@@ -239,13 +239,15 @@ export function useSupabaseData(user: User | null) {
 
   // Fetch all data
   const fetchData = useCallback(async () => {
-    if (!user) {
+    // Use userId from closure to avoid re-triggering on user object changes
+    const userId = user?.id;
+    if (!userId) {
       setState(prev => ({ ...prev, loading: false }));
       return;
     }
 
     // Load cached data for instant display
-    const cached = loadCache(user.id);
+    const cached = loadCache(userId);
     if (cached) {
       setState(prev => ({
         ...prev,
@@ -557,7 +559,8 @@ export function useSupabaseData(user: User | null) {
       console.error('Error fetching data:', error);
       setState(prev => ({ ...prev, loading: false, error: error.message }));
     }
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only refetch when user ID changes, not on token refresh
 
   useEffect(() => {
     fetchData();
