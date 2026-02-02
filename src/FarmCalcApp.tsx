@@ -117,6 +117,8 @@ import { useSupabaseData } from './hooks/useSupabaseData';
 
 // Import migration utilities
 import { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } from './lib/migrateToSupabase';
+// Import SimplePurchase types
+import type { SimplePurchase } from './types/simplePurchase';
 
 // Import initial data from external file
 import { initialState as defaultInitialState, initialProducts, initialVendors } from './initialData';
@@ -454,8 +456,9 @@ const InventoryView: React.FC<{
   products: Product[];
   vendors: Vendor[];
   season: Season | null;
+  purchases: SimplePurchase[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
-}> = ({ inventory, products, vendors, season, onUpdateInventory }) => {
+}> = ({ inventory, products, vendors, season, purchases, onUpdateInventory }) => {
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -464,6 +467,7 @@ const InventoryView: React.FC<{
   const [editPackagingType, setEditPackagingType] = useState<string>('Bulk');
   const [editPackagingSize, setEditPackagingSize] = useState<number>(0);
   const [editContainerCount, setEditContainerCount] = useState<number>(1);
+  const [inventoryTab, setInventoryTab] = useState<'all' | 'on-hand' | 'ordered'>('all');
   
 
   const handleSelectProduct = (product: Product, context: ProductWithContext) => {
@@ -606,33 +610,126 @@ const InventoryView: React.FC<{
         value = (item.quantity / 2000) * product.price;
       }
       const display = formatOnHand(item);
-      return { item, product, vendor, value, display };
+      return { item, product, vendor, value, display, type: 'on-hand' as const };
     }).filter(Boolean) as Array<{
       item: InventoryItem;
       product: Product;
       vendor: Vendor | undefined;
       value: number;
       display: { primary: string; secondary: string };
+      type: 'on-hand';
     }>;
   }, [inventory, products, vendors]);
+
+  // Calculate ordered items from pending purchases
+  const orderedItems = useMemo(() => {
+    const pendingPurchases = purchases.filter(p => p.status === 'ordered');
+    const items: Array<{
+      purchaseId: string;
+      lineId: string;
+      product: Product;
+      vendor: Vendor | undefined;
+      quantity: number;
+      unit: 'gal' | 'lbs';
+      packageType?: string;
+      value: number;
+      orderDate: string;
+      expectedDeliveryDate?: string;
+      type: 'ordered';
+    }> = [];
+    
+    for (const purchase of pendingPurchases) {
+      const vendor = vendors.find(v => v.id === purchase.vendorId);
+      for (const line of purchase.lines) {
+        const product = products.find(p => p.id === line.productId);
+        if (!product) continue;
+        items.push({
+          purchaseId: purchase.id,
+          lineId: line.id,
+          product,
+          vendor,
+          quantity: line.totalQuantity,
+          unit: (line.packageUnit || (product.form === 'liquid' ? 'gal' : 'lbs')) as 'gal' | 'lbs',
+          packageType: line.packageType,
+          value: line.totalPrice,
+          orderDate: purchase.orderDate,
+          expectedDeliveryDate: purchase.expectedDeliveryDate,
+          type: 'ordered',
+        });
+      }
+    }
+    return items;
+  }, [purchases, products, vendors]);
+
+  // Calculate totals for summary cards
+  const onHandTotal = useMemo(() => allInventoryItems.reduce((sum, i) => sum + i.value, 0), [allInventoryItems]);
+  const orderedTotal = useMemo(() => orderedItems.reduce((sum, i) => sum + i.value, 0), [orderedItems]);
 
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-stone-800">Inventory</h2>
-          <p className="text-stone-500 mt-1">
-            Track your on-hand product quantities
+          <h2 className="text-3xl font-bold text-foreground">Inventory</h2>
+          <p className="text-muted-foreground mt-1">
+            Track your on-hand and ordered products
           </p>
         </div>
         <button
           onClick={() => setShowProductSelector(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
         >
           <Plus className="w-5 h-5" />
           Add Inventory
         </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-card rounded-xl p-4 border border-border">
+          <div className="text-sm text-muted-foreground mb-1">On Hand</div>
+          <div className="text-2xl font-bold text-foreground">{formatCurrency(onHandTotal)}</div>
+          <div className="text-xs text-muted-foreground mt-1">{allInventoryItems.length} products</div>
+        </div>
+        <div className="bg-card rounded-xl p-4 border border-border">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <Truck className="w-4 h-4 text-blue-500" />
+            Ordered
+          </div>
+          <div className="text-2xl font-bold text-foreground">{formatCurrency(orderedTotal)}</div>
+          <div className="text-xs text-muted-foreground mt-1">{orderedItems.length} line items</div>
+        </div>
+        <div className="bg-card rounded-xl p-4 border border-border">
+          <div className="text-sm text-muted-foreground mb-1">Total Position</div>
+          <div className="text-2xl font-bold text-foreground">{formatCurrency(onHandTotal + orderedTotal)}</div>
+          <div className="text-xs text-muted-foreground mt-1">On Hand + Ordered</div>
+        </div>
+      </div>
+
+      {/* Tab Bar */}
+      <div className="flex bg-muted rounded-lg p-1 mb-6 w-fit">
+        {[
+          { id: 'all', label: 'All', count: allInventoryItems.length + orderedItems.length },
+          { id: 'on-hand', label: 'On Hand', count: allInventoryItems.length },
+          { id: 'ordered', label: 'Ordered', count: orderedItems.length },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setInventoryTab(tab.id as typeof inventoryTab)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              inventoryTab === tab.id
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+              inventoryTab === tab.id ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/20'
+            }`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Product Selector Modal */}
@@ -672,22 +769,28 @@ const InventoryView: React.FC<{
         />
       )}
 
-      {/* Simple On-Hand Inventory Table */}
-      {allInventoryItems.length > 0 && (
+      {/* On Hand Inventory Table */}
+      {(inventoryTab === 'all' || inventoryTab === 'on-hand') && allInventoryItems.length > 0 && (
         <div className="mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+          {inventoryTab === 'all' && (
+            <div className="flex items-center gap-2 mb-3">
+              <Warehouse className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">On Hand</h3>
+            </div>
+          )}
+          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="bg-stone-50">
-                  <th className="text-left px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Product</th>
-                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">On Hand</th>
-                  <th className="text-right px-6 py-4 text-xs font-semibold text-stone-500 uppercase">Value</th>
+                <tr className="bg-muted/50">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Product</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Quantity</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Value</th>
                   <th className="px-6 py-4 w-24"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-200">
+              <tbody className="divide-y divide-border">
                 {allInventoryItems.map(({ item, product, vendor, value, display }) => (
-                  <tr key={item.id} className="hover:bg-stone-50">
+                  <tr key={item.id} className="hover:bg-muted/30">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -698,17 +801,16 @@ const InventoryView: React.FC<{
                             : <Weight className="w-5 h-5 text-amber-600" />}
                         </div>
                         <div>
-                          <p className="text-[10px] text-stone-400 uppercase tracking-wide">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
                             {vendor?.name || ''}
                           </p>
-                          <span className="font-medium text-stone-800">{product.name}</span>
+                          <span className="font-medium text-foreground">{product.name}</span>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       {editingId === item.id ? (
                         <div className="space-y-2">
-                          {/* Row 1: Packaging Type + Custom Size */}
                           <div className="flex items-center gap-2 justify-end">
                             <select
                               value={editPackagingType}
@@ -719,7 +821,7 @@ const InventoryView: React.FC<{
                                   setEditPackagingSize(getDefaultSizeForType(newType, product.form));
                                 }
                               }}
-                              className="px-2 py-1 text-sm border border-stone-300 rounded bg-white"
+                              className="px-2 py-1 text-sm border border-border rounded bg-background"
                             >
                               <option value="Bulk">Bulk</option>
                               <option value="Tote">Tote</option>
@@ -728,33 +830,30 @@ const InventoryView: React.FC<{
                               <option value="Pail">Pail</option>
                               <option value="Bag">Bag</option>
                             </select>
-                            
                             {editPackagingType !== 'Bulk' && (
                               <>
                                 <input
                                   type="number"
                                   value={editPackagingSize}
                                   onChange={(e) => setEditPackagingSize(Number(e.target.value))}
-                                  className="w-16 px-2 py-1 text-right border border-stone-300 rounded"
+                                  className="w-16 px-2 py-1 text-right border border-border rounded bg-background"
                                 />
-                                <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                                <span className="text-xs text-muted-foreground">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
                               </>
                             )}
                           </div>
-                          
-                          {/* Row 2: Count + Total */}
                           <div className="flex items-center gap-2 justify-end">
                             {editPackagingType !== 'Bulk' ? (
                               <>
-                                <span className="text-stone-500">×</span>
+                                <span className="text-muted-foreground">×</span>
                                 <input
                                   type="number"
                                   value={editContainerCount}
                                   onChange={(e) => setEditContainerCount(Number(e.target.value))}
-                                  className="w-14 px-2 py-1 text-right border border-stone-300 rounded"
+                                  className="w-14 px-2 py-1 text-right border border-border rounded bg-background"
                                   min={1}
                                 />
-                                <span className="text-xs text-stone-400">
+                                <span className="text-xs text-muted-foreground">
                                   = {editPackagingSize * editContainerCount} {product.form === 'liquid' ? 'gal' : 'lbs'}
                                 </span>
                               </>
@@ -764,24 +863,22 @@ const InventoryView: React.FC<{
                                   type="number"
                                   value={editContainerCount}
                                   onChange={(e) => setEditContainerCount(Number(e.target.value))}
-                                  className="w-20 px-2 py-1 text-right border border-stone-300 rounded"
+                                  className="w-20 px-2 py-1 text-right border border-border rounded bg-background"
                                 />
-                                <span className="text-xs text-stone-500">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
+                                <span className="text-xs text-muted-foreground">{product.form === 'liquid' ? 'gal' : 'lbs'}</span>
                               </>
                             )}
                           </div>
-                          
-                          {/* Row 3: Save/Cancel */}
                           <div className="flex items-center gap-1 justify-end">
                             <button
                               onClick={() => handleSaveEdit(item.id, product)}
-                              className="px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                              className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingId(null)}
-                              className="px-2 py-1 text-xs text-stone-500 hover:text-stone-700"
+                              className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                             >
                               Cancel
                             </button>
@@ -789,14 +886,14 @@ const InventoryView: React.FC<{
                         </div>
                       ) : (
                         <div className="text-right">
-                          <span className="text-stone-700">{display.primary}</span>
+                          <span className="text-foreground">{display.primary}</span>
                           {display.secondary && (
-                            <p className="text-xs text-stone-400">{display.secondary}</p>
+                            <p className="text-xs text-muted-foreground">{display.secondary}</p>
                           )}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right text-stone-600">
+                    <td className="px-6 py-4 text-right text-muted-foreground">
                       {formatCurrency(value)}
                     </td>
                     <td className="px-6 py-4">
@@ -805,26 +902,24 @@ const InventoryView: React.FC<{
                           <button
                             onClick={() => {
                               setEditingId(item.id);
-                              // Initialize from existing item
                               if (item.packagingName && item.packagingSize && item.containerCount) {
                                 setEditPackagingType(item.packagingName);
                                 setEditPackagingSize(item.packagingSize);
                                 setEditContainerCount(item.containerCount);
                               } else {
-                                // Bulk mode
                                 setEditPackagingType('Bulk');
                                 setEditPackagingSize(0);
                                 setEditContainerCount(item.quantity);
                               }
                             }}
-                            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"
+                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                         )}
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -838,13 +933,102 @@ const InventoryView: React.FC<{
         </div>
       )}
 
-      {/* Empty State - No inventory */}
-      {allInventoryItems.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center mb-6">
-          <Warehouse className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="font-semibold text-stone-800 mb-2">No Inventory Items</h3>
-          <p className="text-stone-500 max-w-md mx-auto">
+      {/* Ordered Items Table */}
+      {(inventoryTab === 'all' || inventoryTab === 'ordered') && orderedItems.length > 0 && (
+        <div className="mb-6">
+          {inventoryTab === 'all' && (
+            <div className="flex items-center gap-2 mb-3">
+              <Truck className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Ordered (Pending Delivery)</h3>
+            </div>
+          )}
+          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Product</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Quantity</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Expected</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {orderedItems.map((item) => (
+                  <tr key={`${item.purchaseId}-${item.lineId}`} className="hover:bg-muted/30">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-blue-50`}>
+                          <Truck className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                            {item.vendor?.name || ''}
+                          </p>
+                          <span className="font-medium text-foreground">{item.product.name}</span>
+                          {item.packageType && (
+                            <p className="text-xs text-muted-foreground">{item.packageType}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-foreground font-medium">
+                        {formatNumber(item.quantity, 1)} {item.unit}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.expectedDeliveryDate ? (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-foreground">
+                            {new Date(item.expectedDeliveryDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Ordered {new Date(item.orderDate).toLocaleDateString()}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4 text-right text-muted-foreground">
+                      {formatCurrency(item.value)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Empty States */}
+      {inventoryTab === 'on-hand' && allInventoryItems.length === 0 && (
+        <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center mb-6">
+          <Warehouse className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+          <h3 className="font-semibold text-foreground mb-2">No On-Hand Inventory</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
             Add products to track what you have on hand.
+          </p>
+        </div>
+      )}
+      
+      {inventoryTab === 'ordered' && orderedItems.length === 0 && (
+        <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center mb-6">
+          <Truck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+          <h3 className="font-semibold text-foreground mb-2">No Pending Orders</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Record a purchase to track incoming deliveries.
+          </p>
+        </div>
+      )}
+
+      {inventoryTab === 'all' && allInventoryItems.length === 0 && orderedItems.length === 0 && (
+        <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center mb-6">
+          <Warehouse className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+          <h3 className="font-semibold text-foreground mb-2">No Inventory</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Add on-hand inventory or record a purchase to get started.
           </p>
         </div>
       )}
@@ -1308,6 +1492,7 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             vendors={state.vendors}
             season={currentSeason}
+            purchases={simplePurchases || []}
             onUpdateInventory={handleUpdateInventory}
           />
         );
