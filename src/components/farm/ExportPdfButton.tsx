@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import type { Crop, Product } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose } from '@/types/productIntelligence';
+import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import { CropPlanPrintView } from './CropPlanPrintView';
 import { createRoot } from 'react-dom/client';
 
@@ -14,6 +15,10 @@ interface ExportPdfButtonProps {
   priceBook: PriceBookEntry[];
   seasonYear: number;
   purposes: Record<string, ProductPurpose>;
+  // Optional field data for By Field section
+  fields?: Field[];
+  fieldAssignments?: FieldAssignment[];
+  fieldOverrides?: FieldCropOverride[];
 }
 
 export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
@@ -23,6 +28,9 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
   priceBook,
   seasonYear,
   purposes,
+  fields,
+  fieldAssignments,
+  fieldOverrides,
 }) => {
   const handleExport = useCallback(() => {
     // Open a new window for print view
@@ -86,6 +94,9 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
           priceBook={priceBook}
           seasonYear={seasonYear}
           purposes={purposes}
+          fields={fields}
+          fieldAssignments={fieldAssignments}
+          fieldOverrides={fieldOverrides}
         />
       );
 
@@ -99,7 +110,7 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
     printWindow.onload = renderContent;
     // Fallback if onload doesn't fire
     setTimeout(renderContent, 100);
-  }, [crop, products, productMasters, priceBook, seasonYear, purposes]);
+  }, [crop, products, productMasters, priceBook, seasonYear, purposes, fields, fieldAssignments, fieldOverrides]);
 
   return (
     <Button
