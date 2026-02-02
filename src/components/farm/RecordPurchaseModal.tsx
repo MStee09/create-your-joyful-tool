@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Droplets, Weight } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
-import type { SimplePurchase, SimplePurchaseLine, NewSimplePurchase } from '@/types/simplePurchase';
+import type { SimplePurchase, SimplePurchaseLine, NewSimplePurchase, PackageUnitType } from '@/types/simplePurchase';
 import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
 import type { Vendor, ProductMaster, VendorOffering } from '@/types';
 
@@ -17,7 +17,7 @@ interface PurchaseLineInput {
   packageType: string;
   quantity: number;
   packageSize: number;
-  packageUnit: 'gal' | 'lbs';
+  packageUnit: PackageUnitType;
   unitPrice: number;
 }
 
@@ -35,10 +35,10 @@ interface RecordPurchaseModalProps {
   editingPurchase?: SimplePurchase;
 }
 
-const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Pail', 'Bulk'];
+const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Pail', 'Bulk', 'Bottle', 'Case'];
 
-// Package size defaults for auto-filling
-const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: 'gal' | 'lbs' }> = {
+// Package size defaults for auto-filling (fallback only - prefer VendorOffering data)
+const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: PackageUnitType }> = {
   'Tote': { size: 275, unit: 'gal' },
   'Twin-pack': { size: 5, unit: 'gal' },
   'Jug': { size: 2.5, unit: 'gal' },
@@ -46,6 +46,8 @@ const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: 'gal' | 'lbs' 
   'Pail': { size: 5, unit: 'gal' },
   'Bag': { size: 50, unit: 'lbs' },
   'Bulk': { size: 1, unit: 'gal' },
+  'Bottle': { size: 1, unit: 'qt' },
+  'Case': { size: 12, unit: 'qt' },
 };
 
 export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
@@ -271,24 +273,73 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     return products.find(p => p.id === productId);
   };
 
-  // Handle package type change with auto-defaults
+  // Get vendor offering for a product
+  const getVendorOffering = (productId: string) => {
+    return vendorOfferings.find(o => o.productId === productId && o.vendorId === vendorId);
+  };
+
+  // Determine the appropriate default unit for a product based on its default_unit, offering, or form
+  const getProductDefaultUnit = (product: ProductMaster, offering?: VendorOffering): PackageUnitType => {
+    // First priority: vendor offering container unit (most specific)
+    if (offering?.containerUnit) {
+      return offering.containerUnit as PackageUnitType;
+    }
+    // Second priority: product's default unit
+    if (product.defaultUnit) {
+      const unit = product.defaultUnit.toLowerCase();
+      if (['g', 'grams', 'gram'].includes(unit)) return 'g';
+      if (['oz', 'ounce', 'ounces'].includes(unit)) return 'oz';
+      if (['lbs', 'lb', 'pounds', 'pound'].includes(unit)) return 'lbs';
+      if (['gal', 'gallon', 'gallons'].includes(unit)) return 'gal';
+      if (['qt', 'quart', 'quarts'].includes(unit)) return 'qt';
+      if (['pt', 'pint', 'pints'].includes(unit)) return 'pt';
+    }
+    // Fallback: infer from form
+    return product.form === 'liquid' ? 'gal' : 'lbs';
+  };
+
+  // Handle package type change with auto-defaults from vendor offering
   const handlePackageTypeChange = (lineId: string, packageType: string, productId: string) => {
-    const defaults = PACKAGE_SIZE_DEFAULTS[packageType];
     const product = getProductInfo(productId);
+    const offering = getVendorOffering(productId);
+    
+    // Try to get size from vendor offering first
+    let packageSize = offering?.containerSize;
+    let packageUnit: PackageUnitType = product ? getProductDefaultUnit(product, offering) : 'gal';
+    
+    // Fallback to defaults if no offering data
+    if (!packageSize) {
+      const defaults = PACKAGE_SIZE_DEFAULTS[packageType];
+      packageSize = defaults?.size ?? 1;
+      // Only use default unit if we don't have product-specific info
+      if (!product?.defaultUnit && !offering?.containerUnit) {
+        packageUnit = product?.form === 'dry' ? 'lbs' : (defaults?.unit ?? 'gal');
+      }
+    }
+    
     updateLine(lineId, { 
       packageType,
-      packageSize: defaults?.size ?? 1,
-      packageUnit: product?.form === 'dry' ? 'lbs' : (defaults?.unit ?? 'gal'),
+      packageSize,
+      packageUnit,
     });
   };
 
-  // Handle product selection with price pre-fill
+  // Handle product selection with price pre-fill and vendor offering defaults
   const handleProductChange = (lineId: string, productId: string) => {
     const prod = products.find(p => p.id === productId);
+    const offering = getVendorOffering(productId);
     const lastPrice = getLastPrice(productId, vendorId);
+    
+    // Determine unit from offering or product
+    const packageUnit = prod ? getProductDefaultUnit(prod, offering) : 'gal';
+    
+    // Get package size from offering if available
+    const packageSize = offering?.containerSize || PACKAGE_SIZE_DEFAULTS['Jug']?.size || 2.5;
+    
     updateLine(lineId, { 
       productId,
-      packageUnit: prod?.form === 'liquid' ? 'gal' : 'lbs',
+      packageUnit,
+      packageSize,
       unitPrice: lastPrice,
     });
   };
@@ -457,7 +508,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
 
                   <Select 
                     value={line.packageUnit} 
-                    onValueChange={val => updateLine(line.id, { packageUnit: val as 'gal' | 'lbs' })}
+                    onValueChange={val => updateLine(line.id, { packageUnit: val as PackageUnitType })}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
@@ -465,6 +516,10 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                     <SelectContent>
                       <SelectItem value="gal">gal</SelectItem>
                       <SelectItem value="lbs">lbs</SelectItem>
+                      <SelectItem value="g">g</SelectItem>
+                      <SelectItem value="oz">oz</SelectItem>
+                      <SelectItem value="qt">qt</SelectItem>
+                      <SelectItem value="pt">pt</SelectItem>
                     </SelectContent>
                   </Select>
 
