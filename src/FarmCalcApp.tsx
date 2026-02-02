@@ -93,6 +93,7 @@ import { MixCalculatorView } from './components/farm/tankMix/MixCalculatorView';
 import { RecordApplicationModal } from './components/farm/applications/RecordApplicationModal';
 import { ApplicationVarianceView } from './components/farm/ApplicationVarianceView';
 import { NutrientEfficiencyView } from './components/farm/NutrientEfficiencyView';
+import { ApplicationHistoryView } from './components/farm/applications/ApplicationHistoryView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -259,6 +260,7 @@ const Sidebar: React.FC<{
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Review</div>
           <NavButton id="application-variance" label="Actual vs. Plan" icon={GitCompare} />
           <NavButton id="nutrient-efficiency" label="Nutrient Efficiency" icon={Leaf} />
+          <NavButton id="application-history" label="Application History" icon={Calendar} />
         </div>
 
         {/* TOOLS section */}
@@ -1722,6 +1724,16 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             products={legacyProducts}
             applicationRecords={applicationRecords || []}
+          />
+        );
+      case 'application-history':
+        return (
+          <ApplicationHistoryView
+            season={currentSeason}
+            applicationRecords={applicationRecords || []}
+            fields={fields || []}
+            productMasters={productMasters || []}
+            crops={(currentSeason?.crops || []).map(c => ({ id: c.id, name: c.name }))}
           />
         );
       default:

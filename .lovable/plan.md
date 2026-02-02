@@ -130,3 +130,65 @@ Built a report comparing **planned N-P-K-S nutrient delivery** against **actual 
 - `src/lib/nutrientEfficiencyUtils.ts` — Core calculation logic
 - `src/components/farm/NutrientEfficiencyView.tsx` — UI component
 - Added to sidebar under **Review** section as "Nutrient Efficiency"
+
+---
+
+## Application History View ✅ COMPLETED
+
+### Overview
+Timeline view showing all recorded field applications with filtering by field and crop.
+
+---
+
+### Features
+- **Summary cards**: Total applications, fields covered, total acres treated
+- **Filters**: By field and by crop
+- **Grouped by date**: Most recent first with visual timeline
+- **Expandable cards**: Click to see product details, applicator, equipment, notes
+- **Export CSV**: Download full history as spreadsheet
+
+---
+
+### Implementation
+- `src/components/farm/applications/ApplicationHistoryView.tsx` — UI component
+- Added to sidebar under **Review** section as "Application History"
+
+---
+
+## Inventory Shortage Modal ✅ COMPLETED
+
+### Overview
+Modal that appears when recording an application with insufficient inventory.
+
+---
+
+### Resolution Options
+1. **Record Purchase** — Open purchase form to add incoming product
+2. **Add Carryover** — Add existing product from last season
+3. **Save Anyway** — Record application without deducting (shows negative balance)
+
+---
+
+### Implementation
+- `src/components/farm/applications/InventoryShortageModal.tsx` — Modal component
+- Can be integrated into RecordApplicationModal when shortages detected
+
+---
+
+## Report Exports ✅ COMPLETED
+
+### Overview
+CSV export functionality for all variance and history reports.
+
+---
+
+### Export Functions
+- `exportApplicationVarianceCsv()` — Actual vs. Plan report with all product rows
+- `exportNutrientEfficiencyCsv()` — N-P-K-S by crop with farm totals
+- `exportApplicationHistoryCsv()` — Full application history by date
+
+---
+
+### Implementation
+- `src/lib/reportExportUtils.ts` — Export utility functions
+- Export buttons added to all three Review section views
