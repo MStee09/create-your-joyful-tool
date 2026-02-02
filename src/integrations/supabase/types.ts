@@ -14,6 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_records: {
+        Row: {
+          acres_treated: number
+          applicator: string
+          carrier_gpa: number | null
+          created_at: string
+          crop_id: string
+          custom_applicator_name: string | null
+          date_applied: string
+          equipment_id: string | null
+          field_id: string
+          id: string
+          notes: string | null
+          overridden_warnings: Json | null
+          products: Json
+          season_id: string | null
+          timing_id: string
+          updated_at: string
+          user_id: string
+          weather_notes: string | null
+        }
+        Insert: {
+          acres_treated?: number
+          applicator?: string
+          carrier_gpa?: number | null
+          created_at?: string
+          crop_id: string
+          custom_applicator_name?: string | null
+          date_applied?: string
+          equipment_id?: string | null
+          field_id: string
+          id?: string
+          notes?: string | null
+          overridden_warnings?: Json | null
+          products?: Json
+          season_id?: string | null
+          timing_id: string
+          updated_at?: string
+          user_id: string
+          weather_notes?: string | null
+        }
+        Update: {
+          acres_treated?: number
+          applicator?: string
+          carrier_gpa?: number | null
+          created_at?: string
+          crop_id?: string
+          custom_applicator_name?: string | null
+          date_applied?: string
+          equipment_id?: string | null
+          field_id?: string
+          id?: string
+          notes?: string | null
+          overridden_warnings?: Json | null
+          products?: Json
+          season_id?: string | null
+          timing_id?: string
+          updated_at?: string
+          user_id?: string
+          weather_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_records_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_records_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_records_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       awards: {
         Row: {
           bid_event_id: string

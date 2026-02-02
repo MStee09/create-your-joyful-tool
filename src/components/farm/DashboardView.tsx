@@ -7,6 +7,7 @@ import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
 import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
+import { QuickActionsCard } from './applications/QuickActionsCard';
 
 interface DashboardViewProps {
   season: Season | null;
@@ -17,6 +18,7 @@ interface DashboardViewProps {
   inventory?: InventoryItem[];
   purchases?: SimplePurchase[];
   onViewChange?: (view: string) => void;
+  onOpenRecordApplication?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ 
@@ -28,6 +30,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   inventory = [],
   purchases = [],
   onViewChange,
+  onOpenRecordApplication,
 }) => {
   // Build price book context for consistent cost calculations
   const priceBookContext: PriceBookContext = useMemo(() => ({
@@ -97,6 +100,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="p-8">
+      {/* Quick Actions */}
+      <QuickActionsCard
+        onRecordApplication={() => onOpenRecordApplication?.()}
+        onMixCalculator={() => onViewChange?.('mix-calculator')}
+        onNewPurchase={() => onViewChange?.('purchases')}
+      />
+
       {/* Hero Section - Total Plan Cost */}
       <div className="bg-card rounded-xl p-8 shadow-sm border border-border mb-8">
         <div className="text-center">
