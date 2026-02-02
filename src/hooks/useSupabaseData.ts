@@ -25,6 +25,7 @@ import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import type { SimplePurchase, NewSimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import type { Field, FieldAssignment, Equipment, FieldCropOverride } from '@/types/field';
 import type { TankMixRecipe, TankMixProduct } from '@/types/tankMix';
+import type { ApplicationRecord, ApplicationProductRecord } from '@/types/applicationRecord';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -52,6 +53,8 @@ interface SupabaseDataState {
   equipment: Equipment[];
   // Phase 3: Tank Mix Recipes
   tankMixRecipes: TankMixRecipe[];
+  // Phase 5: Application Records
+  applicationRecords: ApplicationRecord[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -232,6 +235,7 @@ export function useSupabaseData(user: User | null) {
     fieldCropOverrides: [],
     equipment: [],
     tankMixRecipes: [],
+    applicationRecords: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -282,6 +286,7 @@ export function useSupabaseData(user: User | null) {
         fieldCropOverridesRes,
         equipmentRes,
         tankMixRecipesRes,
+        applicationRecordsRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -304,6 +309,7 @@ export function useSupabaseData(user: User | null) {
         supabase.from('field_crop_overrides').select('*'),
         supabase.from('equipment').select('*').order('name'),
         supabase.from('tank_mix_recipes').select('*').order('name'),
+        supabase.from('application_records').select('*').order('date_applied', { ascending: false }),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -528,6 +534,27 @@ export function useSupabaseData(user: User | null) {
         updatedAt: row.updated_at,
       }));
 
+      // Map application records
+      const applicationRecords: ApplicationRecord[] = (applicationRecordsRes.data || []).map((row: any) => ({
+        id: row.id,
+        seasonId: row.season_id,
+        cropId: row.crop_id,
+        fieldId: row.field_id,
+        timingId: row.timing_id,
+        dateApplied: row.date_applied,
+        acresTreated: Number(row.acres_treated) || 0,
+        products: (row.products || []) as ApplicationProductRecord[],
+        equipmentId: row.equipment_id,
+        carrierGPA: row.carrier_gpa ? Number(row.carrier_gpa) : undefined,
+        applicator: row.applicator || 'self',
+        customApplicatorName: row.custom_applicator_name,
+        weatherNotes: row.weather_notes,
+        notes: row.notes,
+        overriddenWarnings: row.overridden_warnings || [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
       setState({
         seasons,
         vendors,
@@ -551,6 +578,7 @@ export function useSupabaseData(user: User | null) {
         fieldCropOverrides,
         equipment,
         tankMixRecipes,
+        applicationRecords,
         currentSeasonId,
         loading: false,
         error: null,
@@ -1821,6 +1849,186 @@ export function useSupabaseData(user: User | null) {
     return true;
   }, [user, state.fieldAssignments]);
 
+  // =============================================
+  // APPLICATION RECORDS CRUD (Phase 5)
+  // =============================================
+
+  const addApplicationRecord = useCallback(async (record: Omit<ApplicationRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApplicationRecord | null> => {
+    if (!user) return null;
+
+    const newId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const { data, error } = await supabase.from('application_records').insert({
+      id: newId,
+      user_id: user.id,
+      season_id: record.seasonId,
+      crop_id: record.cropId,
+      field_id: record.fieldId,
+      timing_id: record.timingId,
+      date_applied: record.dateApplied,
+      acres_treated: record.acresTreated,
+      products: record.products as any,
+      equipment_id: record.equipmentId,
+      carrier_gpa: record.carrierGPA,
+      applicator: record.applicator,
+      custom_applicator_name: record.customApplicatorName,
+      weather_notes: record.weatherNotes,
+      notes: record.notes,
+      overridden_warnings: record.overriddenWarnings as any,
+    }).select().single();
+
+    if (error) {
+      console.error('Error adding application record:', error);
+      toast.error('Failed to save application record');
+      return null;
+    }
+
+    const newRecord: ApplicationRecord = {
+      id: data.id,
+      seasonId: data.season_id,
+      cropId: data.crop_id,
+      fieldId: data.field_id,
+      timingId: data.timing_id,
+      dateApplied: data.date_applied,
+      acresTreated: Number(data.acres_treated) || 0,
+      products: (Array.isArray(data.products) ? data.products : []) as unknown as ApplicationProductRecord[],
+      equipmentId: data.equipment_id,
+      carrierGPA: data.carrier_gpa ? Number(data.carrier_gpa) : undefined,
+      applicator: (data.applicator === 'custom' ? 'custom' : 'self') as 'self' | 'custom',
+      customApplicatorName: data.custom_applicator_name,
+      weatherNotes: data.weather_notes,
+      notes: data.notes,
+      overriddenWarnings: (Array.isArray(data.overridden_warnings) ? data.overridden_warnings : []) as unknown as import('@/types/applicationRecord').OverriddenWarning[],
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+
+    setState(prev => ({
+      ...prev,
+      applicationRecords: [newRecord, ...prev.applicationRecords],
+    }));
+
+    return newRecord;
+  }, [user]);
+
+  const updateApplicationRecord = useCallback(async (record: ApplicationRecord): Promise<boolean> => {
+    if (!user) return false;
+
+    const { error } = await supabase.from('application_records').update({
+      season_id: record.seasonId,
+      crop_id: record.cropId,
+      field_id: record.fieldId,
+      timing_id: record.timingId,
+      date_applied: record.dateApplied,
+      acres_treated: record.acresTreated,
+      products: record.products as any,
+      equipment_id: record.equipmentId,
+      carrier_gpa: record.carrierGPA,
+      applicator: record.applicator,
+      custom_applicator_name: record.customApplicatorName,
+      weather_notes: record.weatherNotes,
+      notes: record.notes,
+      overridden_warnings: record.overriddenWarnings as any,
+    }).eq('id', record.id);
+
+    if (error) {
+      console.error('Error updating application record:', error);
+      toast.error('Failed to update application record');
+      return false;
+    }
+
+    setState(prev => ({
+      ...prev,
+      applicationRecords: prev.applicationRecords.map(r => r.id === record.id ? record : r),
+    }));
+
+    return true;
+  }, [user]);
+
+  const deleteApplicationRecord = useCallback(async (recordId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    const { error } = await supabase.from('application_records').delete().eq('id', recordId);
+
+    if (error) {
+      console.error('Error deleting application record:', error);
+      toast.error('Failed to delete application record');
+      return false;
+    }
+
+    setState(prev => ({
+      ...prev,
+      applicationRecords: prev.applicationRecords.filter(r => r.id !== recordId),
+    }));
+
+    return true;
+  }, [user]);
+
+  // Add application record with inventory deduction
+  const addApplicationWithInventoryDeduction = useCallback(async (
+    record: Omit<ApplicationRecord, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<ApplicationRecord | null> => {
+    if (!user) return null;
+
+    // First, create the application record
+    const appRecord = await addApplicationRecord(record);
+    if (!appRecord) return null;
+
+    // Then, create inventory transactions for each product
+    const currentSeason = state.seasons.find(s => s.id === record.seasonId);
+    const seasonYear = currentSeason?.year || new Date().getFullYear();
+
+    for (const product of record.products) {
+      // Create inventory transaction (negative = deduction)
+      const { error } = await supabase.from('inventory_transactions').insert({
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        product_id: product.productId,
+        type: 'application',
+        quantity: -product.totalApplied, // Negative for deduction
+        unit: product.totalUnit,
+        reference_id: appRecord.id,
+        reference_type: 'application_record',
+        season_year: seasonYear,
+        notes: `Applied to field (${record.acresTreated} ac)`,
+      });
+
+      if (error) {
+        console.error('Error creating inventory transaction:', error);
+      }
+
+      // Update inventory balance
+      const invItems = state.inventory.filter(i => i.productId === product.productId);
+      if (invItems.length > 0) {
+        const primaryInv = invItems[0];
+        const newQty = Math.max(0, primaryInv.quantity - product.totalApplied);
+        
+        await supabase.from('inventory').update({
+          quantity: newQty,
+          updated_at: new Date().toISOString(),
+        }).eq('id', primaryInv.id);
+      }
+    }
+
+    // Refetch inventory to get updated balances
+    const { data: invData } = await supabase.from('inventory').select('*');
+    if (invData) {
+      const inventory: InventoryItem[] = invData.map((row: any) => ({
+        id: row.id,
+        productId: row.product_id,
+        quantity: Number(row.quantity) || 0,
+        unit: row.unit || 'gal',
+        packagingName: row.packaging_name,
+        packagingSize: row.packaging_size ? Number(row.packaging_size) : undefined,
+        containerCount: row.container_count,
+      }));
+      setState(prev => ({ ...prev, inventory }));
+    }
+
+    return appRecord;
+  }, [user, addApplicationRecord, state.seasons, state.inventory]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -1867,5 +2075,10 @@ export function useSupabaseData(user: User | null) {
     // Tank mix recipes operations
     addTankMixRecipe,
     deleteTankMixRecipe,
+    // Application records operations (Phase 5)
+    addApplicationRecord,
+    updateApplicationRecord,
+    deleteApplicationRecord,
+    addApplicationWithInventoryDeduction,
   };
 }

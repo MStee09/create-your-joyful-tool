@@ -90,6 +90,7 @@ import { FieldDetailView } from './components/farm/fields/FieldDetailView';
 import { FieldComparisonView } from './components/farm/fields/FieldComparisonView';
 import { EquipmentListView } from './components/farm/equipment/EquipmentListView';
 import { MixCalculatorView } from './components/farm/tankMix/MixCalculatorView';
+import { RecordApplicationModal } from './components/farm/applications/RecordApplicationModal';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -1053,6 +1054,8 @@ const AppContent: React.FC = () => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationComplete, setMigrationComplete] = useState(false);
   const [migrationError, setMigrationError] = useState<string | null>(null);
+  // Phase 5: Record Application modal state
+  const [showRecordApplicationModal, setShowRecordApplicationModal] = useState(false);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
@@ -1116,6 +1119,9 @@ const AppContent: React.FC = () => {
     tankMixRecipes,
     addTankMixRecipe,
     deleteTankMixRecipe,
+    // Application records (Phase 5)
+    applicationRecords,
+    addApplicationWithInventoryDeduction,
     refetch,
   } = supabaseData;
 
@@ -1385,6 +1391,7 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             purchases={simplePurchases || []}
             onViewChange={setActiveView}
+            onOpenRecordApplication={() => setShowRecordApplicationModal(true)}
           />
         );
       case 'crops':
@@ -1764,6 +1771,23 @@ const AppContent: React.FC = () => {
           {renderView()}
         </div>
       </main>
+
+      {/* Phase 5: Record Application Modal */}
+      {currentSeason && (
+        <RecordApplicationModal
+          isOpen={showRecordApplicationModal}
+          onClose={() => setShowRecordApplicationModal(false)}
+          onSave={async (record) => {
+            await addApplicationWithInventoryDeduction(record);
+          }}
+          season={currentSeason}
+          fields={fields || []}
+          fieldAssignments={fieldAssignments || []}
+          productMasters={productMasters || []}
+          inventory={inventory || []}
+          equipment={equipment || []}
+        />
+      )}
     </div>
   );
 };
