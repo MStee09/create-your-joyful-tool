@@ -34,6 +34,7 @@ import {
   ShoppingCart,
   Truck,
   Bell,
+  MapPin,
 } from 'lucide-react';
 
 // Import types
@@ -82,6 +83,9 @@ import { MarketPricesView } from './components/farm/MarketPricesView';
 import { AssistantView } from './components/farm/AssistantView';
 import { PurchasesView } from './components/farm/PurchasesView';
 import { PriceHistoryView } from './components/farm/PriceHistoryView';
+import { FieldsListView } from './components/farm/fields/FieldsListView';
+import { FieldDetailView } from './components/farm/fields/FieldDetailView';
+import { EquipmentListView } from './components/farm/equipment/EquipmentListView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
 
 // Import utilities
@@ -216,6 +220,7 @@ const Sidebar: React.FC<{
         <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Plan</div>
         <NavButton id="dashboard" label="Dashboard" icon={BarChart3} />
         <NavButton id="crops" label="Crop Plans" icon={Leaf} />
+        <NavButton id="fields" label="Fields" icon={MapPin} />
 
         {/* PROCUREMENT section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
@@ -241,6 +246,7 @@ const Sidebar: React.FC<{
 
         {/* Bottom section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
+          <NavButton id="equipment" label="Equipment" icon={Truck} />
           <NavButton id="assistant" label="Assistant" icon={StickyNote} />
           <NavButton id="settings" label="Settings" icon={Settings} />
         </div>
@@ -897,6 +903,17 @@ const AppContent: React.FC = () => {
     addSimplePurchase,
     updateSimplePurchase,
     deleteSimplePurchase,
+    // Fields + Equipment operations
+    fields,
+    fieldAssignments,
+    equipment,
+    addField,
+    updateField,
+    deleteField,
+    updateFields,
+    addEquipment,
+    updateEquipmentItem,
+    deleteEquipment,
     refetch,
   } = supabaseData;
 
@@ -1180,7 +1197,26 @@ const AppContent: React.FC = () => {
             onUpdateSeason={handleUpdateSeason}
           />
         );
-      case 'products':
+      case 'fields':
+        return (
+          <FieldsListView
+            fields={fields || []}
+            fieldAssignments={fieldAssignments || []}
+            seasons={seasons}
+            onSelectField={(fieldId) => setActiveView(`field-${fieldId}`)}
+            onAddField={addField}
+            onUpdateFields={updateFields}
+          />
+        );
+      case 'equipment':
+        return (
+          <EquipmentListView
+            equipment={equipment || []}
+            onAddEquipment={addEquipment}
+            onUpdateEquipment={updateEquipmentItem}
+            onDeleteEquipment={deleteEquipment}
+          />
+        );
         return (
           <ProductsViewNew
             productMasters={state.productMasters || []}
@@ -1418,6 +1454,22 @@ const AppContent: React.FC = () => {
           />
         );
       default:
+        // Check for field detail view
+        if (activeView.startsWith('field-')) {
+          const fieldId = activeView.replace('field-', '');
+          const field = (fields || []).find(f => f.id === fieldId);
+          if (field) {
+            return (
+              <FieldDetailView
+                field={field}
+                fieldAssignments={(fieldAssignments || []).filter(fa => fa.fieldId === fieldId)}
+                seasons={seasons}
+                onUpdateField={updateField}
+                onBack={() => setActiveView('fields')}
+              />
+            );
+          }
+        }
         // Check for bid event detail view
         if (activeView.startsWith('bid-event-')) {
           const eventId = activeView.replace('bid-event-', '');

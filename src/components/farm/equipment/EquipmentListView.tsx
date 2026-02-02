@@ -25,9 +25,9 @@ import { EquipmentEditModal } from './EquipmentEditModal';
 
 interface EquipmentListViewProps {
   equipment: Equipment[];
-  onAddEquipment: (equipment: Equipment) => Promise<void>;
-  onUpdateEquipment: (equipment: Equipment) => Promise<void>;
-  onDeleteEquipment: (equipmentId: string) => Promise<void>;
+  onAddEquipment: (equipment: Equipment) => Promise<Equipment | null>;
+  onUpdateEquipment: (equipment: Equipment) => Promise<boolean>;
+  onDeleteEquipment: (equipmentId: string) => Promise<boolean>;
 }
 
 export const EquipmentListView: React.FC<EquipmentListViewProps> = ({

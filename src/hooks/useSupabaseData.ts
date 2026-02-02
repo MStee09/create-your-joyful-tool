@@ -1459,6 +1459,198 @@ export function useSupabaseData(user: User | null) {
     return true;
   }, [user]);
 
+  // =============================================
+  // FIELDS CRUD
+  // =============================================
+  
+  const addField = useCallback(async (field: Field): Promise<Field | null> => {
+    if (!user) return null;
+    
+    const { error } = await supabase.from('fields').insert({
+      id: field.id,
+      user_id: user.id,
+      name: field.name,
+      acres: field.acres,
+      farm: field.farm,
+      soil_type: field.soilType,
+      ph: field.pH,
+      organic_matter: field.organicMatter,
+      cec: field.cec,
+      notes: field.notes,
+    });
+    
+    if (error) {
+      console.error('Error adding field:', error);
+      toast.error('Failed to save field');
+      return null;
+    }
+    
+    setState(prev => ({ ...prev, fields: [...prev.fields, field] }));
+    return field;
+  }, [user]);
+
+  const updateField = useCallback(async (field: Field): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase.from('fields').update({
+      name: field.name,
+      acres: field.acres,
+      farm: field.farm,
+      soil_type: field.soilType,
+      ph: field.pH,
+      organic_matter: field.organicMatter,
+      cec: field.cec,
+      notes: field.notes,
+    }).eq('id', field.id);
+    
+    if (error) {
+      console.error('Error updating field:', error);
+      toast.error('Failed to update field');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      fields: prev.fields.map(f => f.id === field.id ? field : f),
+    }));
+    return true;
+  }, [user]);
+
+  const deleteField = useCallback(async (fieldId: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase.from('fields').delete().eq('id', fieldId);
+    
+    if (error) {
+      console.error('Error deleting field:', error);
+      toast.error('Failed to delete field');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      fields: prev.fields.filter(f => f.id !== fieldId),
+      fieldAssignments: prev.fieldAssignments.filter(fa => fa.fieldId !== fieldId),
+    }));
+    return true;
+  }, [user]);
+
+  const updateFields = useCallback(async (fields: Field[]) => {
+    if (!user) return;
+    
+    const currentIds = new Set(state.fields.map(f => f.id));
+    const newIds = new Set(fields.map(f => f.id));
+    
+    const deletedIds = [...currentIds].filter(id => !newIds.has(id));
+    const newFields = fields.filter(f => !currentIds.has(f.id));
+    const updatedFields = fields.filter(f => currentIds.has(f.id));
+    
+    for (const id of deletedIds) {
+      await supabase.from('fields').delete().eq('id', id);
+    }
+    
+    for (const field of newFields) {
+      await supabase.from('fields').insert({
+        id: field.id,
+        user_id: user.id,
+        name: field.name,
+        acres: field.acres,
+        farm: field.farm,
+        soil_type: field.soilType,
+        ph: field.pH,
+        organic_matter: field.organicMatter,
+        cec: field.cec,
+        notes: field.notes,
+      });
+    }
+    
+    for (const field of updatedFields) {
+      await supabase.from('fields').update({
+        name: field.name,
+        acres: field.acres,
+        farm: field.farm,
+        soil_type: field.soilType,
+        ph: field.pH,
+        organic_matter: field.organicMatter,
+        cec: field.cec,
+        notes: field.notes,
+      }).eq('id', field.id);
+    }
+    
+    setState(prev => ({ ...prev, fields }));
+  }, [user, state.fields]);
+
+  // =============================================
+  // EQUIPMENT CRUD
+  // =============================================
+  
+  const addEquipment = useCallback(async (equipment: Equipment): Promise<Equipment | null> => {
+    if (!user) return null;
+    
+    const { error } = await supabase.from('equipment').insert({
+      id: equipment.id,
+      user_id: user.id,
+      name: equipment.name,
+      type: equipment.type,
+      tank_size: equipment.tankSize,
+      tank_unit: equipment.tankUnit,
+      default_carrier_gpa: equipment.defaultCarrierGPA,
+      notes: equipment.notes,
+    });
+    
+    if (error) {
+      console.error('Error adding equipment:', error);
+      toast.error('Failed to save equipment');
+      return null;
+    }
+    
+    setState(prev => ({ ...prev, equipment: [...prev.equipment, equipment] }));
+    return equipment;
+  }, [user]);
+
+  const updateEquipmentItem = useCallback(async (equipment: Equipment): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase.from('equipment').update({
+      name: equipment.name,
+      type: equipment.type,
+      tank_size: equipment.tankSize,
+      tank_unit: equipment.tankUnit,
+      default_carrier_gpa: equipment.defaultCarrierGPA,
+      notes: equipment.notes,
+    }).eq('id', equipment.id);
+    
+    if (error) {
+      console.error('Error updating equipment:', error);
+      toast.error('Failed to update equipment');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      equipment: prev.equipment.map(e => e.id === equipment.id ? equipment : e),
+    }));
+    return true;
+  }, [user]);
+
+  const deleteEquipment = useCallback(async (equipmentId: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    const { error } = await supabase.from('equipment').delete().eq('id', equipmentId);
+    
+    if (error) {
+      console.error('Error deleting equipment:', error);
+      toast.error('Failed to delete equipment');
+      return false;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      equipment: prev.equipment.filter(e => e.id !== equipmentId),
+    }));
+    return true;
+  }, [user]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -1491,5 +1683,14 @@ export function useSupabaseData(user: User | null) {
     addSimplePurchase,
     updateSimplePurchase,
     deleteSimplePurchase,
+    // Fields operations
+    addField,
+    updateField,
+    deleteField,
+    updateFields,
+    // Equipment operations
+    addEquipment,
+    updateEquipmentItem,
+    deleteEquipment,
   };
 }
