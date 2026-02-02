@@ -28,9 +28,8 @@ interface FieldsListViewProps {
   fieldAssignments: FieldAssignment[];
   seasons: Season[];
   onSelectField: (fieldId: string) => void;
-  onAddField: (field: Field) => Promise<void>;
-  onUpdateField: (field: Field) => Promise<void>;
-  onAddFields: (fields: Field[]) => Promise<void>;
+  onAddField: (field: Field) => Promise<Field | null>;
+  onUpdateFields: (fields: Field[]) => Promise<void>;
 }
 
 export const FieldsListView: React.FC<FieldsListViewProps> = ({
@@ -39,8 +38,7 @@ export const FieldsListView: React.FC<FieldsListViewProps> = ({
   seasons,
   onSelectField,
   onAddField,
-  onUpdateField,
-  onAddFields,
+  onUpdateFields,
 }) => {
   const [search, setSearch] = useState('');
   const [farmFilter, setFarmFilter] = useState<string>('all');
@@ -90,7 +88,10 @@ export const FieldsListView: React.FC<FieldsListViewProps> = ({
   };
 
   const handleImportFields = async (importedFields: Field[]) => {
-    await onAddFields(importedFields);
+    // Add each field individually and update fields list
+    const existingFields = [...fields];
+    const newFields = [...existingFields, ...importedFields];
+    await onUpdateFields(newFields);
     setShowImportModal(false);
   };
 

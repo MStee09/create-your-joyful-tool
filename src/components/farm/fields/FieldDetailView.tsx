@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,7 @@ interface FieldDetailViewProps {
   field: Field;
   fieldAssignments: FieldAssignment[];
   seasons: Season[];
-  fields: Field[];
-  onUpdateField: (field: Field) => Promise<void>;
-  onDeleteField: (fieldId: string) => Promise<void>;
+  onUpdateField: (field: Field) => Promise<boolean>;
   onBack: () => void;
 }
 
@@ -22,18 +20,14 @@ export const FieldDetailView: React.FC<FieldDetailViewProps> = ({
   field,
   fieldAssignments,
   seasons,
-  fields,
   onUpdateField,
-  onDeleteField,
   onBack,
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Get unique farms from all fields
-  const existingFarms = useMemo(() => {
-    const farmSet = new Set(fields.map(f => f.farm).filter(Boolean) as string[]);
-    return Array.from(farmSet).sort();
-  }, [fields]);
+  // We don't have access to all fields here, so we can't show existing farms
+  // The modal will just allow free text entry
+  const existingFarms: string[] = [];
 
   const handleSave = async (updatedField: Field) => {
     await onUpdateField(updatedField);
@@ -134,10 +128,6 @@ export const FieldDetailView: React.FC<FieldDetailViewProps> = ({
           field={field}
           existingFarms={existingFarms}
           onSave={handleSave}
-          onDelete={() => {
-            onDeleteField(field.id);
-            onBack();
-          }}
           onClose={() => setShowEditModal(false)}
         />
       )}
