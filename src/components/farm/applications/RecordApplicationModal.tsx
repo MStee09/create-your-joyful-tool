@@ -27,6 +27,7 @@ import type {
   InventoryShortage,
   OverriddenWarning,
   RecordApplicationContext,
+  ShortageResolution,
 } from '@/types/applicationRecord';
 import { formatNumber } from '@/lib/calculations';
 import { 
@@ -40,6 +41,7 @@ import {
   buildOverriddenWarnings,
   allBlockingViolationsOverridden,
 } from './RestrictionWarningPanel';
+import { InventoryShortageModal } from './InventoryShortageModal';
 
 interface RecordApplicationModalProps {
   isOpen: boolean;
@@ -396,6 +398,28 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
     await saveApplication();
   };
 
+  const handleShortageResolution = (resolution: ShortageResolution) => {
+    setShowShortageWarning(false);
+    
+    switch (resolution.type) {
+      case 'save-anyway':
+        // Save without deducting inventory
+        saveApplication();
+        break;
+      case 'record-purchase':
+        // Close modal - user will need to record purchase separately
+        // In a future enhancement, this could open RecordPurchaseModal
+        // For now, just close and let user know
+        onClose();
+        break;
+      case 'add-carryover':
+        // Close modal - user will need to add inventory separately
+        // In a future enhancement, this could open AddInventoryModal
+        onClose();
+        break;
+    }
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
@@ -676,49 +700,13 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Inventory Shortage Warning Dialog */}
-      <Dialog open={showShortageWarning} onOpenChange={setShowShortageWarning}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="w-5 h-5" />
-              Inventory Shortage
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <p className="text-muted-foreground mb-4">
-              The following products don't have enough inventory on hand:
-            </p>
-            <div className="space-y-2">
-              {shortages.map(shortage => (
-                <div 
-                  key={shortage.productId}
-                  className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200"
-                >
-                  <span className="font-medium">{shortage.productName}</span>
-                  <span className="text-sm">
-                    Need {formatNumber(shortage.needed, 1)} {shortage.unit}, 
-                    have {formatNumber(shortage.onHand, 1)} {shortage.unit}
-                    <span className="text-red-600 ml-2">
-                      (short {formatNumber(shortage.shortage, 1)})
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowShortageWarning(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleSaveAnyway}>
-              Save Anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Inventory Shortage Modal with resolution options */}
+      <InventoryShortageModal
+        isOpen={showShortageWarning}
+        onClose={() => setShowShortageWarning(false)}
+        shortages={shortages}
+        onResolve={handleShortageResolution}
+      />
     </>
   );
 };
