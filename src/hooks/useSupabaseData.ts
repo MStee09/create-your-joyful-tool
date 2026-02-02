@@ -48,6 +48,7 @@ interface SupabaseDataState {
   // Phase 1: Fields + Equipment
   fields: Field[];
   fieldAssignments: FieldAssignment[];
+  fieldCropOverrides: FieldCropOverride[];
   equipment: Equipment[];
   // Phase 3: Tank Mix Recipes
   tankMixRecipes: TankMixRecipe[];
@@ -228,6 +229,7 @@ export function useSupabaseData(user: User | null) {
     simplePurchases: [],
     fields: [],
     fieldAssignments: [],
+    fieldCropOverrides: [],
     equipment: [],
     tankMixRecipes: [],
     currentSeasonId: null,
@@ -275,6 +277,7 @@ export function useSupabaseData(user: User | null) {
         priceRecordsRes,
         fieldsRes,
         fieldAssignmentsRes,
+        fieldCropOverridesRes,
         equipmentRes,
         tankMixRecipesRes,
       ] = await Promise.all([
@@ -296,6 +299,7 @@ export function useSupabaseData(user: User | null) {
         supabase.from('price_records').select('*').order('date', { ascending: false }),
         supabase.from('fields').select('*').order('name'),
         supabase.from('field_assignments').select('*'),
+        supabase.from('field_crop_overrides').select('*'),
         supabase.from('equipment').select('*').order('name'),
         supabase.from('tank_mix_recipes').select('*').order('name'),
       ]);
@@ -473,11 +477,27 @@ export function useSupabaseData(user: User | null) {
         fieldId: row.field_id,
         cropId: row.crop_id,
         acres: Number(row.acres) || 0,
+        plannedAcres: row.planned_acres ? Number(row.planned_acres) : undefined,
         yieldGoal: row.yield_goal ? Number(row.yield_goal) : undefined,
         yieldUnit: row.yield_unit,
         actualYield: row.actual_yield ? Number(row.actual_yield) : undefined,
         previousCropId: row.previous_crop_id,
         previousCropName: row.previous_crop_name,
+        notes: row.notes,
+        createdAt: row.created_at,
+      }));
+
+      // Map field crop overrides
+      const fieldCropOverrides: FieldCropOverride[] = (fieldCropOverridesRes.data || []).map((row: any) => ({
+        id: row.id,
+        fieldAssignmentId: row.field_assignment_id,
+        applicationId: row.application_id,
+        overrideType: row.override_type || 'rate_adjust',
+        rateAdjustment: row.rate_adjustment ? Number(row.rate_adjustment) : undefined,
+        customRate: row.custom_rate ? Number(row.custom_rate) : undefined,
+        customUnit: row.custom_unit,
+        productId: row.product_id,
+        notes: row.notes,
         createdAt: row.created_at,
       }));
 
@@ -526,6 +546,7 @@ export function useSupabaseData(user: User | null) {
         simplePurchases,
         fields,
         fieldAssignments,
+        fieldCropOverrides,
         equipment,
         tankMixRecipes,
         currentSeasonId,
