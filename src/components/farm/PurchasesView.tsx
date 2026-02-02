@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Truck, CheckCircle, DollarSign, Package, Calendar } from 'lucide-react';
+import { Plus, Truck, CheckCircle, DollarSign, Package, Calendar, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { formatCurrency } from '@/lib/calculations';
 import type { Vendor, ProductMaster, VendorOffering } from '@/types';
 import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
@@ -177,6 +178,30 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                       >
                         Details
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Purchase?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this {formatCurrency(purchase.total)} purchase from {getVendorName(purchase.vendorId)}. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => onDeletePurchase(purchase.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardContent>
@@ -212,16 +237,42 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">{getProductNames(purchase.lines)}</p>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setEditingPurchase(purchase);
-                        setShowAddModal(true);
-                      }}
-                    >
-                      Details
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingPurchase(purchase);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        Details
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Purchase?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this {formatCurrency(purchase.total)} purchase from {getVendorName(purchase.vendorId)}. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => onDeletePurchase(purchase.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
