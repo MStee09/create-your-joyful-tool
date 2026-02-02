@@ -3,10 +3,12 @@
 // ============================================================================
 
 import React, { useMemo } from 'react';
-import { CheckCircle, AlertCircle, Clock, TrendingUp, TrendingDown, Leaf } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, TrendingUp, TrendingDown, Leaf, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Season, Product } from '@/types/farm';
 import type { ApplicationRecord } from '@/types/applicationRecord';
 import { buildNutrientEfficiencyReport, type NutrientTotals, type NutrientEfficiencyRow } from '@/lib/nutrientEfficiencyUtils';
+import { exportNutrientEfficiencyCsv } from '@/lib/reportExportUtils';
 
 function fmt(n: number, decimals = 1) {
   const v = Number.isFinite(n) ? n : 0;
@@ -88,14 +90,25 @@ export const NutrientEfficiencyView: React.FC<NutrientEfficiencyViewProps> = ({
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-          <Leaf className="w-6 h-6 text-emerald-600" />
-          Nutrient Efficiency Report
-        </h2>
-        <p className="text-sm text-stone-500 mt-1">
-          Compare planned nutrient delivery (N-P-K-S lbs/ac) against what was actually applied.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
+            <Leaf className="w-6 h-6 text-emerald-600" />
+            Nutrient Efficiency Report
+          </h2>
+          <p className="text-sm text-stone-500 mt-1">
+            Compare planned nutrient delivery (N-P-K-S lbs/ac) against what was actually applied.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => exportNutrientEfficiencyCsv(report, season?.name || 'season')}
+          disabled={report.rows.length === 0}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary cards - whole-farm weighted average */}

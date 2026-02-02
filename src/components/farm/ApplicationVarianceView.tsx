@@ -3,10 +3,12 @@
 // ============================================================================
 
 import React, { useMemo, useState } from 'react';
-import { CheckCircle, AlertCircle, Clock, TrendingUp, TrendingDown, Filter } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, TrendingUp, TrendingDown, Filter, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Season, Product } from '@/types/farm';
 import type { ApplicationRecord } from '@/types/applicationRecord';
 import { buildApplicationVarianceReport, type ApplicationVarianceRow } from '@/lib/applicationVarianceUtils';
+import { exportApplicationVarianceCsv } from '@/lib/reportExportUtils';
 
 function fmt(n: number, decimals = 1) {
   const v = Number.isFinite(n) ? n : 0;
@@ -86,6 +88,15 @@ export const ApplicationVarianceView: React.FC<ApplicationVarianceViewProps> = (
             Compare what was actually applied in the field against your crop plan targets.
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => exportApplicationVarianceCsv(report, season?.name || 'season')}
+          disabled={report.rows.length === 0}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary cards */}
