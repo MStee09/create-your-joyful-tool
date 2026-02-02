@@ -257,9 +257,12 @@ serve(async (req) => {
 
     console.log('Calling Lovable AI for label extraction...');
     
-    // Try with gemini-2.5-pro first for better PDF handling
-    let model = 'google/gemini-2.5-pro';
-    let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Use gemini-2.5-flash for faster PDF handling with good quality
+    const model = 'google/gemini-2.5-flash';
+    console.log('Using model:', model);
+    
+    const startTime = Date.now();
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -270,6 +273,8 @@ serve(async (req) => {
         messages,
       }),
     });
+    
+    console.log('AI response received in', Date.now() - startTime, 'ms, status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();

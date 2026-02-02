@@ -324,6 +324,11 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           updates.cropRateNotes = `Approved uses: ${data.analysis.approvedUses.join(', ')}`;
         }
         
+        // Chemical data for pesticides (herbicides, fungicides, insecticides)
+        if (data.chemicalData) {
+          updates.chemicalData = data.chemicalData as ChemicalData;
+        }
+        
         // Apply all updates at once
         if (Object.keys(updates).length > 0) {
           onUpdateProduct({ ...product, ...updates });
