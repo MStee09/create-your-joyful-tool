@@ -54,12 +54,55 @@ export interface FieldAssignment {
   fieldId: string;
   cropId: string;
   acres: number;
+  plannedAcres?: number;
   yieldGoal?: number;
   yieldUnit?: 'bu/ac' | 'lbs/ac' | 'tons/ac';
   actualYield?: number;
   previousCropId?: string;
   previousCropName?: string;
+  notes?: string;
   createdAt: string;
+}
+
+// ============================================================================
+// Phase 4: Field-Specific Overrides
+// ============================================================================
+
+export type OverrideType = 'rate_adjust' | 'absolute' | 'exclude' | 'add';
+
+export interface FieldCropOverride {
+  id: string;
+  fieldAssignmentId: string;
+  applicationId: string;  // References Application.id in crop plan
+  overrideType: OverrideType;
+  rateAdjustment?: number;  // Multiplier: 1.1 = +10%, 0.8 = -20%
+  customRate?: number;      // For 'absolute' or 'add' types
+  customUnit?: string;      // Unit for custom rate
+  productId?: string;       // For 'add' type - the product being added
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FieldAssignmentExtended extends FieldAssignment {
+  fieldName: string;
+  farm?: string;
+  overrides: FieldCropOverride[];
+  // Calculated
+  effectiveApplications?: EffectiveApplication[];
+  costPerAcre?: number;
+  nutrients?: { n: number; p: number; k: number; s: number };
+}
+
+export interface EffectiveApplication {
+  applicationId: string;
+  productId: string;
+  productName: string;
+  baseRate: number;
+  effectiveRate: number;  // After override
+  unit: string;
+  isExcluded: boolean;
+  isFieldOnly: boolean;   // Only on this field, not in template
+  overrideNote?: string;
 }
 
 export type EquipmentType = 

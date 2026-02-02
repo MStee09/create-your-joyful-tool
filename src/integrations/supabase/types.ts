@@ -200,6 +200,8 @@ export type Database = {
           crop_id: string
           field_id: string
           id: string
+          notes: string | null
+          planned_acres: number | null
           previous_crop_id: string | null
           previous_crop_name: string | null
           season_id: string | null
@@ -214,6 +216,8 @@ export type Database = {
           crop_id: string
           field_id: string
           id?: string
+          notes?: string | null
+          planned_acres?: number | null
           previous_crop_id?: string | null
           previous_crop_name?: string | null
           season_id?: string | null
@@ -228,6 +232,8 @@ export type Database = {
           crop_id?: string
           field_id?: string
           id?: string
+          notes?: string | null
+          planned_acres?: number | null
           previous_crop_id?: string | null
           previous_crop_name?: string | null
           season_id?: string | null
@@ -248,6 +254,63 @@ export type Database = {
             columns: ["season_id"]
             isOneToOne: false
             referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      field_crop_overrides: {
+        Row: {
+          application_id: string
+          created_at: string
+          custom_rate: number | null
+          custom_unit: string | null
+          field_assignment_id: string
+          id: string
+          notes: string | null
+          override_type: string
+          product_id: string | null
+          rate_adjustment: number | null
+          user_id: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          custom_rate?: number | null
+          custom_unit?: string | null
+          field_assignment_id: string
+          id?: string
+          notes?: string | null
+          override_type?: string
+          product_id?: string | null
+          rate_adjustment?: number | null
+          user_id: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          custom_rate?: number | null
+          custom_unit?: string | null
+          field_assignment_id?: string
+          id?: string
+          notes?: string | null
+          override_type?: string
+          product_id?: string | null
+          rate_adjustment?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_crop_overrides_field_assignment_id_fkey"
+            columns: ["field_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "field_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_crop_overrides_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_masters"
             referencedColumns: ["id"]
           },
         ]

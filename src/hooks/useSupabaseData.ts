@@ -23,7 +23,7 @@ import type {
 import type { PriceHistory } from '@/types/farm';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import type { SimplePurchase, NewSimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
-import type { Field, FieldAssignment, Equipment } from '@/types/field';
+import type { Field, FieldAssignment, Equipment, FieldCropOverride } from '@/types/field';
 import type { TankMixRecipe, TankMixProduct } from '@/types/tankMix';
 
 interface SupabaseDataState {
@@ -1727,6 +1727,76 @@ export function useSupabaseData(user: User | null) {
     return true;
   }, [user]);
 
+  // =============================================
+  // FIELD CROP OVERRIDES CRUD (Phase 4)
+  // =============================================
+  
+  const updateFieldCropOverrides = useCallback(async (overrides: FieldCropOverride[]): Promise<boolean> => {
+    if (!user) return false;
+    
+    // Get unique field assignment IDs from the overrides
+    const assignmentIds = [...new Set(overrides.map(o => o.fieldAssignmentId))];
+    
+    // Delete existing overrides for these assignments
+    for (const assignmentId of assignmentIds) {
+      await supabase.from('field_crop_overrides').delete().eq('field_assignment_id', assignmentId);
+    }
+    
+    // Insert new overrides
+    for (const override of overrides) {
+      const { error } = await supabase.from('field_crop_overrides').insert({
+        id: override.id,
+        user_id: user.id,
+        field_assignment_id: override.fieldAssignmentId,
+        application_id: override.applicationId,
+        override_type: override.overrideType,
+        rate_adjustment: override.rateAdjustment,
+        custom_rate: override.customRate,
+        custom_unit: override.customUnit,
+        product_id: override.productId,
+        notes: override.notes,
+      });
+      if (error) console.error('Error inserting override:', error);
+    }
+    
+    return true;
+  }, [user]);
+
+  // Field Assignments update
+  const updateFieldAssignments = useCallback(async (assignments: FieldAssignment[]): Promise<boolean> => {
+    if (!user) return false;
+    
+    const currentIds = new Set(state.fieldAssignments.map(fa => fa.id));
+    const newIds = new Set(assignments.map(fa => fa.id));
+    
+    const deletedIds = [...currentIds].filter(id => !newIds.has(id));
+    for (const id of deletedIds) {
+      await supabase.from('field_assignments').delete().eq('id', id);
+    }
+    
+    for (const fa of assignments) {
+      const { error } = await supabase.from('field_assignments').upsert({
+        id: fa.id,
+        user_id: user.id,
+        season_id: fa.seasonId,
+        field_id: fa.fieldId,
+        crop_id: fa.cropId,
+        acres: fa.acres,
+        planned_acres: fa.plannedAcres,
+        yield_goal: fa.yieldGoal,
+        yield_unit: fa.yieldUnit,
+        actual_yield: fa.actualYield,
+        previous_crop_id: fa.previousCropId,
+        previous_crop_name: fa.previousCropName,
+        notes: fa.notes,
+      });
+      if (error) console.error('Error upserting field assignment:', error);
+    }
+    
+    setState(prev => ({ ...prev, fieldAssignments: assignments }));
+    return true;
+  }, [user, state.fieldAssignments]);
+
   return {
     ...state,
     refetch: fetchData,
@@ -1764,6 +1834,8 @@ export function useSupabaseData(user: User | null) {
     updateField,
     deleteField,
     updateFields,
+    updateFieldAssignments,
+    updateFieldCropOverrides,
     // Equipment operations
     addEquipment,
     updateEquipmentItem,
