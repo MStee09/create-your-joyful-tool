@@ -153,6 +153,150 @@ export type Database = {
           },
         ]
       }
+      equipment: {
+        Row: {
+          created_at: string
+          default_carrier_gpa: number | null
+          id: string
+          name: string
+          notes: string | null
+          tank_size: number
+          tank_unit: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_carrier_gpa?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          tank_size?: number
+          tank_unit?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_carrier_gpa?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          tank_size?: number
+          tank_unit?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      field_assignments: {
+        Row: {
+          acres: number
+          actual_yield: number | null
+          created_at: string
+          crop_id: string
+          field_id: string
+          id: string
+          previous_crop_id: string | null
+          previous_crop_name: string | null
+          season_id: string | null
+          user_id: string
+          yield_goal: number | null
+          yield_unit: string | null
+        }
+        Insert: {
+          acres?: number
+          actual_yield?: number | null
+          created_at?: string
+          crop_id: string
+          field_id: string
+          id?: string
+          previous_crop_id?: string | null
+          previous_crop_name?: string | null
+          season_id?: string | null
+          user_id: string
+          yield_goal?: number | null
+          yield_unit?: string | null
+        }
+        Update: {
+          acres?: number
+          actual_yield?: number | null
+          created_at?: string
+          crop_id?: string
+          field_id?: string
+          id?: string
+          previous_crop_id?: string | null
+          previous_crop_name?: string | null
+          season_id?: string | null
+          user_id?: string
+          yield_goal?: number | null
+          yield_unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_assignments_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_assignments_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fields: {
+        Row: {
+          acres: number
+          cec: number | null
+          created_at: string
+          farm: string | null
+          id: string
+          name: string
+          notes: string | null
+          organic_matter: number | null
+          ph: number | null
+          soil_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acres?: number
+          cec?: number | null
+          created_at?: string
+          farm?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          organic_matter?: number | null
+          ph?: number | null
+          soil_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acres?: number
+          cec?: number | null
+          created_at?: string
+          farm?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          organic_matter?: number | null
+          ph?: number | null
+          soil_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           container_count: number | null

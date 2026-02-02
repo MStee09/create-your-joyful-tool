@@ -23,6 +23,7 @@ import type {
 import type { PriceHistory } from '@/types/farm';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import type { SimplePurchase, NewSimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
+import type { Field, FieldAssignment, Equipment } from '@/types/field';
 
 interface SupabaseDataState {
   seasons: Season[];
@@ -43,6 +44,10 @@ interface SupabaseDataState {
   // New simplified types
   priceRecords: PriceRecord[];
   simplePurchases: SimplePurchase[];
+  // Phase 1: Fields + Equipment
+  fields: Field[];
+  fieldAssignments: FieldAssignment[];
+  equipment: Equipment[];
   currentSeasonId: string | null;
   loading: boolean;
   error: string | null;
@@ -218,6 +223,9 @@ export function useSupabaseData(user: User | null) {
     invoices: [],
     priceRecords: [],
     simplePurchases: [],
+    fields: [],
+    fieldAssignments: [],
+    equipment: [],
     currentSeasonId: null,
     loading: true,
     error: null,
@@ -261,6 +269,9 @@ export function useSupabaseData(user: User | null) {
         ordersRes,
         invoicesRes,
         priceRecordsRes,
+        fieldsRes,
+        fieldAssignmentsRes,
+        equipmentRes,
       ] = await Promise.all([
         supabase.from('seasons').select('*').order('year', { ascending: false }),
         supabase.from('vendors').select('*').order('name'),
@@ -278,6 +289,9 @@ export function useSupabaseData(user: User | null) {
         supabase.from('orders').select('*').order('order_date', { ascending: false }),
         supabase.from('invoices').select('*').order('received_date', { ascending: false }),
         supabase.from('price_records').select('*').order('date', { ascending: false }),
+        supabase.from('fields').select('*').order('name'),
+        supabase.from('field_assignments').select('*'),
+        supabase.from('equipment').select('*').order('name'),
       ]);
 
       const seasons = (seasonsRes.data || []).map(dbSeasonToSeason);
@@ -431,6 +445,49 @@ export function useSupabaseData(user: User | null) {
       const savedSeasonId = localStorage.getItem('farmcalc-current-season');
       const currentSeasonId = seasons.find(s => s.id === savedSeasonId)?.id || seasons[0]?.id || null;
 
+      // Map fields
+      const fields: Field[] = (fieldsRes.data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        acres: Number(row.acres) || 0,
+        farm: row.farm,
+        soilType: row.soil_type,
+        pH: row.ph ? Number(row.ph) : undefined,
+        organicMatter: row.organic_matter ? Number(row.organic_matter) : undefined,
+        cec: row.cec ? Number(row.cec) : undefined,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+      // Map field assignments
+      const fieldAssignments: FieldAssignment[] = (fieldAssignmentsRes.data || []).map((row: any) => ({
+        id: row.id,
+        seasonId: row.season_id,
+        fieldId: row.field_id,
+        cropId: row.crop_id,
+        acres: Number(row.acres) || 0,
+        yieldGoal: row.yield_goal ? Number(row.yield_goal) : undefined,
+        yieldUnit: row.yield_unit,
+        actualYield: row.actual_yield ? Number(row.actual_yield) : undefined,
+        previousCropId: row.previous_crop_id,
+        previousCropName: row.previous_crop_name,
+        createdAt: row.created_at,
+      }));
+
+      // Map equipment
+      const equipment: Equipment[] = (equipmentRes.data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        type: row.type || 'sprayer',
+        tankSize: Number(row.tank_size) || 0,
+        tankUnit: 'gal' as const,
+        defaultCarrierGPA: row.default_carrier_gpa ? Number(row.default_carrier_gpa) : undefined,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
       setState({
         seasons,
         vendors,
@@ -449,6 +506,9 @@ export function useSupabaseData(user: User | null) {
         invoices,
         priceRecords,
         simplePurchases,
+        fields,
+        fieldAssignments,
+        equipment,
         currentSeasonId,
         loading: false,
         error: null,
