@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, ChevronDown, ChevronRight, AlertTriangle, Check } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,15 +19,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Season, Crop, ApplicationTiming, Application, ProductMaster, InventoryItem } from '@/types';
+import type { Season, ProductMaster, InventoryItem } from '@/types';
 import type { Field, FieldAssignment, Equipment } from '@/types/field';
 import type { 
   ApplicationRecord, 
   ApplicationProductRecord, 
-  RecordApplicationContext,
   InventoryShortage,
+  OverriddenWarning,
+  RecordApplicationContext,
 } from '@/types/applicationRecord';
 import { formatNumber } from '@/lib/calculations';
+import { 
+  checkRestrictions, 
+  type RestrictionViolation,
+  type RestrictionCheckContext,
+  type PlannedApplication,
+} from '@/lib/restrictionEngine';
+import { 
+  RestrictionWarningPanel, 
+  buildOverriddenWarnings,
+  allBlockingViolationsOverridden,
+} from './RestrictionWarningPanel';
 
 interface RecordApplicationModalProps {
   isOpen: boolean;
@@ -41,6 +53,7 @@ interface RecordApplicationModalProps {
   productMasters: ProductMaster[];
   inventory: InventoryItem[];
   equipment: Equipment[];
+  applicationRecords: ApplicationRecord[];
   
   // Pre-population context
   context?: RecordApplicationContext;
@@ -65,6 +78,7 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
   productMasters,
   inventory,
   equipment,
+  applicationRecords,
   context,
 }) => {
   // Form state
@@ -82,6 +96,11 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [showShortageWarning, setShowShortageWarning] = useState(false);
   const [shortages, setShortages] = useState<InventoryShortage[]>([]);
+  
+  // Restriction engine state
+  const [restrictionOverrides, setRestrictionOverrides] = useState<
+    Record<string, { reason: string; confirmed: boolean }>
+  >({});
 
   // Get crops from season
   const crops = season?.crops || [];
@@ -165,6 +184,81 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
     })));
   }, [totalAcres]);
 
+  // Run restriction checks when selections change
+  const restrictionViolations = useMemo((): RestrictionViolation[] => {
+    if (!selectedCropId || !selectedTimingId || selectedFieldIds.length === 0 || productLines.length === 0) {
+      return [];
+    }
+
+    const checkContext: RestrictionCheckContext = {
+      season,
+      fields,
+      fieldAssignments,
+      applicationRecords,
+      productMasters,
+    };
+
+    const allViolations: RestrictionViolation[] = [];
+    
+    // Check each field separately
+    for (const fieldId of selectedFieldIds) {
+      const assignment = fieldAssignments.find(
+        fa => fa.fieldId === fieldId && fa.seasonId === season?.id && fa.cropId === selectedCropId
+      );
+      const fieldAcres = assignment?.acres || 0;
+
+      const plannedApps: PlannedApplication[] = productLines.map(line => ({
+        productId: line.productId,
+        rate: line.actualRate,
+        rateUnit: line.rateUnit,
+        acres: fieldAcres,
+      }));
+
+      const violations = checkRestrictions(
+        checkContext,
+        fieldId,
+        selectedCropId,
+        selectedTimingId,
+        dateApplied,
+        plannedApps
+        // harvestDate would go here if we had it
+      );
+
+      allViolations.push(...violations);
+    }
+
+    // Deduplicate by id (same product/field combo)
+    const seen = new Set<string>();
+    return allViolations.filter(v => {
+      if (seen.has(v.id)) return false;
+      seen.add(v.id);
+      return true;
+    });
+  }, [
+    selectedCropId,
+    selectedTimingId,
+    selectedFieldIds,
+    productLines,
+    dateApplied,
+    season,
+    fields,
+    fieldAssignments,
+    applicationRecords,
+    productMasters,
+  ]);
+
+  // Check if all blocking violations are overridden
+  const canSubmitWithRestrictions = useMemo(() => {
+    return allBlockingViolationsOverridden(restrictionViolations, restrictionOverrides);
+  }, [restrictionViolations, restrictionOverrides]);
+
+  const handleOverrideChange = (violationId: string, reason: string, confirmed: boolean) => {
+    setRestrictionOverrides(prev => ({
+      ...prev,
+      [violationId]: { reason, confirmed },
+    }));
+  };
+
   const handleRateChange = (productId: string, newRate: number) => {
     setProductLines(prev => prev.map(line => 
       line.productId === productId
@@ -216,6 +310,14 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
       return;
     }
 
+    // Check for blocking restriction violations that haven't been overridden
+    const hasBlockingRestrictions = restrictionViolations.some(
+      v => v.severity === 'error' && v.canOverride
+    );
+    if (hasBlockingRestrictions && !canSubmitWithRestrictions) {
+      return; // User must acknowledge all blocking violations
+    }
+
     // Check for inventory shortages
     const foundShortages = checkInventoryShortages();
     if (foundShortages.length > 0) {
@@ -259,6 +361,12 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
           totalApplied: p.actualRate * fieldAcres,
         }));
 
+        // Build overridden warnings for this field
+        const fieldOverriddenWarnings = buildOverriddenWarnings(
+          restrictionViolations.filter(v => !v.fieldId || v.fieldId === fieldId),
+          restrictionOverrides
+        );
+
         await onSave({
           seasonId: season.id,
           cropId: selectedCropId,
@@ -273,6 +381,7 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
           customApplicatorName: applicator === 'custom' ? customApplicatorName : undefined,
           weatherNotes: weatherNotes || undefined,
           notes: notes || undefined,
+          overriddenWarnings: fieldOverriddenWarnings.length > 0 ? fieldOverriddenWarnings : undefined,
         });
       }
 
@@ -449,6 +558,15 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
               </div>
             )}
 
+            {/* Restriction Warnings */}
+            {restrictionViolations.length > 0 && (
+              <RestrictionWarningPanel
+                violations={restrictionViolations}
+                overrides={restrictionOverrides}
+                onOverrideChange={handleOverrideChange}
+              />
+            )}
+
             {/* Equipment & Carrier */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -541,7 +659,13 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
             </Button>
             <Button 
               onClick={handleSubmit}
-              disabled={saving || !selectedCropId || !selectedTimingId || selectedFieldIds.length === 0}
+              disabled={
+                saving || 
+                !selectedCropId || 
+                !selectedTimingId || 
+                selectedFieldIds.length === 0 ||
+                (restrictionViolations.some(v => v.severity === 'error' && v.canOverride) && !canSubmitWithRestrictions)
+              }
             >
               {saving ? 'Saving...' : 'Record Application'}
             </Button>
