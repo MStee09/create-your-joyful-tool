@@ -917,11 +917,14 @@ const AppContent: React.FC = () => {
     // Fields + Equipment operations
     fields,
     fieldAssignments,
+    fieldCropOverrides,
     equipment,
     addField,
     updateField,
     deleteField,
     updateFields,
+    updateFieldAssignments,
+    updateFieldCropOverrides,
     addEquipment,
     updateEquipmentItem,
     deleteEquipment,
@@ -1209,7 +1212,12 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
+            fields={fields || []}
+            fieldAssignments={fieldAssignments || []}
+            fieldCropOverrides={fieldCropOverrides || []}
             onUpdateSeason={handleUpdateSeason}
+            onUpdateFieldAssignments={updateFieldAssignments}
+            onUpdateFieldCropOverrides={updateFieldCropOverrides}
           />
         );
       case 'fields':

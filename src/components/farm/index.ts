@@ -29,3 +29,6 @@ export { CropPlanPrintView } from './CropPlanPrintView';
 export { ExportPdfButton } from './ExportPdfButton';
 export { AddProductToVendorModal } from './AddProductToVendorModal';
 export { ProductPriceHistory } from './ProductPriceHistory';
+export { FieldAssignmentModal } from './FieldAssignmentModal';
+export { CropByFieldView } from './CropByFieldView';
+export { FieldOverrideEditor } from './FieldOverrideEditor';
