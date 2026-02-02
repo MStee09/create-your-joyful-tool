@@ -571,12 +571,15 @@ export const RecordApplicationModal: React.FC<RecordApplicationModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Equipment</Label>
-                <Select value={selectedEquipmentId} onValueChange={setSelectedEquipmentId}>
+                <Select 
+                  value={selectedEquipmentId || "__none__"} 
+                  onValueChange={(val) => setSelectedEquipmentId(val === "__none__" ? "" : val)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {equipment.map(eq => (
                       <SelectItem key={eq.id} value={eq.id}>
                         {eq.name} ({eq.tankSize} gal)
