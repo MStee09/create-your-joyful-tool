@@ -58,5 +58,42 @@ Enhanced the Inventory view to show products that are **ordered but not yet rece
 - ✅ Tab bar: All | On Hand | Ordered
 - ✅ Summary cards show On Hand value + Ordered value separately
 
+---
+
+## Actual vs. Planned Application Report ✅ COMPLETED
+
+### Overview
+Built a variance report comparing **recorded field applications** against **crop plan targets** by product, field, and timing.
+
+---
+
+### What It Shows
+
+**Summary Cards:**
+- Passes Planned — unique crop/timing combinations
+- Passes Started — at least one application recorded
+- Passes Complete — all products fully applied
+- Progress bar — percentage of passes complete
+
+**Per-Product Row:**
+- Planned rate and total (from crop plan, weighted by tier)
+- Actual rate and total (from recorded applications)
+- Rate variance (actual - planned, with %)
+- Total variance (actual - planned, with %)
+- Status badge: Not Applied | Partial | Complete | Over Applied
+
+---
+
+### Filters
+- Filter by status (Not Applied, Partial, Complete, Over Applied)
+- Filter by crop
+
+---
+
+### Implementation
+- `src/lib/applicationVarianceUtils.ts` — Core calculation logic
+- `src/components/farm/ApplicationVarianceView.tsx` — UI component
+- Added to sidebar under **Review** section as "Actual vs. Plan"
+
 
 
