@@ -20,6 +20,7 @@ import {
 import type { ProductMaster } from '@/types';
 import type { ChemicalData } from '@/types/chemicalData';
 import { getChemicalDataStatus } from '@/types/chemicalData';
+import { mergeChemicalData, type DocumentSource } from '@/lib/chemicalMerge';
 import { saveDocument, getDocument, deleteDocument } from '@/lib/documentStorage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -93,22 +94,34 @@ export function ChemicalProductDocumentsTab({
           ? { labelFileName: file.name }
           : { sdsFileName: file.name };
 
-        // Update chemicalData if extracted
+        // Update chemicalData using merge logic
+        // Label is authoritative, SDS only fills gaps
         if (data.chemicalData) {
-          updates.chemicalData = {
-            ...product.chemicalData,
-            ...data.chemicalData,
-          } as ChemicalData;
+          const documentSource: DocumentSource = type === 'label' ? 'label' : 'sds';
+          updates.chemicalData = mergeChemicalData(
+            product.chemicalData,
+            data.chemicalData,
+            documentSource
+          ) as ChemicalData;
+        }
+
+        // Update manufacturer from extraction if available and not already set
+        if (data.manufacturer && !product.manufacturer) {
+          updates.manufacturer = data.manufacturer;
         }
 
         // Update extraction metadata
         updates.extractionSource = type === 'label' ? 'label-pdf' : 'sds-pdf';
-        updates.extractionConfidence = data.confidence || 'medium';
+        updates.extractionConfidence = data.extractionConfidence || data.confidence || 'medium';
         updates.lastExtractedAt = new Date().toISOString();
 
         if (Object.keys(updates).length > 0) {
           onUpdateProduct({ ...product, ...updates });
-          toast.success(`Extracted chemical data from ${type}`);
+          const sourceLabel = type === 'label' ? 'product label' : 'SDS';
+          const mergeNote = type === 'sds' && product.chemicalData 
+            ? ' (supplementing existing data)' 
+            : '';
+          toast.success(`Extracted chemical data from ${sourceLabel}${mergeNote}`);
         }
       } catch (err) {
         console.error('Extraction failed:', err);

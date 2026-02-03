@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Edit2, Check, X, Droplets, Wind, Gauge } from 'lucide-react';
+import { Edit2, Check, X, Droplets, Wind, Gauge, Plane, Tractor, Layers } from 'lucide-react';
 import { AdjuvantRequirementsTable } from './AdjuvantRequirementsTable';
-import type { ChemicalData, RateRange, ApplicationRequirements, AdjuvantRequirement } from '@/types/chemicalData';
+import { hasRateByCondition } from '@/lib/chemicalMerge';
+import type { ChemicalData, RateRange, ApplicationRequirements, RateByCondition } from '@/types/chemicalData';
 import { DROPLET_SIZE_LABELS } from '@/types/chemicalData';
 
 interface ChemicalProductRatesTabProps {
@@ -50,6 +50,8 @@ export function ChemicalProductRatesTab({
 
   const rateRange = data.rateRange;
   const appReqs = data.applicationRequirements;
+  const hasConditionRates = hasRateByCondition(chemicalData);
+  const hasAerialGroundCarrier = appReqs?.carrierGpaMinAerial !== undefined || appReqs?.carrierGpaMinGround !== undefined;
 
   return (
     <div className="space-y-6">
@@ -151,6 +153,40 @@ export function ChemicalProductRatesTab({
               {rateRange.notes && (
                 <p className="text-sm text-muted-foreground">{rateRange.notes}</p>
               )}
+
+              {/* Rate by Condition Table */}
+              {hasConditionRates && rateRange.byCondition && rateRange.byCondition.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-blue-500" />
+                    Rate by Soil Type / Conditions
+                  </h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium">Condition</th>
+                          <th className="text-right px-3 py-2 font-medium">Min</th>
+                          <th className="text-right px-3 py-2 font-medium">Max</th>
+                          <th className="text-left px-3 py-2 font-medium">Unit</th>
+                          <th className="text-left px-3 py-2 font-medium">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {rateRange.byCondition.map((cond, idx) => (
+                          <tr key={idx} className="hover:bg-muted/30">
+                            <td className="px-3 py-2 font-medium">{cond.condition}</td>
+                            <td className="px-3 py-2 text-right">{cond.min ?? '—'}</td>
+                            <td className="px-3 py-2 text-right">{cond.max ?? '—'}</td>
+                            <td className="px-3 py-2">{cond.unit}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{cond.notes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic">No rate range specified</p>
@@ -181,111 +217,181 @@ export function ChemicalProductRatesTab({
         </CardHeader>
         <CardContent>
           {editingSection === 'appReqs' ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Carrier GPA (Min)</Label>
-                <Input
-                  type="number"
-                  placeholder="Min GPA"
-                  value={editData.applicationRequirements?.carrierGpaMin || ''}
-                  onChange={(e) => updateAppRequirements('carrierGpaMin', e.target.value ? parseFloat(e.target.value) : undefined)}
-                />
+            <div className="space-y-4">
+              {/* Carrier volumes */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <Label className="flex items-center gap-1">
+                    <Plane className="w-3 h-3" /> Carrier Min (Aerial)
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="GPA"
+                    value={editData.applicationRequirements?.carrierGpaMinAerial || ''}
+                    onChange={(e) => updateAppRequirements('carrierGpaMinAerial', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  />
+                </div>
+                <div>
+                  <Label className="flex items-center gap-1">
+                    <Tractor className="w-3 h-3" /> Carrier Min (Ground)
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="GPA"
+                    value={editData.applicationRequirements?.carrierGpaMinGround || ''}
+                    onChange={(e) => updateAppRequirements('carrierGpaMinGround', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  />
+                </div>
+                <div>
+                  <Label>Carrier GPA (Min)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Min GPA"
+                    value={editData.applicationRequirements?.carrierGpaMin || ''}
+                    onChange={(e) => updateAppRequirements('carrierGpaMin', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  />
+                </div>
+                <div>
+                  <Label>Carrier GPA (Max)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Max GPA"
+                    value={editData.applicationRequirements?.carrierGpaMax || ''}
+                    onChange={(e) => updateAppRequirements('carrierGpaMax', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  />
+                </div>
               </div>
-              <div>
-                <Label>Carrier GPA (Max)</Label>
-                <Input
-                  type="number"
-                  placeholder="Max GPA"
-                  value={editData.applicationRequirements?.carrierGpaMax || ''}
-                  onChange={(e) => updateAppRequirements('carrierGpaMax', e.target.value ? parseFloat(e.target.value) : undefined)}
-                />
-              </div>
-              <div>
-                <Label>Droplet Size</Label>
-                <Select 
-                  value={editData.applicationRequirements?.dropletSize || ''} 
-                  onValueChange={(v) => updateAppRequirements('dropletSize', v || undefined)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(DROPLET_SIZE_LABELS).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Spray Pressure (Min PSI)</Label>
-                <Input
-                  type="number"
-                  placeholder="Min PSI"
-                  value={editData.applicationRequirements?.sprayPressureMin || ''}
-                  onChange={(e) => updateAppRequirements('sprayPressureMin', e.target.value ? parseInt(e.target.value) : undefined)}
-                />
-              </div>
-              <div>
-                <Label>Spray Pressure (Max PSI)</Label>
-                <Input
-                  type="number"
-                  placeholder="Max PSI"
-                  value={editData.applicationRequirements?.sprayPressureMax || ''}
-                  onChange={(e) => updateAppRequirements('sprayPressureMax', e.target.value ? parseInt(e.target.value) : undefined)}
-                />
-              </div>
-              <div>
-                <Label>Application Timing</Label>
-                <Input
-                  placeholder="e.g., V2-V6"
-                  value={editData.applicationRequirements?.applicationTiming || ''}
-                  onChange={(e) => updateAppRequirements('applicationTiming', e.target.value)}
-                />
+
+              {/* Other requirements */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Droplet Size</Label>
+                  <Select 
+                    value={editData.applicationRequirements?.dropletSize || ''} 
+                    onValueChange={(v) => updateAppRequirements('dropletSize', v || undefined)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DROPLET_SIZE_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Spray Pressure (Min PSI)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Min PSI"
+                    value={editData.applicationRequirements?.sprayPressureMin || ''}
+                    onChange={(e) => updateAppRequirements('sprayPressureMin', e.target.value ? parseInt(e.target.value) : undefined)}
+                  />
+                </div>
+                <div>
+                  <Label>Spray Pressure (Max PSI)</Label>
+                  <Input
+                    type="number"
+                    placeholder="Max PSI"
+                    value={editData.applicationRequirements?.sprayPressureMax || ''}
+                    onChange={(e) => updateAppRequirements('sprayPressureMax', e.target.value ? parseInt(e.target.value) : undefined)}
+                  />
+                </div>
+                <div className="col-span-2 md:col-span-3">
+                  <Label>Application Timing</Label>
+                  <Input
+                    placeholder="e.g., V2-V6, Preemergence"
+                    value={editData.applicationRequirements?.applicationTiming || ''}
+                    onChange={(e) => updateAppRequirements('applicationTiming', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           ) : appReqs ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(appReqs.carrierGpaMin || appReqs.carrierGpaMax) && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
-                    <Droplets className="w-3 h-3" />
-                    Carrier
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Aerial/Ground carrier volumes */}
+                {hasAerialGroundCarrier ? (
+                  <>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
+                        <Plane className="w-3 h-3" />
+                        Carrier (Aerial)
+                      </div>
+                      <div className="font-medium">
+                        {appReqs.carrierGpaMinAerial ? `${appReqs.carrierGpaMinAerial}+ GPA` : '—'}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
+                        <Tractor className="w-3 h-3" />
+                        Carrier (Ground)
+                      </div>
+                      <div className="font-medium">
+                        {appReqs.carrierGpaMinGround ? `${appReqs.carrierGpaMinGround}+ GPA` : '—'}
+                      </div>
+                    </div>
+                  </>
+                ) : (appReqs.carrierGpaMin || appReqs.carrierGpaMax) && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
+                      <Droplets className="w-3 h-3" />
+                      Carrier
+                    </div>
+                    <div className="font-medium">
+                      {appReqs.carrierGpaMin && appReqs.carrierGpaMax 
+                        ? `${appReqs.carrierGpaMin}-${appReqs.carrierGpaMax} GPA`
+                        : appReqs.carrierGpaTypical 
+                          ? `${appReqs.carrierGpaTypical} GPA`
+                          : `${appReqs.carrierGpaMin || appReqs.carrierGpaMax} GPA`
+                      }
+                    </div>
                   </div>
-                  <div className="font-medium">
-                    {appReqs.carrierGpaMin && appReqs.carrierGpaMax 
-                      ? `${appReqs.carrierGpaMin}-${appReqs.carrierGpaMax} GPA`
-                      : appReqs.carrierGpaTypical 
-                        ? `${appReqs.carrierGpaTypical} GPA`
-                        : `${appReqs.carrierGpaMin || appReqs.carrierGpaMax} GPA`
-                    }
+                )}
+                {appReqs.dropletSize && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
+                      <Wind className="w-3 h-3" />
+                      Droplet
+                    </div>
+                    <div className="font-medium">{DROPLET_SIZE_LABELS[appReqs.dropletSize]}</div>
                   </div>
-                </div>
-              )}
-              {appReqs.dropletSize && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
-                    <Wind className="w-3 h-3" />
-                    Droplet
+                )}
+                {(appReqs.sprayPressureMin || appReqs.sprayPressureMax) && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
+                      <Gauge className="w-3 h-3" />
+                      Pressure
+                    </div>
+                    <div className="font-medium">
+                      {appReqs.sprayPressureMin && appReqs.sprayPressureMax
+                        ? `${appReqs.sprayPressureMin}-${appReqs.sprayPressureMax} PSI`
+                        : `${appReqs.sprayPressureMin || appReqs.sprayPressureMax} PSI`
+                      }
+                    </div>
                   </div>
-                  <div className="font-medium">{DROPLET_SIZE_LABELS[appReqs.dropletSize]}</div>
-                </div>
-              )}
-              {(appReqs.sprayPressureMin || appReqs.sprayPressureMax) && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground uppercase mb-1">
-                    <Gauge className="w-3 h-3" />
-                    Pressure
+                )}
+                {appReqs.applicationTiming && (
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <div className="text-xs text-muted-foreground uppercase mb-1">Timing</div>
+                    <div className="font-medium">{appReqs.applicationTiming}</div>
                   </div>
-                  <div className="font-medium">
-                    {appReqs.sprayPressureMin && appReqs.sprayPressureMax
-                      ? `${appReqs.sprayPressureMin}-${appReqs.sprayPressureMax} PSI`
-                      : `${appReqs.sprayPressureMin || appReqs.sprayPressureMax} PSI`
-                    }
+                )}
+              </div>
+
+              {/* Application methods */}
+              {appReqs.applicationMethods && appReqs.applicationMethods.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Application Methods</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {appReqs.applicationMethods.map((method, idx) => (
+                      <span 
+                        key={idx} 
+                        className="px-2 py-1 bg-muted rounded text-sm"
+                      >
+                        {method}
+                      </span>
+                    ))}
                   </div>
-                </div>
-              )}
-              {appReqs.applicationTiming && (
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                  <div className="text-xs text-muted-foreground uppercase mb-1">Timing</div>
-                  <div className="font-medium">{appReqs.applicationTiming}</div>
                 </div>
               )}
             </div>
