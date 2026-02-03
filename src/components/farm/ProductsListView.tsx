@@ -13,6 +13,10 @@ import {
   ArrowLeft,
   FlaskConical,
   ChevronRight,
+  FlaskRound,
+  CheckCircle2,
+  AlertCircle,
+  CircleDashed,
 } from 'lucide-react';
 import type { ProductMaster, VendorOffering, Vendor, InventoryItem, ProductCategory, Season, NutrientAnalysis } from '@/types';
 import { 
@@ -22,6 +26,7 @@ import {
   CATEGORY_LABELS,
   inferProductCategory,
 } from '@/lib/calculations';
+import { isPesticideCategory, getChemicalDataStatus } from '@/types/chemicalData';
 import {
   HoverCard,
   HoverCardContent,
@@ -94,6 +99,7 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     return (localStorage.getItem('productsViewDensity') as ViewDensity) || 'compact';
   });
   const [compareNutrient, setCompareNutrient] = useState<string | null>(null);
+  const [categoryTab, setCategoryTab] = useState<ProductCategory | 'all'>('all');
 
   // Two-step add product state
   const [addStep, setAddStep] = useState<AddStep>(1);
@@ -169,6 +175,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         const vendor = preferredOffering ? vendors.find(v => v.id === preferredOffering.vendorId) : null;
         const stockInfo = getStockStatus(product, inventory);
         const hasVendor = offerings.length > 0;
+        const chemicalDataStatus = isPesticideCategory(product.category || '') 
+          ? getChemicalDataStatus(product.chemicalData)
+          : null;
 
         return {
           ...product,
@@ -178,14 +187,19 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
           totalOnHand: stockInfo.totalOnHand,
           usedThisSeason: usedThisSeasonIds.has(product.id),
           hasVendor,
+          chemicalDataStatus,
         };
       })
       .filter(product => {
+        // Category tab filter (quick filter)
+        if (categoryTab !== 'all' && product.category !== categoryTab) {
+          return false;
+        }
         // Search filter
         if (searchTerm && !product.name.toLowerCase().includes(searchTerm.toLowerCase())) {
           return false;
         }
-        // Category filter
+        // Category filter (from advanced filters)
         if (filterCategory && product.category !== filterCategory) {
           return false;
         }
@@ -207,7 +221,29 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         }
         return true;
       });
-  }, [productMasters, vendorOfferings, vendors, inventory, usedThisSeasonIds, searchTerm, filterCategory, filterForm, filterVendor, filterStock, filterNoVendor]);
+  }, [productMasters, vendorOfferings, vendors, inventory, usedThisSeasonIds, searchTerm, filterCategory, filterForm, filterVendor, filterStock, filterNoVendor, categoryTab]);
+
+  // Category tab counts for quick filter
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: productMasters.length };
+    productMasters.forEach(p => {
+      const cat = p.category || 'other';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [productMasters]);
+
+  // Define category tabs (subset for quick access)
+  const CATEGORY_TABS: Array<{ key: ProductCategory | 'all'; label: string; icon?: React.ReactNode }> = [
+    { key: 'all', label: 'All' },
+    { key: 'fertilizer-dry', label: 'Dry Fert' },
+    { key: 'fertilizer-liquid', label: 'Liquid Fert' },
+    { key: 'herbicide', label: 'Herbicide' },
+    { key: 'fungicide', label: 'Fungicide' },
+    { key: 'insecticide', label: 'Insecticide' },
+    { key: 'adjuvant', label: 'Adjuvant' },
+    { key: 'biological', label: 'Biological' },
+  ];
 
   // Group by category for detailed view
   const groupedProducts = useMemo(() => {
@@ -346,6 +382,28 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
           {/* Spacer */}
           <div className="flex-1" />
           
+          {/* Chemical Data Status - for pesticides only */}
+          {product.chemicalDataStatus && (
+            <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${
+              product.chemicalDataStatus === 'complete' 
+                ? 'text-emerald-600' 
+                : product.chemicalDataStatus === 'partial'
+                  ? 'text-amber-600'
+                  : 'text-muted-foreground'
+            }`}>
+              {product.chemicalDataStatus === 'complete' && <CheckCircle2 className="w-3 h-3" />}
+              {product.chemicalDataStatus === 'partial' && <AlertCircle className="w-3 h-3" />}
+              {product.chemicalDataStatus === 'none' && <CircleDashed className="w-3 h-3" />}
+            </span>
+          )}
+          
+          {/* Manufacturer badge for chemicals */}
+          {isPesticideCategory(product.category || '') && product.manufacturer && (
+            <span className="text-xs text-muted-foreground truncate max-w-24">
+              {product.manufacturer}
+            </span>
+          )}
+          
           {/* Stock status - only show if problematic */}
           {product.stockStatus === 'low' && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs whitespace-nowrap">
@@ -372,6 +430,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
             {product.vendor && (
               <p className="text-xs text-muted-foreground">{product.vendor.name}</p>
             )}
+            {product.manufacturer && (
+              <p className="text-xs text-muted-foreground italic">by {product.manufacturer}</p>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-1">
@@ -390,6 +451,21 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
                 {product.analysis.n}-{product.analysis.p}-{product.analysis.k}
                 {product.analysis.s > 0 && `-${product.analysis.s}S`}
               </span>
+            </div>
+          )}
+          
+          {/* Chemical data status for pesticides */}
+          {product.chemicalDataStatus && (
+            <div className={`text-xs flex items-center gap-1 ${
+              product.chemicalDataStatus === 'complete' 
+                ? 'text-emerald-600' 
+                : product.chemicalDataStatus === 'partial'
+                  ? 'text-amber-600'
+                  : 'text-muted-foreground'
+            }`}>
+              {product.chemicalDataStatus === 'complete' && <><CheckCircle2 className="w-3 h-3" /> Data complete</>}
+              {product.chemicalDataStatus === 'partial' && <><AlertCircle className="w-3 h-3" /> Partial data</>}
+              {product.chemicalDataStatus === 'none' && <><CircleDashed className="w-3 h-3" /> No chemical data</>}
             </div>
           )}
           
@@ -440,15 +516,31 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
           }
         </div>
         <div>
-          {product.vendor && (
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
-              {product.vendor.name}
-            </p>
-          )}
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">
+            {product.vendor && (
+              <span>{product.vendor.name}</span>
+            )}
+            {product.manufacturer && isPesticideCategory(product.category || '') && (
+              <>
+                {product.vendor && <span>·</span>}
+                <span className="italic normal-case">by {product.manufacturer}</span>
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground">{product.name}</span>
             {product.generalNotes && <StickyNote className="w-4 h-4 text-amber-500" />}
             {product.labelFileName && <FileText className="w-4 h-4 text-blue-500" />}
+            {/* Chemical data status icon */}
+            {product.chemicalDataStatus === 'complete' && (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            )}
+            {product.chemicalDataStatus === 'partial' && (
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+            )}
+            {product.chemicalDataStatus === 'none' && (
+              <CircleDashed className="w-4 h-4 text-muted-foreground" />
+            )}
             {product.stockStatus === 'low' && (
               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
                 <AlertTriangle className="w-3 h-3" />
@@ -684,6 +776,30 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
             </span>
           )}
         </button>
+      </div>
+
+      {/* Category Filter Tabs */}
+      <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+        {CATEGORY_TABS.map(tab => {
+          const count = categoryCounts[tab.key] || 0;
+          const isActive = categoryTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setCategoryTab(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full whitespace-nowrap transition-colors ${
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-xs ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filter Row */}
