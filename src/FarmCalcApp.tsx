@@ -365,12 +365,23 @@ const ProductsViewNew: React.FC<{
     ? productMasters.find(p => p.id === selectedProductId) 
     : null;
 
+  // Only reset selectedProductId if product was removed (not during add race condition)
+  // We check if there's no product AND no pending add by verifying it's not a brand new ID
   useEffect(() => {
-    if (selectedProductId && !selectedProduct) selectProduct(null);
-  }, [productMasters, selectedProductId]);
+    if (selectedProductId && !selectedProduct) {
+      // Delay the reset to allow for state propagation from product add
+      const timeout = setTimeout(() => {
+        const stillNotFound = !productMasters.find(p => p.id === selectedProductId);
+        if (stillNotFound) selectProduct(null);
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [productMasters, selectedProductId, selectedProduct]);
 
   const handleAddProduct = (product: ProductMaster) => {
     onAddProduct(product);
+    // Immediately select the new product
+    selectProduct(product.id);
   };
 
   const handleUpdateProduct = (product: ProductMaster) => {
