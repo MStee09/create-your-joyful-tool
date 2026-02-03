@@ -92,6 +92,8 @@ import { EquipmentListView } from './components/farm/equipment/EquipmentListView
 import { MixCalculatorView } from './components/farm/tankMix/MixCalculatorView';
 import { RecordApplicationModal } from './components/farm/applications/RecordApplicationModal';
 import { ApplicationVarianceView } from './components/farm/ApplicationVarianceView';
+import { ChemicalProductDetailView } from './components/farm/chemical/ChemicalProductDetailView';
+import { isPesticideCategory } from './types/chemicalData';
 import { NutrientEfficiencyView } from './components/farm/NutrientEfficiencyView';
 import { ApplicationHistoryView } from './components/farm/applications/ApplicationHistoryView';
 import { migrateAppState, getProductsAsLegacy } from './lib/dataMigration';
@@ -383,6 +385,25 @@ const ProductsViewNew: React.FC<{
   };
 
   if (selectedProduct) {
+    // Use ChemicalProductDetailView for pesticides and adjuvants
+    if (isPesticideCategory(selectedProduct.category) || selectedProduct.category === 'adjuvant') {
+      return (
+        <ChemicalProductDetailView
+          product={selectedProduct}
+          vendorOfferings={vendorOfferings}
+          vendors={vendors}
+          inventory={inventory}
+          commoditySpecs={commoditySpecs}
+          onUpdateProduct={handleUpdateProduct}
+          onUpdateOfferings={onUpdateOfferings}
+          onDeleteProduct={handleDeleteProduct}
+          onBack={() => selectProduct(null)}
+          onNavigateToVendor={onNavigateToVendor}
+        />
+      );
+    }
+    
+    // Use standard ProductDetailView for fertilizers and other categories
     return (
       <ProductDetailView
         product={selectedProduct}
