@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
@@ -12,6 +12,7 @@ import { getTimingDisplayText } from '@/lib/growthStages';
 import { TimingEditorPopover } from './TimingEditorPopover';
 import { hasAwardedPrice } from '@/lib/priceBookUtils';
 import { cn } from '@/lib/utils';
+import { getPassType, PASS_TYPE_CONFIG } from '@/lib/passTypeUtils';
 
 interface PassCardProps {
   timing: ApplicationTiming;
@@ -228,6 +229,14 @@ export const PassCard: React.FC<PassCardProps> = ({
     return fieldsWithOverrides.size;
   }, [summary.applications, fieldOverrides]);
 
+  // Calculate pass type from product categories
+  const passType = useMemo(() => 
+    getPassType(summary.applications, productMasters),
+    [summary.applications, productMasters]
+  );
+  const passTypeConfig = PASS_TYPE_CONFIG[passType];
+  const PassTypeIcon = passTypeConfig.Icon;
+
   const patternStyle = PATTERN_BADGE_STYLES[summary.passPattern];
 
   return (
@@ -318,6 +327,19 @@ export const PassCard: React.FC<PassCardProps> = ({
                     </div>
                   </div>
                 </div>
+              )}
+              {/* Pass Type Badge */}
+              {passType !== 'other' && (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                    passTypeConfig.bgColor,
+                    passTypeConfig.textColor
+                  )}
+                >
+                  <PassTypeIcon className="w-3 h-3" />
+                  {passTypeConfig.label}
+                </span>
               )}
               {/* Pass Pattern Badge */}
               <span
