@@ -1,216 +1,200 @@
 
+# Inventory Integration Expansion
 
-# Pass Type Badge Implementation
+## Problem Statement
 
-## Overview
+Inventory data is currently siloed to the Inventory tab and not surfacing actionable insights where users need them most. The Order Status widget on the Dashboard and detailed view only show product counts (e.g., "3 Ready, 2 Ordered"), not the actual coverage percentages or quantities that would help with decision-making.
 
-This plan adds visual pass type indicators (Herbicide, Fungicide, Fertility, etc.) to pass cards in the crop planner. The badge will appear prominently in the pass header, helping users instantly identify the application type.
+## Solution Overview
 
----
+Expand inventory visibility across the application to make it genuinely useful for operational planning:
 
-## Current State
-
-Pass cards show:
-- Pass name (e.g., "POST PLANT/PRE EMERGE")
-- Timing badge (e.g., "At Planting")
-- Pattern badge (Uniform/Selective/Trial)
-- Function chips (Rooting, Fertility, etc.)
-- Coverage distribution
-
-**What's missing:** No indication of the application type (herbicide vs fungicide vs fertility pass).
+1. **Dashboard Order Status Widget** - Show % coverage by value or volume
+2. **Order Status Detail Page** - Add summary metrics for inventory position
+3. **Demand Rollup View** - Add "On Hand" and "To Order" columns
+4. **Pass Cards in Crop Planning** - Show inventory indicator for products without stock
 
 ---
 
-## Implementation Plan
+## Phase 1: Dashboard Order Status Enhancement
 
-### Phase 1: Create Pass Type Utility
+**File: `src/components/farm/DashboardView.tsx`**
 
-**Create `src/lib/passTypeUtils.ts`:**
+Update the Order Status widget to show meaningful inventory metrics:
 
-Define the pass type detection logic and styling:
-
-```typescript
-type PassType = 'herbicide' | 'fungicide' | 'insecticide' 
-              | 'fertility' | 'biological' | 'mixed' | 'other';
-
-interface PassTypeConfig {
-  label: string;
-  icon: string;      // Lucide icon name
-  bgColor: string;   // Tailwind bg class
-  textColor: string; // Tailwind text class
-}
-
-const PASS_TYPE_CONFIG: Record<PassType, PassTypeConfig> = {
-  herbicide:   { label: 'Herbicide',   icon: 'Leaf',       bg: 'bg-green-500/15',  text: 'text-green-600' },
-  fungicide:   { label: 'Fungicide',   icon: 'FlaskRound', bg: 'bg-purple-500/15', text: 'text-purple-600' },
-  insecticide: { label: 'Insecticide', icon: 'Bug',        bg: 'bg-orange-500/15', text: 'text-orange-600' },
-  fertility:   { label: 'Fertility',   icon: 'Wheat',      bg: 'bg-blue-500/15',   text: 'text-blue-600' },
-  biological:  { label: 'Biological',  icon: 'Sprout',     bg: 'bg-teal-500/15',   text: 'text-teal-600' },
-  mixed:       { label: 'Mixed',       icon: 'FlaskConical', bg: 'bg-gray-500/15', text: 'text-gray-600' },
-  other:       { label: 'Other',       icon: 'Package',    bg: 'bg-gray-500/15',   text: 'text-gray-500' },
-};
+**Current:**
+```
+[Progress Bar: Ready | Ordered | Need to Order]
+3 Ready • 2 Ordered • 1 Need to Order
 ```
 
-**Detection Logic:**
+**Proposed:**
+```
+[Progress Bar: Covered | On Order | Short]
 
+Coverage: 85% by volume
+$12,400 On Hand · $3,200 Ordered · $1,800 to Go
+
+3 Ready • 2 Ordered • 1 Need to Order
+```
+
+Changes:
+- Add a "coverage percentage" calculation based on inventory quantity vs. planned need
+- Add dollar values for On Hand, Ordered, and remaining "To Go" positions
+- Keep the product count legend for context
+
+**New calculation needed:**
 ```typescript
-function getPassType(
-  applications: Application[],
-  productMasters: ProductMaster[]
-): PassType {
-  const categories = applications.map(app => {
-    const product = productMasters.find(p => p.id === app.productId);
-    return product?.category;
-  }).filter(Boolean);
-
-  // Count occurrences of each category type
-  const counts = {
-    herbicide: categories.filter(c => c === 'herbicide').length,
-    fungicide: categories.filter(c => c === 'fungicide').length,
-    insecticide: categories.filter(c => c === 'insecticide').length,
-    fertility: categories.filter(c => 
-      c === 'fertilizer-liquid' || c === 'fertilizer-dry' || c === 'micronutrient'
-    ).length,
-    biological: categories.filter(c => c === 'biological').length,
-  };
-
-  // If multiple major types, return 'mixed'
-  const significantTypes = Object.entries(counts)
-    .filter(([_, count]) => count > 0);
-  
-  if (significantTypes.length > 1) return 'mixed';
-  if (significantTypes.length === 1) return significantTypes[0][0] as PassType;
-  
-  return 'other';
+// In planReadinessUtils.ts - add volume/value metrics
+interface ReadinessSummary {
+  // ...existing counts
+  onHandValue: number;      // $ value of current inventory
+  onOrderValue: number;     // $ value of pending orders
+  shortValue: number;       // $ value still needed
+  coveragePct: number;      // (onHand + onOrder) / planned * 100
 }
 ```
 
-### Phase 2: Add Pass Type Badge to PassCard
+---
 
-**Modify `src/components/farm/PassCard.tsx`:**
+## Phase 2: Order Status Detailed Page Enhancement
 
-1. Import the new utility and Lucide icons
-2. Calculate pass type in the component
-3. Render badge in the header
+**File: `src/components/farm/PlanReadinessView.tsx`**
 
-**Badge Placement:**
+Add a new summary row showing total quantities and values:
 
-The badge will appear after the timing display, before the pattern badge:
+**Current Summary Cards:**
+| Total Products | Ready | Ordered | Need to Order |
+|----------------|-------|---------|---------------|
+| 6 | 3 | 2 | 1 |
 
-```text
-POST PLANT/PRE EMERGE
-At Planting  [Herbicide]  Uniform  ⏱ 1 ...
-```
+**Proposed - Add second row:**
 
-**Visual Design:**
+| On Hand Value | Ordered Value | Still Needed |
+|---------------|---------------|--------------|
+| $12,400 | $3,200 | $1,800 |
 
-```tsx
-{passType !== 'other' && (
-  <span className={cn(
-    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-    passTypeConfig.bg,
-    passTypeConfig.text
-  )}>
-    <PassTypeIcon className="w-3 h-3" />
-    {passTypeConfig.label}
-  </span>
-)}
-```
+| Coverage by Volume | Coverage by Value |
+|--------------------|-------------------|
+| 78% | 85% |
 
-### Phase 3: Icon Selection
-
-Using Lucide icons that match the semantic meaning:
-
-| Pass Type | Icon | Rationale |
-|-----------|------|-----------|
-| Herbicide | `Leaf` or `Sprout` | Vegetation control |
-| Fungicide | `FlaskRound` | Lab/treatment |
-| Insecticide | `Bug` | Insect control |
-| Fertility | `Wheat` | Plant nutrition |
-| Biological | `Dna` or `Microscope` | Living organisms |
-| Mixed | `FlaskConical` | Multiple types |
+This gives users actual financial visibility into their inventory position.
 
 ---
 
-## Technical Details
+## Phase 3: Demand Rollup Inventory Integration
 
-### Files to Create
+**File: `src/components/farm/DemandRollupView.tsx`**
 
-| File | Purpose |
-|------|---------|
-| `src/lib/passTypeUtils.ts` | Pass type detection and styling config |
+Add "On Hand" and "Net Need" columns to show true purchase requirements:
+
+**Current columns:**
+| Commodity | Total Qty | UOM | Crops |
+
+**Proposed columns:**
+| Commodity | Planned | On Hand | Net Need | UOM | Crops |
+
+Changes:
+- Pass `inventory` prop to DemandRollupView
+- Calculate on-hand quantity per commodity (aggregate across linked products)
+- Show "Net Need" = max(0, Planned - On Hand)
+- Add visual indicator when On Hand covers 100% (green checkmark)
+
+---
+
+## Phase 4: Pass Card Inventory Indicator
+
+**File: `src/components/farm/PassCard.tsx`**
+
+Add a subtle indicator when products in a pass are not covered by inventory:
+
+**Visual change in collapsed header:**
+```
+POST PLANT/PRE EMERGE  [Herbicide]  Uniform    ⚠️ 2 short    $9.66/ac
+```
+
+Changes:
+- Pass `inventory` to PassCard (already passed to CropPlanningView)
+- Calculate how many products in the pass have insufficient inventory
+- Show warning badge: "⚠️ 2 short" if products are uncovered
+- Optional: Make it clickable to open Order Status filtered to those products
+
+---
+
+## Technical Implementation
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/farm/PassCard.tsx` | Add pass type badge to header |
+| `src/lib/planReadinessUtils.ts` | Add value/coverage calculations |
+| `src/components/farm/DashboardView.tsx` | Enhanced Order Status widget |
+| `src/components/farm/PlanReadinessView.tsx` | Add value summary row |
+| `src/components/farm/DemandRollupView.tsx` | Add On Hand / Net Need columns |
+| `src/components/farm/PassCard.tsx` | Add inventory shortage indicator |
+| `src/components/farm/CropPlanningView.tsx` | Pass inventory to PassCard |
+| `src/lib/procurementCalculations.ts` | Update DemandRollup to include inventory |
+| `src/FarmCalcApp.tsx` | Pass inventory to DemandRollupView |
 
-### Component Updates
+### New Calculations Needed
 
-In `PassCard.tsx`:
+**In `planReadinessUtils.ts`:**
+```typescript
+// Calculate value-based metrics
+const onHandValue = readiness.items.reduce((sum, item) => {
+  const product = products.find(p => p.id === item.productId);
+  const price = product?.price || 0;
+  return sum + (item.onHandQty * price);
+}, 0);
 
-1. Add new imports:
-   ```tsx
-   import { getPassType, PASS_TYPE_CONFIG } from '@/lib/passTypeUtils';
-   import { Leaf, FlaskRound, Bug, Wheat, Sprout, FlaskConical, Package } from 'lucide-react';
-   ```
+const plannedValue = readiness.items.reduce((sum, item) => {
+  const product = products.find(p => p.id === item.productId);
+  const price = product?.price || 0;
+  return sum + (item.requiredQty * price);
+}, 0);
 
-2. Calculate pass type in `useMemo`:
-   ```tsx
-   const passType = useMemo(() => 
-     getPassType(summary.applications, productMasters),
-     [summary.applications, productMasters]
-   );
-   ```
-
-3. Add badge after timing line:
-   ```tsx
-   {passType !== 'other' && (
-     <PassTypeBadge type={passType} />
-   )}
-   ```
-
----
-
-## Visual Examples
-
-**Herbicide Pass:**
-```text
-POST PLANT/PRE EMERGE                    Uniform    ⏱ 1    $9.66/ac
-At Planting  🌿 Herbicide
-Core  1 product · 158 ac  0.1 gal
-```
-
-**Mixed Pass (herbicide + fertility):**
-```text
-BURNDOWN                                 Selective   ⏱ 2    $24.50/ac
-Pre-Plant  ⚗️ Mixed
-Building 2 · Trial 1 · 158 ac
-```
-
-**Fertility Pass:**
-```text
-STARTER                                  Uniform    ⏱ 1    $18.00/ac
-At Planting  🌾 Fertility
-Core  2 products · 158 ac  8.5 gal
+const coveragePct = plannedValue > 0 
+  ? ((onHandValue + onOrderValue) / plannedValue) * 100 
+  : 100;
 ```
 
 ---
 
-## Edge Cases
+## Visual Summary
 
-1. **Empty pass:** No products = no badge shown
-2. **Adjuvant-only pass:** Classified as "other" (no badge)
-3. **Seed treatment:** Will show if detected, but typically separate
-4. **Unknown categories:** Fall back to "other"
+### Dashboard Widget (After)
+```
+┌─────────────────────────────────────────────────┐
+│  Order Status                              ✓    │
+├─────────────────────────────────────────────────┤
+│  [███████████████░░░░░]                         │
+│                                                 │
+│  Coverage: 78% by volume                        │
+│  $12,400 On Hand · $3,200 Ordered · $1,800 to Go│
+│                                                 │
+│  3 Ready • 2 Ordered • 1 Need to Order          │
+└─────────────────────────────────────────────────┘
+```
+
+### Demand Rollup (After)
+```
+| Commodity      | Planned  | On Hand | Net Need | UOM  |
+|----------------|----------|---------|----------|------|
+| 28-0-0 (UAN)   | 1,200    | 800     | 400      | gal  |
+| 10-34-0 (APP)  | 450      | 450     | ✓ 0      | gal  |
+| Glyphosate     | 85       | 0       | 85       | gal  |
+```
+
+### Pass Card Shortage Indicator
+```
+POST PLANT/PRE EMERGE  [Herbicide]  ⚠️ 1 short  $9.66/ac
+```
 
 ---
 
-## Expected Result
+## Benefits
 
-Users will be able to:
-- Instantly identify what type of application each pass represents
-- Scan the season timeline and distinguish herbicide passes from fertility passes
-- See "Mixed" badge when a pass combines multiple product types
-
+1. **Dashboard becomes actionable** - Users see $ value coverage at a glance
+2. **Demand Rollup shows true needs** - Net quantity after inventory is clear
+3. **Crop planning has inventory context** - Passes show if products are short
+4. **Consistent data flow** - All views use the same readiness engine calculations
