@@ -81,6 +81,17 @@ export function calculateReadinessSummary(
   const totalProducts = readiness.totalCount || 0;
   const total = totalProducts || 1;
 
+  // Build index of on-order value by product (from actual purchase line prices)
+  const onOrderValueByProduct = new Map<string, number>();
+  scopedPurchases.forEach(p => {
+    (p.lines || []).forEach(line => {
+      if (line.productId && line.totalPrice) {
+        const current = onOrderValueByProduct.get(line.productId) || 0;
+        onOrderValueByProduct.set(line.productId, current + line.totalPrice);
+      }
+    });
+  });
+
   // Calculate value-based metrics
   let onHandValue = 0;
   let onOrderValue = 0;
@@ -91,11 +102,18 @@ export function calculateReadinessSummary(
 
   readiness.items.forEach(item => {
     const product = products.find(p => p.id === item.productId);
-    const price = product?.price || 0;
+    // Use product price for planning/inventory valuation
+    const unitPrice = product?.price || 0;
 
-    onHandValue += item.onHandQty * price;
-    onOrderValue += item.onOrderQty * price;
-    plannedValue += item.requiredQty * price;
+    // On-hand value: use product unit price × quantity
+    onHandValue += item.onHandQty * unitPrice;
+    
+    // On-order value: use ACTUAL purchase line totals (not estimated)
+    const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
+    onOrderValue += actualOrderValue;
+    
+    // Planned value: use product unit price × required quantity
+    plannedValue += item.requiredQty * unitPrice;
 
     onHandQtyTotal += item.onHandQty;
     onOrderQtyTotal += item.onOrderQty;
