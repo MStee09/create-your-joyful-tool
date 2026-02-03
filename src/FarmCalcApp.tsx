@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, forwardRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef, useCallback, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -355,6 +355,11 @@ const ProductsViewNew: React.FC<{
     return saved || null;
   });
 
+  // Track the previous set of product IDs so we can distinguish:
+  // - product temporarily missing during async add/sync (do NOT clear selection)
+  // - product truly removed (clear selection)
+  const prevProductIdsRef = useRef<Set<string>>(new Set());
+
   const selectProduct = (id: string | null) => {
     setSelectedProductId(id);
     if (id) sessionStorage.setItem('farmcalc-selected-product', id);
@@ -365,18 +370,20 @@ const ProductsViewNew: React.FC<{
     ? productMasters.find(p => p.id === selectedProductId) 
     : null;
 
-  // Only reset selectedProductId if product was removed (not during add race condition)
-  // We check if there's no product AND no pending add by verifying it's not a brand new ID
+  // Only reset selectedProductId if the product existed previously and is now missing.
+  // This avoids clearing selection during the async add → backend sync window.
   useEffect(() => {
-    if (selectedProductId && !selectedProduct) {
-      // Delay the reset to allow for state propagation from product add
-      const timeout = setTimeout(() => {
-        const stillNotFound = !productMasters.find(p => p.id === selectedProductId);
-        if (stillNotFound) selectProduct(null);
-      }, 100);
-      return () => clearTimeout(timeout);
-    }
+    if (!selectedProductId) return;
+    if (selectedProduct) return;
+
+    const existedBefore = prevProductIdsRef.current.has(selectedProductId);
+    if (existedBefore) selectProduct(null);
   }, [productMasters, selectedProductId, selectedProduct]);
+
+  // Update previous IDs AFTER the reset check runs for this render.
+  useEffect(() => {
+    prevProductIdsRef.current = new Set(productMasters.map(p => p.id));
+  }, [productMasters]);
 
   const handleAddProduct = (product: ProductMaster) => {
     onAddProduct(product);
