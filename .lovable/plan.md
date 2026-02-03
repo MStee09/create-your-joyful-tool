@@ -1,193 +1,162 @@
 
 
-# Enhanced Chemical Label Extraction
+# Enhanced Mixing Tab Redesign
 
 ## Overview
 
-This plan addresses the gaps identified in the current AI extraction system for chemical product labels. The user's analysis of the Outlook Herbicide label revealed significant missing data:
-- Crop-specific PHI (Pre-Harvest Intervals) not extracted
-- Rate ranges by soil type not captured
-- Carrier volume requirements missing
-- Adjuvant recommendations not extracted
-- Buffer zones for endangered species missing
-- Manufacturer not reliably extracted
-- SDS potentially overwriting label data
+This plan transforms the Mixing tab from a data display layout into a "field-ready checklist" designed for the person filling the sprayer. The goal is to show critical safety/compatibility info at the top, followed by actionable mixing steps, with adjuvant and water quality details integrated in context.
 
 ---
 
 ## Current State
 
-### What the Extract-Label Edge Function Does Now
-- Extracts basic chemical data structure (active ingredients, PHI, REI)
-- Uses a single `phiDays` field (not crop-specific)
-- Basic rate extraction without soil-type conditions
-- No dedicated adjuvant extraction
-- No carrier volume extraction
-- No buffer zone differentiation (aerial vs ground)
-- Treats all document types the same (no label vs SDS distinction)
+The existing `ChemicalProductMixingTab.tsx` has:
+- Mixing Order card (shows priority number + category)
+- Compatibility card (synergists, antagonists, incompatible, jar test)
+- Water Quality card (pH range, hardness)
 
-### Data Types Already Support (Partially)
-- `ChemicalData.adjuvantRequirements` - array exists but not populated
-- `ChemicalData.applicationRequirements` - has carrier fields but not aerial/ground split
-- `ChemicalData.rateRange` - exists but no by-condition array
-- `ChemicalData.restrictions.rotationRestrictions` - exists but conditions field rarely populated
+**What's missing:**
+- Pre-mix checklist with prioritized warnings
+- Full tank mix sequence (all 8 steps, not just this product)
+- Adjuvants displayed in mixing context (currently only on Rates tab)
+- Carrier volume (currently only on Rates tab)
+- Crop-specific mixing warnings
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Extended ChemicalData Types
+### Phase 1: Extend ChemicalData Types
 
 **Modify `src/types/chemicalData.ts`:**
 
-Add new interfaces for crop-specific data:
+Add new interfaces for enhanced mixing data:
 
 ```typescript
-// Crop-specific PHI
-interface CropSpecificPHI {
+// Crop-specific mixing warning
+export interface CropMixingWarning {
   crop: string;
-  days: number;
+  warning: string;
+  severity: 'caution' | 'avoid' | 'prohibited';
+}
+
+// Carrier volume configuration
+export interface CarrierVolume {
+  aerialMin?: number;
+  groundMin?: number;
+  chemigationRange?: string;
   notes?: string;
 }
 
-// Rate by condition (soil type, etc.)
-interface RateByCondition {
-  condition: string; // "Coarse soils, <3% OM"
-  min?: number;
-  max?: number;
-  unit: string;
+// Extended Compatibility interface
+export interface Compatibility {
+  // Existing fields...
+  antagonists?: string[];
+  synergists?: string[];
+  incompatible?: string[];
+  jarTest?: boolean;
+  waterQuality?: WaterQuality;
   notes?: string;
-}
-
-// Extended Restrictions
-interface Restrictions {
-  // Existing...
-  phiDays?: number | null; // null = varies by crop
-  phiByCrop?: CropSpecificPHI[];
   
-  // Buffer zones
-  bufferZoneAerialFeet?: number;
-  bufferZoneGroundFeet?: number;
-  endangeredSpeciesBufferAerialFeet?: number;
-  endangeredSpeciesBufferGroundFeet?: number;
+  // New fields
+  cautionWith?: string[];              // "May cause issues" warnings
+  cropMixingWarnings?: CropMixingWarning[];  // Per-crop tank mix warnings
 }
 
-// Extended RateRange
-interface RateRange {
-  // Existing...
-  byCondition?: RateByCondition[];
-}
-
-// Extended ApplicationRequirements
-interface ApplicationRequirements {
-  // Existing carrier fields...
-  carrierGpaMinAerial?: number;
-  carrierGpaMinGround?: number;
-  applicationMethods?: string[]; // "Preplant", "Preemergence", etc.
+// Extended ChemicalData
+export interface ChemicalData {
+  // Existing fields...
+  
+  // New field for carrier volumes in mixing context
+  carrierVolume?: CarrierVolume;
 }
 ```
 
-### Phase 2: Enhanced Extraction Prompt
+### Phase 2: Redesign ChemicalProductMixingTab
+
+**Rewrite `src/components/farm/chemical/ChemicalProductMixingTab.tsx`:**
+
+New layout structure:
+
+```text
+1. Pre-Mix Checklist (Card)
+   - Jar test warning (if applicable)
+   - DO NOT MIX list (incompatible products)
+   - CAUTION list (antagonists/cautionWith)
+   
+2. Tank Mix Sequence (Card)
+   - Full 8-step mixing order table
+   - This product highlighted in sequence
+   - "Fill tank 3/4 with water" instruction
+   
+3. Adjuvants (Card)
+   - Table: Type, Required/Optional, Rate, Notes
+   - Context note (e.g., "Not needed for preemergence")
+   
+4. Water Quality (Card)
+   - pH/hardness requirements with remediation tips
+   
+5. Carrier Volume (Card)
+   - Aerial/Ground/Chemigation minimums
+   
+6. Crop-Specific Mixing Warnings (Card)
+   - Per-crop warning callouts with icons
+```
+
+### Phase 3: Create Pre-Mix Checklist Component
+
+**Create `src/components/farm/chemical/PreMixChecklist.tsx`:**
+
+A focused component that shows:
+- Red "DO NOT MIX" section for hard stops
+- Amber "CAUTION" section for injury risks
+- Jar test recommendation badge
+
+Prioritized display order:
+1. Jar test warning (always first if true)
+2. Incompatible products (DO NOT MIX)
+3. Antagonists + cautionWith (CAUTION)
+
+### Phase 4: Create Tank Mix Sequence Component
+
+**Create `src/components/farm/chemical/TankMixSequence.tsx`:**
+
+Shows the standard mixing order with:
+- All 8 steps from `MIXING_ORDER_GUIDE`
+- The current product row highlighted
+- Arrow indicator showing "THIS PRODUCT"
+
+Visual design:
+```text
+| Step | Category                              |
+|------|---------------------------------------|
+|  1   | Water conditioners (AMS)              |
+|  2   | Inductor products                     |
+|  3   | Products in PVA bags                  |
+|  4   | Water-dispersible products (DF, WDG)  |
+|  5   | Water-soluble products (SL)           |
+| ▶ 6  | OUTLOOK (EC) ◀ THIS PRODUCT          |
+|  7   | Surfactants, oils                     |
+|  8   | Drift retardants                      |
+```
+
+### Phase 5: Create Crop Mixing Warnings Component
+
+**Create `src/components/farm/chemical/CropMixingWarnings.tsx`:**
+
+Displays crop-specific tank mix restrictions:
+- Emoji icons per crop type
+- Severity-based styling (caution=amber, avoid=orange, prohibited=red)
+- Grouped by crop for easy scanning
+
+### Phase 6: Update Extraction Prompt for Mixing Data
 
 **Modify `supabase/functions/extract-label/index.ts`:**
 
-Update `EXTRACTION_PROMPT` to be more comprehensive:
-
-Key additions:
-1. **Manufacturer extraction** - Explicitly state it's always on page 1
-2. **Crop-specific PHI** - Array format when PHI varies
-3. **Rate-by-condition** - Capture soil type variations
-4. **Carrier volume split** - Aerial vs ground minimums
-5. **Adjuvant extraction** - COC, NIS, AMS, UAN with rates/requirements
-6. **Buffer zones** - Standard vs endangered species, aerial vs ground
-7. **Application methods** - Pre-emerge, post-emerge, timing windows
-8. **Grazing restrictions** - Often missed
-
-### Phase 3: Label vs SDS Merge Logic
-
-**Modify `src/components/farm/chemical/ChemicalProductDocumentsTab.tsx`:**
-
-Add intelligent merge logic:
-
-```text
-Label Priority (always wins):
-- Active ingredients, concentrations
-- Rate ranges, by-condition rates
-- PHI (all crop-specific values)
-- REI
-- Max rates, max applications
-- Rotation restrictions
-- Carrier volumes
-- Adjuvant requirements
-- Application timing/methods
-- Buffer zones (including endangered species)
-
-SDS Supplement (fills gaps only):
-- Signal word (if missing from label)
-- First aid/emergency info
-- PPE requirements
-- Storage/handling (supplemental)
-```
-
-The merge function will:
-1. Check document type being uploaded (label vs SDS)
-2. If label: fully replace agronomic fields
-3. If SDS: only fill null fields, never overwrite
-
-### Phase 4: Review Modal for Chemical Data
-
-**Create `src/components/farm/ChemicalDataReviewModal.tsx`:**
-
-New modal for reviewing extracted chemical data with:
-
-1. **Active Ingredients Section**
-   - Editable name, concentration, MOA group
-   - Add/remove ingredients
-
-2. **Rate Range Section**
-   - Min/max/typical with unit
-   - Expandable "By Condition" table for soil-type rates
-
-3. **Restrictions Section**
-   - PHI display with crop-specific toggle
-   - Table for crop-specific PHI when applicable
-   - REI, max rates, max apps
-   - Buffer zones (standard vs endangered species)
-
-4. **Adjuvants Section**
-   - Table of adjuvant requirements
-   - Required vs recommended indicator
-   - Rate + unit
-
-5. **Carrier & Application Section**
-   - Aerial/ground minimums
-   - Droplet size
-   - Application methods checkboxes
-
-6. **Confidence Indicators**
-   - Per-field "?" icon for low-confidence values
-   - Overall extraction confidence badge
-
-### Phase 5: Update ChemicalProductRestrictionsTab
-
-**Modify `src/components/farm/chemical/ChemicalProductRestrictionsTab.tsx`:**
-
-Update to display new data:
-
-1. Crop-specific PHI table (when applicable)
-2. Buffer zones section with aerial/ground breakdown
-3. Endangered species restrictions callout
-4. Grazing restrictions table
-
-### Phase 6: Update ChemicalProductRatesTab
-
-**Modify `src/components/farm/chemical/ChemicalProductRatesTab.tsx`:**
-
-Update to display:
-
-1. Rate-by-condition table showing soil type variations
-2. Carrier volume requirements (aerial vs ground)
-3. Adjuvant requirements table
+Add extraction guidance for:
+- `cautionWith` array (injury risk warnings)
+- `cropMixingWarnings` (per-crop tank mix restrictions)
+- `carrierVolume` (aerial/ground/chemigation)
 
 ---
 
@@ -197,104 +166,116 @@ Update to display:
 
 | File | Purpose |
 |------|---------|
-| `src/components/farm/ChemicalDataReviewModal.tsx` | Review modal for extracted chemical data |
-| `src/lib/chemicalMerge.ts` | Label vs SDS merge logic |
+| `src/components/farm/chemical/PreMixChecklist.tsx` | Jar test + DO NOT MIX + CAUTION display |
+| `src/components/farm/chemical/TankMixSequence.tsx` | Full 8-step mixing order table |
+| `src/components/farm/chemical/CropMixingWarnings.tsx` | Per-crop tank mix warnings |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/types/chemicalData.ts` | Extended interfaces for crop-specific PHI, rate conditions, buffer zones, aerial/ground splits |
-| `supabase/functions/extract-label/index.ts` | Enhanced extraction prompt with all fields |
-| `src/components/farm/chemical/ChemicalProductDocumentsTab.tsx` | Add merge logic, trigger review modal |
-| `src/components/farm/chemical/ChemicalProductRestrictionsTab.tsx` | Display crop-specific PHI, buffer zones |
-| `src/components/farm/chemical/ChemicalProductRatesTab.tsx` | Display rate-by-condition, adjuvants |
+| `src/types/chemicalData.ts` | Add CropMixingWarning, CarrierVolume, extend Compatibility |
+| `src/components/farm/chemical/ChemicalProductMixingTab.tsx` | Complete redesign with new components |
+| `src/components/farm/chemical/index.ts` | Export new components |
+| `supabase/functions/extract-label/index.ts` | Add extraction for new mixing fields |
 
-### Enhanced Extraction Prompt (Key Sections)
+### Component Hierarchy
 
 ```text
-IDENTITY EXTRACTION:
-- Manufacturer is ALWAYS on page 1 - extract it
-- EPA Reg. No. format: XXXXX-XXX
-- Formulation type often in product name
-
-PHI EXTRACTION:
-- If PHI varies by crop, set phiDays to null
-- Populate phiByCrop array with ALL crop-specific intervals
-- Common crops: corn, soybeans, wheat, sorghum, cotton, etc.
-
-RATE EXTRACTION:
-- Look for rate tables with soil type columns
-- "Coarse soils" vs "Medium/Fine soils"
-- "<3% OM" vs "≥3% OM"
-- Extract ALL rate variations
-
-ADJUVANT EXTRACTION:
-- Look for "Adjuvants", "Surfactants", "Tank Mix Partners" sections
-- COC: crop oil concentrate (1 qt/ac typical)
-- NIS: non-ionic surfactant (0.25% v/v typical)
-- AMS: ammonium sulfate (2-4 lb/100 gal typical)
-- MSO: methylated seed oil
-
-BUFFER ZONES:
-- Standard buffer zones (all applications)
-- Endangered species buffer zones (separate section)
-- Differentiate aerial vs ground application buffers
+ChemicalProductMixingTab
+├── PreMixChecklist
+│   └── (jar test, incompatible, caution)
+├── TankMixSequence
+│   └── (8-step table with highlight)
+├── AdjuvantRequirementsTable (existing)
+│   └── (reused from Rates tab)
+├── WaterQualityCard (inline)
+│   └── (pH, hardness with notes)
+├── CarrierVolumeCard (inline)
+│   └── (aerial/ground/chemigation)
+└── CropMixingWarnings
+    └── (per-crop callouts)
 ```
 
-### Merge Logic Detail
+### Visual Design Patterns
 
-```typescript
-function mergeChemicalData(
-  existing: ChemicalData | undefined,
-  extracted: ChemicalData,
-  source: 'label' | 'sds'
-): ChemicalData {
-  if (source === 'label') {
-    // Label is authoritative - full replacement
-    return {
-      ...extracted,
-      // Keep any SDS-only safety data
-      signalWord: extracted.signalWord || existing?.signalWord,
-    };
-  }
-  
-  // SDS only fills gaps - never overwrites
-  return {
-    ...existing,
-    signalWord: existing?.signalWord || extracted.signalWord,
-    // Only add SDS data where existing is null/undefined
-  };
-}
-```
+**Pre-Mix Checklist:**
+- Red border/background for "DO NOT MIX"
+- Amber border/background for "CAUTION"
+- Uses XCircle, AlertTriangle icons
+
+**Tank Mix Sequence:**
+- Primary background for current product row
+- Arrow icon pointing to highlighted row
+- Numbered steps 1-8
+
+**Crop Warnings:**
+- Crop emoji + name header
+- Severity badge (caution/avoid/prohibited)
+- Warning text description
 
 ---
 
-## Estimated Effort
+## Data Flow
 
-| Phase | Effort |
-|-------|--------|
-| Phase 1: Extended Types | Small |
-| Phase 2: Enhanced Prompt | Medium |
-| Phase 3: Merge Logic | Small |
-| Phase 4: Review Modal | Large |
-| Phase 5: Restrictions Tab | Medium |
-| Phase 6: Rates Tab | Medium |
+1. **AI Extraction** populates:
+   - `compatibility.incompatible` (DO NOT MIX)
+   - `compatibility.cautionWith` (CAUTION)
+   - `compatibility.cropMixingWarnings` (per-crop)
+   - `compatibility.jarTest` (boolean)
+   - `carrierVolume` (aerial/ground/chemigation)
 
-**Total: 4-5 sessions**
+2. **Mixing Tab** reads from `chemicalData` and renders:
+   - PreMixChecklist from `compatibility`
+   - TankMixSequence from `mixingOrder`
+   - Adjuvants from `adjuvantRequirements`
+   - Water Quality from `compatibility.waterQuality`
+   - Carrier Volume from `carrierVolume` or `applicationRequirements`
+   - Crop Warnings from `compatibility.cropMixingWarnings`
 
 ---
 
-## Expected Improvements
+## Editing Flow
 
-After implementation, the Outlook Herbicide example would extract:
+Each card section will have:
+- View mode (display only)
+- Edit mode (triggered by pencil icon)
+- Save/Cancel buttons
 
-| Field | Before | After |
-|-------|--------|-------|
-| Manufacturer | Missing | BASF Corporation |
-| PHI | "null days" | Array of 9 crop-specific values |
-| Rate Range | Not shown | "12-21 fl oz/ac with soil conditions" |
-| Carrier Volume | Missing | "2+ gal/ac aerial, 5+ gal/ac ground" |
-| Adjuvants | Missing | COC, NIS, AMS, UAN with rates |
-| Buffer Zones | Missing | "150 ft aerial, 35 ft ground (endangered species)" |
+The AdjuvantRequirementsTable component already supports editable mode.
+
+---
+
+## Expected Result
+
+For Outlook Herbicide, the Mixing tab would show:
+
+**Pre-Mix Checklist:**
+- Jar Test Recommended badge
+- DO NOT MIX: Ammonium nitrate, Potassium nitrate, Sodium nitrate
+- CAUTION: EC products in cotton, Postemergence in dry bean
+
+**Tank Mix Sequence:**
+- Steps 1-8 with Outlook highlighted at step 6 (EC)
+
+**Adjuvants:**
+- NIS: Optional, 1-2 qt/100, "For burndown partners"
+- COC: Optional, 1 qt/ac, "Per partner label"
+- AMS: Optional, 8-17 lb/100, "Hard water"
+- UAN: Optional, 1-2 gal/ac, "28-32% solution"
+
+**Water Quality:**
+- pH: Not specified
+- Hardness: Not specified, "Use AMS if hard water"
+
+**Carrier Volume:**
+- Aerial: 2+ gal/ac
+- Ground: 5+ gal/ac
+- Chemigation: 0.33-0.67 in
+
+**Crop-Specific Warnings:**
+- Corn: Avoid petroleum-based oils after emergence
+- Cotton: EC tank mixes may enhance injury
+- Dry Bean: POST tank mixes may cause leaf injury
+- Hops: Tank mixes not advised
 
