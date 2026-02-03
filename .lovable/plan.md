@@ -1,162 +1,134 @@
 
 
-# Enhanced Mixing Tab Redesign
+# Pass Type Badge Implementation
 
 ## Overview
 
-This plan transforms the Mixing tab from a data display layout into a "field-ready checklist" designed for the person filling the sprayer. The goal is to show critical safety/compatibility info at the top, followed by actionable mixing steps, with adjuvant and water quality details integrated in context.
+This plan adds visual pass type indicators (Herbicide, Fungicide, Fertility, etc.) to pass cards in the crop planner. The badge will appear prominently in the pass header, helping users instantly identify the application type.
 
 ---
 
 ## Current State
 
-The existing `ChemicalProductMixingTab.tsx` has:
-- Mixing Order card (shows priority number + category)
-- Compatibility card (synergists, antagonists, incompatible, jar test)
-- Water Quality card (pH range, hardness)
+Pass cards show:
+- Pass name (e.g., "POST PLANT/PRE EMERGE")
+- Timing badge (e.g., "At Planting")
+- Pattern badge (Uniform/Selective/Trial)
+- Function chips (Rooting, Fertility, etc.)
+- Coverage distribution
 
-**What's missing:**
-- Pre-mix checklist with prioritized warnings
-- Full tank mix sequence (all 8 steps, not just this product)
-- Adjuvants displayed in mixing context (currently only on Rates tab)
-- Carrier volume (currently only on Rates tab)
-- Crop-specific mixing warnings
+**What's missing:** No indication of the application type (herbicide vs fungicide vs fertility pass).
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Extend ChemicalData Types
+### Phase 1: Create Pass Type Utility
 
-**Modify `src/types/chemicalData.ts`:**
+**Create `src/lib/passTypeUtils.ts`:**
 
-Add new interfaces for enhanced mixing data:
+Define the pass type detection logic and styling:
 
 ```typescript
-// Crop-specific mixing warning
-export interface CropMixingWarning {
-  crop: string;
-  warning: string;
-  severity: 'caution' | 'avoid' | 'prohibited';
+type PassType = 'herbicide' | 'fungicide' | 'insecticide' 
+              | 'fertility' | 'biological' | 'mixed' | 'other';
+
+interface PassTypeConfig {
+  label: string;
+  icon: string;      // Lucide icon name
+  bgColor: string;   // Tailwind bg class
+  textColor: string; // Tailwind text class
 }
 
-// Carrier volume configuration
-export interface CarrierVolume {
-  aerialMin?: number;
-  groundMin?: number;
-  chemigationRange?: string;
-  notes?: string;
-}
+const PASS_TYPE_CONFIG: Record<PassType, PassTypeConfig> = {
+  herbicide:   { label: 'Herbicide',   icon: 'Leaf',       bg: 'bg-green-500/15',  text: 'text-green-600' },
+  fungicide:   { label: 'Fungicide',   icon: 'FlaskRound', bg: 'bg-purple-500/15', text: 'text-purple-600' },
+  insecticide: { label: 'Insecticide', icon: 'Bug',        bg: 'bg-orange-500/15', text: 'text-orange-600' },
+  fertility:   { label: 'Fertility',   icon: 'Wheat',      bg: 'bg-blue-500/15',   text: 'text-blue-600' },
+  biological:  { label: 'Biological',  icon: 'Sprout',     bg: 'bg-teal-500/15',   text: 'text-teal-600' },
+  mixed:       { label: 'Mixed',       icon: 'FlaskConical', bg: 'bg-gray-500/15', text: 'text-gray-600' },
+  other:       { label: 'Other',       icon: 'Package',    bg: 'bg-gray-500/15',   text: 'text-gray-500' },
+};
+```
 
-// Extended Compatibility interface
-export interface Compatibility {
-  // Existing fields...
-  antagonists?: string[];
-  synergists?: string[];
-  incompatible?: string[];
-  jarTest?: boolean;
-  waterQuality?: WaterQuality;
-  notes?: string;
+**Detection Logic:**
+
+```typescript
+function getPassType(
+  applications: Application[],
+  productMasters: ProductMaster[]
+): PassType {
+  const categories = applications.map(app => {
+    const product = productMasters.find(p => p.id === app.productId);
+    return product?.category;
+  }).filter(Boolean);
+
+  // Count occurrences of each category type
+  const counts = {
+    herbicide: categories.filter(c => c === 'herbicide').length,
+    fungicide: categories.filter(c => c === 'fungicide').length,
+    insecticide: categories.filter(c => c === 'insecticide').length,
+    fertility: categories.filter(c => 
+      c === 'fertilizer-liquid' || c === 'fertilizer-dry' || c === 'micronutrient'
+    ).length,
+    biological: categories.filter(c => c === 'biological').length,
+  };
+
+  // If multiple major types, return 'mixed'
+  const significantTypes = Object.entries(counts)
+    .filter(([_, count]) => count > 0);
   
-  // New fields
-  cautionWith?: string[];              // "May cause issues" warnings
-  cropMixingWarnings?: CropMixingWarning[];  // Per-crop tank mix warnings
-}
-
-// Extended ChemicalData
-export interface ChemicalData {
-  // Existing fields...
+  if (significantTypes.length > 1) return 'mixed';
+  if (significantTypes.length === 1) return significantTypes[0][0] as PassType;
   
-  // New field for carrier volumes in mixing context
-  carrierVolume?: CarrierVolume;
+  return 'other';
 }
 ```
 
-### Phase 2: Redesign ChemicalProductMixingTab
+### Phase 2: Add Pass Type Badge to PassCard
 
-**Rewrite `src/components/farm/chemical/ChemicalProductMixingTab.tsx`:**
+**Modify `src/components/farm/PassCard.tsx`:**
 
-New layout structure:
+1. Import the new utility and Lucide icons
+2. Calculate pass type in the component
+3. Render badge in the header
+
+**Badge Placement:**
+
+The badge will appear after the timing display, before the pattern badge:
 
 ```text
-1. Pre-Mix Checklist (Card)
-   - Jar test warning (if applicable)
-   - DO NOT MIX list (incompatible products)
-   - CAUTION list (antagonists/cautionWith)
-   
-2. Tank Mix Sequence (Card)
-   - Full 8-step mixing order table
-   - This product highlighted in sequence
-   - "Fill tank 3/4 with water" instruction
-   
-3. Adjuvants (Card)
-   - Table: Type, Required/Optional, Rate, Notes
-   - Context note (e.g., "Not needed for preemergence")
-   
-4. Water Quality (Card)
-   - pH/hardness requirements with remediation tips
-   
-5. Carrier Volume (Card)
-   - Aerial/Ground/Chemigation minimums
-   
-6. Crop-Specific Mixing Warnings (Card)
-   - Per-crop warning callouts with icons
+POST PLANT/PRE EMERGE
+At Planting  [Herbicide]  Uniform  ⏱ 1 ...
 ```
 
-### Phase 3: Create Pre-Mix Checklist Component
+**Visual Design:**
 
-**Create `src/components/farm/chemical/PreMixChecklist.tsx`:**
-
-A focused component that shows:
-- Red "DO NOT MIX" section for hard stops
-- Amber "CAUTION" section for injury risks
-- Jar test recommendation badge
-
-Prioritized display order:
-1. Jar test warning (always first if true)
-2. Incompatible products (DO NOT MIX)
-3. Antagonists + cautionWith (CAUTION)
-
-### Phase 4: Create Tank Mix Sequence Component
-
-**Create `src/components/farm/chemical/TankMixSequence.tsx`:**
-
-Shows the standard mixing order with:
-- All 8 steps from `MIXING_ORDER_GUIDE`
-- The current product row highlighted
-- Arrow indicator showing "THIS PRODUCT"
-
-Visual design:
-```text
-| Step | Category                              |
-|------|---------------------------------------|
-|  1   | Water conditioners (AMS)              |
-|  2   | Inductor products                     |
-|  3   | Products in PVA bags                  |
-|  4   | Water-dispersible products (DF, WDG)  |
-|  5   | Water-soluble products (SL)           |
-| ▶ 6  | OUTLOOK (EC) ◀ THIS PRODUCT          |
-|  7   | Surfactants, oils                     |
-|  8   | Drift retardants                      |
+```tsx
+{passType !== 'other' && (
+  <span className={cn(
+    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+    passTypeConfig.bg,
+    passTypeConfig.text
+  )}>
+    <PassTypeIcon className="w-3 h-3" />
+    {passTypeConfig.label}
+  </span>
+)}
 ```
 
-### Phase 5: Create Crop Mixing Warnings Component
+### Phase 3: Icon Selection
 
-**Create `src/components/farm/chemical/CropMixingWarnings.tsx`:**
+Using Lucide icons that match the semantic meaning:
 
-Displays crop-specific tank mix restrictions:
-- Emoji icons per crop type
-- Severity-based styling (caution=amber, avoid=orange, prohibited=red)
-- Grouped by crop for easy scanning
-
-### Phase 6: Update Extraction Prompt for Mixing Data
-
-**Modify `supabase/functions/extract-label/index.ts`:**
-
-Add extraction guidance for:
-- `cautionWith` array (injury risk warnings)
-- `cropMixingWarnings` (per-crop tank mix restrictions)
-- `carrierVolume` (aerial/ground/chemigation)
+| Pass Type | Icon | Rationale |
+|-----------|------|-----------|
+| Herbicide | `Leaf` or `Sprout` | Vegetation control |
+| Fungicide | `FlaskRound` | Lab/treatment |
+| Insecticide | `Bug` | Insect control |
+| Fertility | `Wheat` | Plant nutrition |
+| Biological | `Dna` or `Microscope` | Living organisms |
+| Mixed | `FlaskConical` | Multiple types |
 
 ---
 
@@ -166,116 +138,79 @@ Add extraction guidance for:
 
 | File | Purpose |
 |------|---------|
-| `src/components/farm/chemical/PreMixChecklist.tsx` | Jar test + DO NOT MIX + CAUTION display |
-| `src/components/farm/chemical/TankMixSequence.tsx` | Full 8-step mixing order table |
-| `src/components/farm/chemical/CropMixingWarnings.tsx` | Per-crop tank mix warnings |
+| `src/lib/passTypeUtils.ts` | Pass type detection and styling config |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/types/chemicalData.ts` | Add CropMixingWarning, CarrierVolume, extend Compatibility |
-| `src/components/farm/chemical/ChemicalProductMixingTab.tsx` | Complete redesign with new components |
-| `src/components/farm/chemical/index.ts` | Export new components |
-| `supabase/functions/extract-label/index.ts` | Add extraction for new mixing fields |
+| `src/components/farm/PassCard.tsx` | Add pass type badge to header |
 
-### Component Hierarchy
+### Component Updates
 
+In `PassCard.tsx`:
+
+1. Add new imports:
+   ```tsx
+   import { getPassType, PASS_TYPE_CONFIG } from '@/lib/passTypeUtils';
+   import { Leaf, FlaskRound, Bug, Wheat, Sprout, FlaskConical, Package } from 'lucide-react';
+   ```
+
+2. Calculate pass type in `useMemo`:
+   ```tsx
+   const passType = useMemo(() => 
+     getPassType(summary.applications, productMasters),
+     [summary.applications, productMasters]
+   );
+   ```
+
+3. Add badge after timing line:
+   ```tsx
+   {passType !== 'other' && (
+     <PassTypeBadge type={passType} />
+   )}
+   ```
+
+---
+
+## Visual Examples
+
+**Herbicide Pass:**
 ```text
-ChemicalProductMixingTab
-├── PreMixChecklist
-│   └── (jar test, incompatible, caution)
-├── TankMixSequence
-│   └── (8-step table with highlight)
-├── AdjuvantRequirementsTable (existing)
-│   └── (reused from Rates tab)
-├── WaterQualityCard (inline)
-│   └── (pH, hardness with notes)
-├── CarrierVolumeCard (inline)
-│   └── (aerial/ground/chemigation)
-└── CropMixingWarnings
-    └── (per-crop callouts)
+POST PLANT/PRE EMERGE                    Uniform    ⏱ 1    $9.66/ac
+At Planting  🌿 Herbicide
+Core  1 product · 158 ac  0.1 gal
 ```
 
-### Visual Design Patterns
+**Mixed Pass (herbicide + fertility):**
+```text
+BURNDOWN                                 Selective   ⏱ 2    $24.50/ac
+Pre-Plant  ⚗️ Mixed
+Building 2 · Trial 1 · 158 ac
+```
 
-**Pre-Mix Checklist:**
-- Red border/background for "DO NOT MIX"
-- Amber border/background for "CAUTION"
-- Uses XCircle, AlertTriangle icons
-
-**Tank Mix Sequence:**
-- Primary background for current product row
-- Arrow icon pointing to highlighted row
-- Numbered steps 1-8
-
-**Crop Warnings:**
-- Crop emoji + name header
-- Severity badge (caution/avoid/prohibited)
-- Warning text description
+**Fertility Pass:**
+```text
+STARTER                                  Uniform    ⏱ 1    $18.00/ac
+At Planting  🌾 Fertility
+Core  2 products · 158 ac  8.5 gal
+```
 
 ---
 
-## Data Flow
+## Edge Cases
 
-1. **AI Extraction** populates:
-   - `compatibility.incompatible` (DO NOT MIX)
-   - `compatibility.cautionWith` (CAUTION)
-   - `compatibility.cropMixingWarnings` (per-crop)
-   - `compatibility.jarTest` (boolean)
-   - `carrierVolume` (aerial/ground/chemigation)
-
-2. **Mixing Tab** reads from `chemicalData` and renders:
-   - PreMixChecklist from `compatibility`
-   - TankMixSequence from `mixingOrder`
-   - Adjuvants from `adjuvantRequirements`
-   - Water Quality from `compatibility.waterQuality`
-   - Carrier Volume from `carrierVolume` or `applicationRequirements`
-   - Crop Warnings from `compatibility.cropMixingWarnings`
-
----
-
-## Editing Flow
-
-Each card section will have:
-- View mode (display only)
-- Edit mode (triggered by pencil icon)
-- Save/Cancel buttons
-
-The AdjuvantRequirementsTable component already supports editable mode.
+1. **Empty pass:** No products = no badge shown
+2. **Adjuvant-only pass:** Classified as "other" (no badge)
+3. **Seed treatment:** Will show if detected, but typically separate
+4. **Unknown categories:** Fall back to "other"
 
 ---
 
 ## Expected Result
 
-For Outlook Herbicide, the Mixing tab would show:
-
-**Pre-Mix Checklist:**
-- Jar Test Recommended badge
-- DO NOT MIX: Ammonium nitrate, Potassium nitrate, Sodium nitrate
-- CAUTION: EC products in cotton, Postemergence in dry bean
-
-**Tank Mix Sequence:**
-- Steps 1-8 with Outlook highlighted at step 6 (EC)
-
-**Adjuvants:**
-- NIS: Optional, 1-2 qt/100, "For burndown partners"
-- COC: Optional, 1 qt/ac, "Per partner label"
-- AMS: Optional, 8-17 lb/100, "Hard water"
-- UAN: Optional, 1-2 gal/ac, "28-32% solution"
-
-**Water Quality:**
-- pH: Not specified
-- Hardness: Not specified, "Use AMS if hard water"
-
-**Carrier Volume:**
-- Aerial: 2+ gal/ac
-- Ground: 5+ gal/ac
-- Chemigation: 0.33-0.67 in
-
-**Crop-Specific Warnings:**
-- Corn: Avoid petroleum-based oils after emergence
-- Cotton: EC tank mixes may enhance injury
-- Dry Bean: POST tank mixes may cause leaf injury
-- Hops: Tank mixes not advised
+Users will be able to:
+- Instantly identify what type of application each pass represents
+- Scan the season timeline and distinguish herbicide passes from fertility passes
+- See "Mixed" badge when a pass combines multiple product types
 
