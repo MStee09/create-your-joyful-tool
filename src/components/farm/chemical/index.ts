@@ -10,3 +10,4 @@ export { ChemicalProductRatesTab } from './ChemicalProductRatesTab';
 export { ChemicalProductRestrictionsTab } from './ChemicalProductRestrictionsTab';
 export { ChemicalProductMixingTab } from './ChemicalProductMixingTab';
 export { ChemicalProductDocumentsTab } from './ChemicalProductDocumentsTab';
+export { ChemicalProductVendorsTab } from './ChemicalProductVendorsTab';

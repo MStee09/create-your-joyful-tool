@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Search, ChevronDown, Droplet, Weight, AlertTriangle, Check, Package } from 'lucide-react';
+import { Search, ChevronDown, Droplet, Weight, AlertTriangle, Check, Package, Ban, DollarSign } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Product, Vendor, Season, InventoryItem } from '@/types/farm';
 import { calculatePlannedUsage } from '@/lib/calculations';
+import { canAddToPlan } from '@/lib/pricingUtils';
 
 export interface ProductWithContext {
   product: Product;
@@ -17,6 +19,7 @@ export interface ProductWithContext {
   status: 'ok' | 'low' | 'short';
   shortfall: number;
   usedIn: string[]; // "Corn → In Furrow"
+  canAddToPlan: boolean; // Whether product has valid pricing
 }
 
 interface ProductSelectorModalProps {
@@ -68,6 +71,10 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
         status = 'low';
       }
       
+      // Check if product can be added to plan (has price)
+      // Legacy products have vendorId + price, so check if price > 0
+      const productCanAddToPlan = product.price !== undefined && product.price > 0;
+      
       return {
         product,
         vendor,
@@ -76,6 +83,7 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
         status,
         shortfall,
         usedIn,
+        canAddToPlan: productCanAddToPlan,
       };
     });
   }, [products, vendors, inventory, currentSeason]);
@@ -121,10 +129,25 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
     );
   };
 
+  const handleSelectProduct = (ctx: ProductWithContext) => {
+    if (!ctx.canAddToPlan) {
+      toast.error('Cannot add to plan', {
+        description: 'This product has no price set. Add a vendor or estimated price first.',
+      });
+      return;
+    }
+    onSelectProduct(ctx.product, ctx);
+  };
+
   const ProductRow: React.FC<{ ctx: ProductWithContext }> = ({ ctx }) => (
     <button
-      className="w-full p-3 text-left rounded-lg border border-border/50 hover:border-primary/30 hover:bg-accent/50 transition-colors"
-      onClick={() => onSelectProduct(ctx.product, ctx)}
+      className={`w-full p-3 text-left rounded-lg border transition-colors ${
+        ctx.canAddToPlan 
+          ? 'border-border/50 hover:border-primary/30 hover:bg-accent/50 cursor-pointer'
+          : 'border-border/30 bg-muted/30 cursor-not-allowed opacity-60'
+      }`}
+      onClick={() => handleSelectProduct(ctx)}
+      disabled={!ctx.canAddToPlan}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -141,6 +164,12 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
               <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
             )}
             <span className="font-medium truncate">{ctx.product.name}</span>
+            {!ctx.canAddToPlan && (
+              <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30 gap-0.5">
+                <Ban className="h-2.5 w-2.5" />
+                No price
+              </Badge>
+            )}
           </div>
           
           {/* Where used */}
@@ -154,7 +183,7 @@ export const ProductSelectorModal: React.FC<ProductSelectorModalProps> = ({
         
         {/* Status badge */}
         <div className="flex-shrink-0">
-          {getStatusBadge(ctx)}
+          {ctx.canAddToPlan ? getStatusBadge(ctx) : null}
         </div>
       </div>
     </button>

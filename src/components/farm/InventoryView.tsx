@@ -153,6 +153,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         status: 'ok',
         shortfall: 0,
         usedIn: [],
+        canAddToPlan: product.price !== undefined && product.price > 0,
       });
       setShowAddModal(true);
     }

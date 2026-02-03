@@ -10,6 +10,7 @@ import {
   Edit2,
   Check,
   Trash2,
+  Store,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ import { ChemicalProductRatesTab } from './ChemicalProductRatesTab';
 import { ChemicalProductRestrictionsTab } from './ChemicalProductRestrictionsTab';
 import { ChemicalProductMixingTab } from './ChemicalProductMixingTab';
 import { ChemicalProductDocumentsTab } from './ChemicalProductDocumentsTab';
+import { ChemicalProductVendorsTab } from './ChemicalProductVendorsTab';
 
 interface ChemicalProductDetailViewProps {
   product: ProductMaster;
@@ -229,7 +231,7 @@ export function ChemicalProductDetailView({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Beaker className="w-4 h-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -245,6 +247,10 @@ export function ChemicalProductDetailView({
           <TabsTrigger value="mixing" className="flex items-center gap-2">
             <ListOrdered className="w-4 h-4" />
             <span className="hidden sm:inline">Mixing</span>
+          </TabsTrigger>
+          <TabsTrigger value="vendors" className="flex items-center gap-2">
+            <Store className="w-4 h-4" />
+            <span className="hidden sm:inline">Vendors</span>
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
@@ -280,6 +286,17 @@ export function ChemicalProductDetailView({
           <ChemicalProductMixingTab
             chemicalData={chemicalData}
             onUpdate={handleUpdateChemicalData}
+          />
+        </TabsContent>
+
+        <TabsContent value="vendors">
+          <ChemicalProductVendorsTab
+            product={product}
+            vendorOfferings={vendorOfferings}
+            vendors={vendors}
+            onUpdateProduct={onUpdateProduct}
+            onUpdateOfferings={onUpdateOfferings}
+            onNavigateToVendor={onNavigateToVendor}
           />
         </TabsContent>
 
