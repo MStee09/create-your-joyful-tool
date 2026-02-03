@@ -137,6 +137,21 @@ export interface WaterQuality {
   notes?: string;
 }
 
+// Crop-specific mixing warning
+export interface CropMixingWarning {
+  crop: string;
+  warning: string;
+  severity: 'caution' | 'avoid' | 'prohibited';
+}
+
+// Carrier volume configuration for mixing context
+export interface CarrierVolume {
+  aerialMin?: number;
+  groundMin?: number;
+  chemigationRange?: string;
+  notes?: string;
+}
+
 export interface Compatibility {
   antagonists?: string[]; // Products that reduce efficacy
   synergists?: string[]; // Products that enhance efficacy
@@ -144,6 +159,9 @@ export interface Compatibility {
   jarTest?: boolean; // Jar test recommended
   waterQuality?: WaterQuality;
   notes?: string;
+  // Enhanced fields for mixing tab
+  cautionWith?: string[]; // "May cause issues" warnings
+  cropMixingWarnings?: CropMixingWarning[]; // Per-crop tank mix warnings
 }
 
 export type SignalWord = 'danger' | 'warning' | 'caution' | 'none';
@@ -198,6 +216,9 @@ export interface ChemicalData {
   adjuvantRequirements?: AdjuvantRequirement[];
   targetPests?: TargetPest[];
   targetWeeds?: TargetPest[];
+  
+  // Carrier volume for mixing context
+  carrierVolume?: CarrierVolume;
   
   // Extraction metadata (for AI-extracted data)
   extractedAt?: string;

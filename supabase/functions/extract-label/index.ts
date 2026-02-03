@@ -179,9 +179,24 @@ Return a JSON object with the following structure:
     "compatibility": {
       "antagonists": ["<products that reduce efficacy>"],
       "synergists": ["<products that enhance efficacy>"],
-      "incompatible": ["<products causing physical incompatibility, fertilizers to avoid>"],
+      "incompatible": ["<products causing physical incompatibility, fertilizers to avoid - e.g., ammonium nitrate, potassium nitrate>"],
+      "cautionWith": ["<tank mixes that may cause crop injury - e.g., 'EC products in cotton', 'Postemergence in dry bean'>"],
       "jarTest": <true if jar test recommended>,
+      "cropMixingWarnings": [
+        {
+          "crop": "<crop name>",
+          "warning": "<specific warning for this crop when tank mixing>",
+          "severity": "<'caution' | 'avoid' | 'prohibited'>"
+        }
+      ],
       "notes": "<compatibility notes>"
+    },
+    
+    "carrierVolume": {
+      "aerialMin": <minimum gal/ac for aerial>,
+      "groundMin": <minimum gal/ac for ground>,
+      "chemigationRange": "<e.g., 0.33-0.67 in>",
+      "notes": "<carrier volume notes>"
     },
     
     "signalWord": "<'danger' | 'warning' | 'caution' | 'none'>",

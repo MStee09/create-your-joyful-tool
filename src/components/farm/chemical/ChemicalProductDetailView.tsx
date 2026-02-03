@@ -285,6 +285,7 @@ export function ChemicalProductDetailView({
         <TabsContent value="mixing">
           <ChemicalProductMixingTab
             chemicalData={chemicalData}
+            productName={product.name}
             onUpdate={handleUpdateChemicalData}
           />
         </TabsContent>
