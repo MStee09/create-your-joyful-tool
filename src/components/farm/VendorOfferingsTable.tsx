@@ -1,9 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle, TrendingDown } from 'lucide-react';
+import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle, TrendingDown, UserPlus } from 'lucide-react';
 import type { VendorOffering, Vendor, ProductMaster } from '@/types';
 import { formatCurrency, generateId, calculateCostPerPound } from '@/lib/calculations';
 import { isLowestPrice } from '@/lib/pricingUtils';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface VendorOfferingsTableProps {
   product: ProductMaster;
@@ -11,6 +22,7 @@ interface VendorOfferingsTableProps {
   vendors: Vendor[];
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
+  onCreateVendor?: (vendor: Partial<Vendor>) => Vendor | Promise<Vendor>;
 }
 
 export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
@@ -19,11 +31,19 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   vendors,
   onUpdateOfferings,
   onNavigateToVendor,
+  onCreateVendor,
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<VendorOffering>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  
+  // New vendor creation state
+  const [showNewVendorDialog, setShowNewVendorDialog] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorEmail, setNewVendorEmail] = useState('');
+  const [newVendorPhone, setNewVendorPhone] = useState('');
+  const [creatingVendor, setCreatingVendor] = useState(false);
 
   // Filter and sort offerings by price ascending (lowest first)
   const productOfferings = useMemo(() => {
@@ -140,6 +160,41 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const startEdit = (offering: VendorOffering) => {
     setEditingId(offering.id);
     setFormData({ ...offering });
+  };
+
+  // Handle creating a new vendor inline
+  const handleCreateVendor = async () => {
+    if (!newVendorName.trim() || !onCreateVendor) return;
+    
+    setCreatingVendor(true);
+    try {
+      const newVendor = await onCreateVendor({
+        name: newVendorName.trim(),
+        contactEmail: newVendorEmail.trim() || undefined,
+        contactPhone: newVendorPhone.trim() || undefined,
+      });
+      
+      // Set the new vendor as selected in the form
+      setFormData({ ...formData, vendorId: newVendor.id });
+      
+      // Reset and close dialog
+      setNewVendorName('');
+      setNewVendorEmail('');
+      setNewVendorPhone('');
+      setShowNewVendorDialog(false);
+    } catch (error) {
+      console.error('Failed to create vendor:', error);
+    } finally {
+      setCreatingVendor(false);
+    }
+  };
+
+  const handleVendorSelectChange = (value: string) => {
+    if (value === '__new__') {
+      setShowNewVendorDialog(true);
+    } else {
+      setFormData({ ...formData, vendorId: value });
+    }
   };
 
   return (
@@ -430,13 +485,18 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
               <label className="block text-xs font-medium mb-1 text-muted-foreground">Vendor</label>
               <select
                 value={formData.vendorId || ''}
-                onChange={(e) => setFormData({ ...formData, vendorId: e.target.value })}
+                onChange={(e) => handleVendorSelectChange(e.target.value)}
                 className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
               >
                 <option value="">Select vendor...</option>
                 {vendors.map(v => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
+                {onCreateVendor && (
+                  <option value="__new__" className="text-primary font-medium">
+                    + Add new vendor...
+                  </option>
+                )}
               </select>
             </div>
             <div>
@@ -617,6 +677,74 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
           </div>
         </div>
       )}
+
+      {/* New Vendor Dialog */}
+      <Dialog open={showNewVendorDialog} onOpenChange={setShowNewVendorDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Add New Vendor
+            </DialogTitle>
+            <DialogDescription>
+              Create a new vendor to add an offering for {product.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="vendor-name">Vendor Name *</Label>
+              <Input
+                id="vendor-name"
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                placeholder="e.g., Nutrien Ag Solutions"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="vendor-email">Contact Email</Label>
+              <Input
+                id="vendor-email"
+                type="email"
+                value={newVendorEmail}
+                onChange={(e) => setNewVendorEmail(e.target.value)}
+                placeholder="sales@vendor.com"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="vendor-phone">Contact Phone</Label>
+              <Input
+                id="vendor-phone"
+                type="tel"
+                value={newVendorPhone}
+                onChange={(e) => setNewVendorPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowNewVendorDialog(false);
+                setNewVendorName('');
+                setNewVendorEmail('');
+                setNewVendorPhone('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateVendor}
+              disabled={!newVendorName.trim() || creatingVendor}
+            >
+              {creatingVendor ? 'Creating...' : 'Create Vendor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
