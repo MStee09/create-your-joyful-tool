@@ -326,6 +326,7 @@ const ProductsViewNew: React.FC<{
   onUpdateProductMasters: (productMasters: ProductMaster[]) => void;
   onAddProduct: (product: ProductMaster) => void;
   onUpdateProductMaster: (product: ProductMaster) => void;
+  onDeleteProductMaster: (productId: string) => void;
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onAddVendorOffering?: (offering: VendorOffering) => void;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
@@ -343,6 +344,7 @@ const ProductsViewNew: React.FC<{
   onUpdateProductMasters,
   onAddProduct,
   onUpdateProductMaster,
+  onDeleteProductMaster,
   onUpdateOfferings,
   onAddVendorOffering,
   onUpdateInventory,
@@ -396,9 +398,7 @@ const ProductsViewNew: React.FC<{
   };
 
   const handleDeleteProduct = (productId: string) => {
-    onUpdateProductMasters(productMasters.filter(p => p.id !== productId));
-    onUpdateOfferings(vendorOfferings.filter(o => o.productId !== productId));
-    onUpdateInventory(inventory.filter(i => i.productId !== productId));
+    onDeleteProductMaster(productId);
     selectProduct(null);
   };
 
@@ -1134,6 +1134,7 @@ const AppContent: React.FC = () => {
     updateProductMasters,
     addProductMaster,
     updateProductMaster,
+    deleteProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,
@@ -1522,6 +1523,7 @@ const AppContent: React.FC = () => {
             onUpdateProductMasters={handleUpdateProductMasters}
             onAddProduct={handleAddProduct}
             onUpdateProductMaster={handleUpdateProductMaster}
+            onDeleteProductMaster={deleteProductMaster}
             onUpdateOfferings={handleUpdateVendorOfferings}
             onAddVendorOffering={(offering) => handleUpdateVendorOfferings([...(state.vendorOfferings || []), offering])}
             onUpdateInventory={handleUpdateInventory}

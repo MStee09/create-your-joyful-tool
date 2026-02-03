@@ -746,6 +746,31 @@ export function useSupabaseData(user: User | null) {
     setState(prev => ({ ...prev, productMasters: [...prev.productMasters, product] }));
   }, [user]);
 
+  // Delete a single product (fast optimistic delete)
+  const deleteProductMaster = useCallback(async (productId: string) => {
+    if (!user) return;
+
+    // Optimistic UI update first
+    setState(prev => ({
+      ...prev,
+      productMasters: prev.productMasters.filter(p => p.id !== productId),
+      vendorOfferings: prev.vendorOfferings.filter(o => o.productId !== productId),
+      inventory: prev.inventory.filter(i => i.productId !== productId),
+    }));
+
+    // Then delete from DB (product will cascade or we clean up offerings/inventory)
+    const [productRes, offeringsRes, inventoryRes] = await Promise.all([
+      supabase.from('product_masters').delete().eq('id', productId),
+      supabase.from('vendor_offerings').delete().eq('product_id', productId),
+      supabase.from('inventory').delete().eq('product_id', productId),
+    ]);
+
+    if (productRes.error) {
+      console.error('Error deleting product:', productRes.error);
+      toast.error('Failed to delete product');
+    }
+  }, [user]);
+
   // Update a single product (prevents re-saving every product on every edit)
   const updateProductMaster = useCallback(async (product: ProductMaster) => {
     if (!user) return;
@@ -2038,6 +2063,7 @@ export function useSupabaseData(user: User | null) {
     updateProductMasters,
     addProductMaster,
     updateProductMaster,
+    deleteProductMaster,
     updateVendorOfferings,
     updateInventory,
     updateCommoditySpecs,
