@@ -157,6 +157,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
           </div>
           
+          {/* Coverage and Value Metrics */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="text-muted-foreground">Coverage by Value</span>
+              <span className="font-semibold text-foreground">{Math.round(readiness.coveragePct)}%</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="text-emerald-600 font-medium">{formatCurrency(readiness.onHandValue)} On Hand</span>
+              <span>·</span>
+              <span className="text-blue-600 font-medium">{formatCurrency(readiness.onOrderValue)} Ordered</span>
+              {readiness.shortValue > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-red-600 font-medium">{formatCurrency(readiness.shortValue)} to Go</span>
+                </>
+              )}
+            </div>
+          </div>
+          
           {/* Legend */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>{readiness.readyCount} Ready</span>

@@ -1584,6 +1584,7 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             productMasters={state.productMasters || []}
             commoditySpecs={state.commoditySpecs || []}
+            inventory={state.inventory || []}
             onNavigateToSpecs={() => setActiveView('commodity-specs')}
             fieldAssignments={fieldAssignments || []}
             fieldOverrides={fieldCropOverrides || []}

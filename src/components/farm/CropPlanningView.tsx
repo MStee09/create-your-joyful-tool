@@ -539,6 +539,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                           crop={crop}
                           products={products}
                           vendors={vendors}
+                          inventory={inventory}
                           purposes={purposes}
                           productMasters={productMasters}
                           priceBook={priceBook}
