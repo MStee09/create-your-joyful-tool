@@ -333,7 +333,8 @@ const ProductsViewNew: React.FC<{
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
   onAddPriceRecord?: (record: any) => Promise<any>;
-}> = ({ 
+  onAddVendor?: (vendor: Vendor) => void;
+}> = ({
   productMasters, 
   vendorOfferings, 
   vendors, 
@@ -351,6 +352,7 @@ const ProductsViewNew: React.FC<{
   onUpdateSpecs,
   onNavigateToVendor,
   onAddPriceRecord,
+  onAddVendor,
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
     const saved = sessionStorage.getItem('farmcalc-selected-product');
@@ -417,6 +419,7 @@ const ProductsViewNew: React.FC<{
           onDeleteProduct={handleDeleteProduct}
           onBack={() => selectProduct(null)}
           onNavigateToVendor={onNavigateToVendor}
+          onAddVendor={onAddVendor}
         />
       );
     }
@@ -1530,6 +1533,7 @@ const AppContent: React.FC = () => {
             onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
             onAddPriceRecord={addPriceRecord}
+            onAddVendor={(vendor) => handleUpdateVendors([...state.vendors, vendor])}
           />
         );
       case 'vendors':

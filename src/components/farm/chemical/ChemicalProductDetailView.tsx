@@ -50,6 +50,7 @@ interface ChemicalProductDetailViewProps {
   onDeleteProduct: (productId: string) => void;
   onBack: () => void;
   onNavigateToVendor?: (vendorId: string) => void;
+  onAddVendor?: (vendor: Vendor) => void;
 }
 
 export function ChemicalProductDetailView({
@@ -63,6 +64,7 @@ export function ChemicalProductDetailView({
   onDeleteProduct,
   onBack,
   onNavigateToVendor,
+  onAddVendor,
 }: ChemicalProductDetailViewProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [editingName, setEditingName] = useState(false);
@@ -298,6 +300,7 @@ export function ChemicalProductDetailView({
             onUpdateProduct={onUpdateProduct}
             onUpdateOfferings={onUpdateOfferings}
             onNavigateToVendor={onNavigateToVendor}
+            onAddVendor={onAddVendor}
           />
         </TabsContent>
 
