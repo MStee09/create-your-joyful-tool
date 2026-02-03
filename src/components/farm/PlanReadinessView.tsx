@@ -4,7 +4,7 @@ import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
-import { getNormalizedUnitPrice } from '@/lib/planReadinessUtils';
+import { getInventoryUnitPrice, getPlannedUnitPrice } from '@/lib/planReadinessUtils';
 import { ExplainMathDrawer } from './ExplainMathDrawer';
 import { AddInventoryModal } from './AddInventoryModal';
 import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
@@ -238,16 +238,18 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
     readiness.items.forEach(item => {
       const product = products.find(p => p.id === item.productId);
-      // Use normalized price (handles container-based pricing)
-      const normalizedPrice = getNormalizedUnitPrice(product);
-
-      onHandValue += item.onHandQty * normalizedPrice;
+      
+      // On-hand value: inventory is in base units (gal/lbs/g)
+      const inventoryPrice = getInventoryUnitPrice(product);
+      onHandValue += item.onHandQty * inventoryPrice;
       
       // Use actual purchase totals for on-order value
       const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
       onOrderValue += actualOrderValue;
       
-      plannedValue += item.requiredQty * normalizedPrice;
+      // Planned value: planned qty is in product's native unit
+      const plannedPrice = getPlannedUnitPrice(product);
+      plannedValue += item.requiredQty * plannedPrice;
     });
 
     const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);

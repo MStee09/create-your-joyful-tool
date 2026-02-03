@@ -8,21 +8,41 @@ import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations
 import { computeReadiness, type PlannedUsage } from '@/lib/readinessEngine';
 
 /**
- * Get price per base unit (gal/lbs/g), handling container-based pricing.
- * For products priced per container (e.g., $900/jug of 1800g), this returns
- * the per-unit price ($0.50/g) instead of the container price.
+ * Get price per base unit (gal/lbs/g) for valuing INVENTORY quantities.
+ * Inventory is always stored in base units (gal, lbs, g).
+ * 
+ * For container-based products (priced per jug/bag/case/tote):
+ *   - Divides container price by container size to get per-unit price
+ *   - e.g., $900/jug ÷ 1800g = $0.50/g
+ * 
+ * For standard products (priced per gal/lbs):
+ *   - Returns the price as-is since it's already per-unit
  */
-export function getNormalizedUnitPrice(product: Product | undefined): number {
+export function getInventoryUnitPrice(product: Product | undefined): number {
   if (!product) return 0;
   const price = product.price || 0;
   
-  // Container-based pricing: divide by container size
-  if (product.containerSize && product.containerSize > 0) {
+  // Container-based pricing: need to normalize to base units
+  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+  if (isContainerPricing && product.containerSize && product.containerSize > 0) {
     return price / product.containerSize;
   }
   
-  // Standard per-unit pricing
+  // Standard per-unit pricing - price is already per gal/lbs
   return price;
+}
+
+/**
+ * Get price for valuing PLANNED usage quantities.
+ * Planned usage is expressed in the product's native unit:
+ *   - Container-based products: quantity is in containers (jugs, bags, etc.)
+ *   - Standard products: quantity is in base units (gal, lbs)
+ * 
+ * So we just return the product price as-is - it matches the planned unit.
+ */
+export function getPlannedUnitPrice(product: Product | undefined): number {
+  if (!product) return 0;
+  return product.price || 0;
 }
 
 export interface ReadinessSummary {
@@ -120,18 +140,18 @@ export function calculateReadinessSummary(
 
   readiness.items.forEach(item => {
     const product = products.find(p => p.id === item.productId);
-    // Use normalized price (handles container-based pricing)
-    const normalizedPrice = getNormalizedUnitPrice(product);
-
-    // On-hand value: normalized price × quantity
-    onHandValue += item.onHandQty * normalizedPrice;
+    
+    // On-hand value: inventory is in base units (gal/lbs/g), use inventory price
+    const inventoryPrice = getInventoryUnitPrice(product);
+    onHandValue += item.onHandQty * inventoryPrice;
     
     // On-order value: use ACTUAL purchase line totals (not estimated)
     const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
     onOrderValue += actualOrderValue;
     
-    // Planned value: normalized price × required quantity
-    plannedValue += item.requiredQty * normalizedPrice;
+    // Planned value: planned qty is in product's native unit, use product price directly
+    const plannedPrice = getPlannedUnitPrice(product);
+    plannedValue += item.requiredQty * plannedPrice;
 
     onHandQtyTotal += item.onHandQty;
     onOrderQtyTotal += item.onOrderQty;
