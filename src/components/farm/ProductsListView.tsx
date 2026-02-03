@@ -313,15 +313,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     return { usedThisSeasonProducts: used, otherProducts: other };
   }, [filteredProducts]);
 
-  // Handle new product save - create product and navigate to detail page
+  // Handle new product save - create product (parent handles navigation)
   const handleAddProductSave = (product: ProductMaster) => {
     onAddProduct(product);
-    // Navigate to the product detail page
-    if (onNavigateToProduct) {
-      onNavigateToProduct(product.id);
-    } else {
-      onSelectProduct(product.id);
-    }
     setShowAddModal(false);
   };
 
