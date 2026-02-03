@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, Package, Droplets, Weight, FileSpreadsheet, Settings } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Package, Droplets, Weight, FileSpreadsheet, Settings, CheckCircle } from 'lucide-react';
 import type { Season, ProductMaster, CommoditySpec } from '@/types';
+import type { InventoryItem } from '@/types/farm';
 import type { FieldAssignment, FieldCropOverride } from '@/types/field';
 import { calculateDemandRollup, formatDemandQty, generateBidSheetCSV } from '@/lib/procurementCalculations';
 import { downloadCSV } from '@/lib/calculations';
@@ -10,6 +11,7 @@ interface DemandRollupViewProps {
   season: Season | null;
   productMasters: ProductMaster[];
   commoditySpecs: CommoditySpec[];
+  inventory?: InventoryItem[];
   onNavigateToSpecs?: () => void;
   // Optional field data for field-weighted calculations
   fieldAssignments?: FieldAssignment[];
@@ -20,6 +22,7 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
   season,
   productMasters,
   commoditySpecs,
+  inventory = [],
   onNavigateToSpecs,
   fieldAssignments,
   fieldOverrides,
@@ -30,6 +33,16 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
     calculateDemandRollup(season, productMasters, commoditySpecs, fieldAssignments, fieldOverrides),
     [season, productMasters, commoditySpecs, fieldAssignments, fieldOverrides]
   );
+  
+  // Build inventory lookup by product ID (aggregate all rows per product)
+  const inventoryByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    (inventory || []).forEach(item => {
+      const current = map.get(item.productId) || 0;
+      map.set(item.productId, current + (item.quantity || 0));
+    });
+    return map;
+  }, [inventory]);
   
   const toggleExpanded = (id: string) => {
     setExpandedItems(prev => {
@@ -148,10 +161,11 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
         <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-stone-200 bg-stone-50">
             <div className="grid grid-cols-12 gap-4 text-xs font-semibold text-stone-500 uppercase tracking-wider">
-              <div className="col-span-6">Commodity / Spec</div>
-              <div className="col-span-2 text-right">Total Qty</div>
-              <div className="col-span-1">UOM</div>
-              <div className="col-span-3">Crops</div>
+              <div className="col-span-4">Commodity / Spec</div>
+              <div className="col-span-2 text-right">Planned</div>
+              <div className="col-span-2 text-right">On Hand</div>
+              <div className="col-span-2 text-right">Net Need</div>
+              <div className="col-span-2">Crops</div>
             </div>
           </div>
           
@@ -159,6 +173,11 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
             {demandRollup.map(item => {
               const isExpanded = expandedItems.has(item.specId || item.productId);
               const product = productMasters.find(p => p.id === item.productId);
+              
+              // Get on-hand quantity for this product
+              const onHandQty = inventoryByProduct.get(item.productId) || 0;
+              const netNeed = Math.max(0, item.plannedQty - onHandQty);
+              const isCovered = netNeed === 0;
               
               return (
                 <Collapsible key={item.specId || item.productId} open={isExpanded}>
@@ -168,7 +187,7 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
                       className="w-full px-6 py-4 hover:bg-stone-50 transition-colors"
                     >
                       <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-6 flex items-center gap-3">
+                        <div className="col-span-4 flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             product?.form === 'liquid' ? 'bg-cyan-100' : 'bg-amber-100'
                           }`}>
@@ -187,14 +206,28 @@ export const DemandRollupView: React.FC<DemandRollupViewProps> = ({
                             : <ChevronRight className="w-4 h-4 text-stone-400" />}
                         </div>
                         <div className="col-span-2 text-right">
-                          <span className="text-lg font-bold text-stone-800">
-                            {formatDemandQty(item.plannedQty, item.uom)}
+                          <span className="text-sm text-stone-700">
+                            {formatDemandQty(item.plannedQty, item.uom)} {item.uom}
                           </span>
                         </div>
-                        <div className="col-span-1">
-                          <span className="text-sm text-stone-600">{item.uom}</span>
+                        <div className="col-span-2 text-right">
+                          <span className={`text-sm ${onHandQty > 0 ? 'text-emerald-600 font-medium' : 'text-stone-400'}`}>
+                            {onHandQty > 0 ? formatDemandQty(onHandQty, item.uom) : '—'} {onHandQty > 0 ? item.uom : ''}
+                          </span>
                         </div>
-                        <div className="col-span-3 text-left">
+                        <div className="col-span-2 text-right">
+                          {isCovered ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 font-medium text-sm">
+                              <CheckCircle className="w-4 h-4" />
+                              Covered
+                            </span>
+                          ) : (
+                            <span className="text-lg font-bold text-stone-800">
+                              {formatDemandQty(netNeed, item.uom)} {item.uom}
+                            </span>
+                          )}
+                        </div>
+                        <div className="col-span-2 text-left">
                           <span className="text-sm text-stone-500">
                             {item.cropBreakdown.map(c => c.cropName).join(', ')}
                           </span>

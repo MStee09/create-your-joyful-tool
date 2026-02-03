@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight } from 'lucide-react';
+import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
-import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
+import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
 import { ExplainMathDrawer } from './ExplainMathDrawer';
 import { AddInventoryModal } from './AddInventoryModal';
@@ -218,6 +218,29 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return vendors.find(v => v.id === selectedProduct.vendorId) || null;
   }, [selectedProduct, vendors]);
 
+  // Calculate value-based metrics
+  const valueMetrics = useMemo(() => {
+    let onHandValue = 0;
+    let onOrderValue = 0;
+    let plannedValue = 0;
+
+    readiness.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      const price = product?.price || 0;
+
+      onHandValue += item.onHandQty * price;
+      onOrderValue += item.onOrderQty * price;
+      plannedValue += item.requiredQty * price;
+    });
+
+    const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);
+    const coveragePct = plannedValue > 0 
+      ? Math.min(100, ((onHandValue + onOrderValue) / plannedValue) * 100)
+      : 100;
+
+    return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
+  }, [readiness.items, products]);
+
   // Progress bar percentages
   const total = readiness.totalCount || 1;
   const readyPct = (readiness.readyCount / total) * 100;
@@ -283,6 +306,57 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               <div>
                 <p className="text-2xl font-bold text-rose-600">{readiness.blockingCount}</p>
                 <p className="text-sm text-stone-500">Need to Order</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Financial Summary Cards */}
+        <div className="grid grid-cols-4 gap-4 mt-4">
+          <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-emerald-600">{formatCurrency(valueMetrics.onHandValue)}</p>
+                <p className="text-xs text-stone-500">On Hand Value</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <Truck className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-amber-600">{formatCurrency(valueMetrics.onOrderValue)}</p>
+                <p className="text-xs text-stone-500">On Order Value</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-rose-600">{formatCurrency(valueMetrics.shortValue)}</p>
+                <p className="text-xs text-stone-500">Still Needed</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-blue-600">{Math.round(valueMetrics.coveragePct)}%</p>
+                <p className="text-xs text-stone-500">Coverage by Value</p>
               </div>
             </div>
           </div>

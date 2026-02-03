@@ -15,6 +15,16 @@ export interface ReadinessSummary {
   readyPct: number;
   onOrderPct: number;
   blockingPct: number;
+  // Value-based metrics
+  onHandValue: number;
+  onOrderValue: number;
+  plannedValue: number;
+  shortValue: number;
+  coveragePct: number;
+  // Volume-based totals
+  onHandQtyTotal: number;
+  onOrderQtyTotal: number;
+  plannedQtyTotal: number;
 }
 
 export function calculateReadinessSummary(
@@ -71,6 +81,32 @@ export function calculateReadinessSummary(
   const totalProducts = readiness.totalCount || 0;
   const total = totalProducts || 1;
 
+  // Calculate value-based metrics
+  let onHandValue = 0;
+  let onOrderValue = 0;
+  let plannedValue = 0;
+  let onHandQtyTotal = 0;
+  let onOrderQtyTotal = 0;
+  let plannedQtyTotal = 0;
+
+  readiness.items.forEach(item => {
+    const product = products.find(p => p.id === item.productId);
+    const price = product?.price || 0;
+
+    onHandValue += item.onHandQty * price;
+    onOrderValue += item.onOrderQty * price;
+    plannedValue += item.requiredQty * price;
+
+    onHandQtyTotal += item.onHandQty;
+    onOrderQtyTotal += item.onOrderQty;
+    plannedQtyTotal += item.requiredQty;
+  });
+
+  const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);
+  const coveragePct = plannedValue > 0 
+    ? Math.min(100, ((onHandValue + onOrderValue) / plannedValue) * 100)
+    : 100;
+
   return {
     totalProducts,
     readyCount: readiness.readyCount,
@@ -79,5 +115,13 @@ export function calculateReadinessSummary(
     readyPct: (readiness.readyCount / total) * 100,
     onOrderPct: (readiness.onOrderCount / total) * 100,
     blockingPct: (readiness.blockingCount / total) * 100,
+    onHandValue,
+    onOrderValue,
+    plannedValue,
+    shortValue,
+    coveragePct,
+    onHandQtyTotal,
+    onOrderQtyTotal,
+    plannedQtyTotal,
   };
 }

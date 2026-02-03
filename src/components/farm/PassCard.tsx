@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap } from 'lucide-react';
-import type { ApplicationTiming, Application, Crop, Product, Vendor } from '@/types/farm';
+import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap, AlertTriangle } from 'lucide-react';
+import type { ApplicationTiming, Application, Crop, Product, Vendor, InventoryItem } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import type { FieldCropOverride } from '@/types/field';
@@ -19,6 +19,7 @@ interface PassCardProps {
   crop: Crop;
   products: Product[];
   vendors?: Vendor[];
+  inventory?: InventoryItem[];
   purposes?: Record<string, ProductPurpose>;
   applicationOverrides?: Record<string, ApplicationOverride>;
   productMasters?: ProductMaster[];
@@ -131,6 +132,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   crop,
   products,
   vendors = [],
+  inventory = [],
   purposes = {},
   applicationOverrides = {},
   productMasters = [],
@@ -228,6 +230,34 @@ export const PassCard: React.FC<PassCardProps> = ({
     );
     return fieldsWithOverrides.size;
   }, [summary.applications, fieldOverrides]);
+
+  // Calculate inventory shortages for products in this pass
+  const inventoryShortageCount = useMemo(() => {
+    if (!inventory || inventory.length === 0) return 0;
+    
+    // Build inventory lookup (aggregate all rows per product)
+    const invByProduct = new Map<string, number>();
+    inventory.forEach(item => {
+      const current = invByProduct.get(item.productId) || 0;
+      invByProduct.set(item.productId, current + (item.quantity || 0));
+    });
+    
+    // Count products in this pass that have 0 inventory
+    let shortCount = 0;
+    const seenProducts = new Set<string>();
+    
+    summary.applications.forEach(app => {
+      if (seenProducts.has(app.productId)) return;
+      seenProducts.add(app.productId);
+      
+      const onHand = invByProduct.get(app.productId) || 0;
+      if (onHand <= 0) {
+        shortCount++;
+      }
+    });
+    
+    return shortCount;
+  }, [summary.applications, inventory]);
 
   // Calculate pass type from product categories
   const passType = useMemo(() => 
@@ -397,6 +427,17 @@ export const PassCard: React.FC<PassCardProps> = ({
                 >
                   <Zap className="w-3 h-3" />
                   {fieldOverrideCount} field{fieldOverrideCount !== 1 ? 's' : ''}
+                </span>
+              )}
+              
+              {/* Inventory shortage indicator */}
+              {inventoryShortageCount > 0 && (
+                <span 
+                  className="flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-600 rounded-full text-xs"
+                  title={`${inventoryShortageCount} product${inventoryShortageCount !== 1 ? 's' : ''} have no inventory on hand`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {inventoryShortageCount} short
                 </span>
               )}
             </div>
