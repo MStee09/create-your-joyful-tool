@@ -4,6 +4,7 @@ import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
+import { getNormalizedUnitPrice } from '@/lib/planReadinessUtils';
 import { ExplainMathDrawer } from './ExplainMathDrawer';
 import { AddInventoryModal } from './AddInventoryModal';
 import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
@@ -218,19 +219,35 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return vendors.find(v => v.id === selectedProduct.vendorId) || null;
   }, [selectedProduct, vendors]);
 
-  // Calculate value-based metrics
+  // Calculate value-based metrics using normalized prices and actual purchase totals
   const valueMetrics = useMemo(() => {
     let onHandValue = 0;
     let onOrderValue = 0;
     let plannedValue = 0;
 
+    // Build on-order value from actual purchase line totals
+    const onOrderValueByProduct = new Map<string, number>();
+    scopedPurchases.forEach(p => {
+      (p.lines || []).forEach(line => {
+        if (line.productId && line.totalPrice) {
+          const current = onOrderValueByProduct.get(line.productId) || 0;
+          onOrderValueByProduct.set(line.productId, current + line.totalPrice);
+        }
+      });
+    });
+
     readiness.items.forEach(item => {
       const product = products.find(p => p.id === item.productId);
-      const price = product?.price || 0;
+      // Use normalized price (handles container-based pricing)
+      const normalizedPrice = getNormalizedUnitPrice(product);
 
-      onHandValue += item.onHandQty * price;
-      onOrderValue += item.onOrderQty * price;
-      plannedValue += item.requiredQty * price;
+      onHandValue += item.onHandQty * normalizedPrice;
+      
+      // Use actual purchase totals for on-order value
+      const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
+      onOrderValue += actualOrderValue;
+      
+      plannedValue += item.requiredQty * normalizedPrice;
     });
 
     const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);
@@ -239,7 +256,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       : 100;
 
     return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
-  }, [readiness.items, products]);
+  }, [readiness.items, products, scopedPurchases]);
 
   // Progress bar percentages
   const total = readiness.totalCount || 1;
