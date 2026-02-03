@@ -1,164 +1,121 @@
 
-# Fix Value Calculations in Order Status
+# Fix Value Calculations for Ton-Priced Products
 
-## Problem
+## Root Cause Identified
 
-The "Ordered" and "To Go" dollar amounts on the Dashboard and Order Status page are dramatically incorrect. The root cause is that value calculations multiply quantities by `product.price` without accounting for **container-based pricing**.
+The **"On Order"** and **"To Go"** dollar amounts are massively inflated because `getPlannedUnitPrice()` returns the raw product price without considering unit conversions.
 
-### Example of the Bug
+### The Bug
 
-For a product priced at $900/jug (1800g per jug):
-- Inventory on hand: 25g
-- **Buggy calculation:** `25 × $900 = $22,500` (treating $900 as per-gram price)
-- **Correct calculation:** `25 × ($900 ÷ 1800) = 25 × $0.50 = $12.50`
+For a product like **AMS** (Ammonium Sulfate):
+- Price: **$420/ton**
+- Planned usage calculated in **lbs** (e.g., 13,200 lbs)
 
-The same bug exists in two places:
-1. **Dashboard widget** - `src/lib/planReadinessUtils.ts`
-2. **Order Status page** - `src/components/farm/PlanReadinessView.tsx`
+Current calculation:
+```
+plannedValue = 13,200 lbs × $420 = $5,544,000 ❌
+```
+
+Correct calculation:
+```
+pricePerLb = $420 / 2000 = $0.21/lb
+plannedValue = 13,200 lbs × $0.21 = $2,772 ✓
+```
+
+This bug affects all products priced per **ton** but measured in **lbs**, causing values to be inflated by ~2000x.
 
 ---
 
 ## Solution
 
-Create a utility function that normalizes prices to base units, then use it in both locations.
+Update `getPlannedUnitPrice()` in `src/lib/planReadinessUtils.ts` to normalize prices to match the unit returned by `calculatePlannedUsage()`:
 
-### Phase 1: Create Price Normalization Utility
+**For standard dry products (priced per ton):**
+- Divide price by 2000 to get per-lb price
+- The planned quantity is always in lbs
 
-Add a helper function that calculates the correct per-unit price:
+**For container-based products (priced per jug/bag):**
+- Return price as-is (planned qty is already in containers)
+
+**For standard liquid products (priced per gal):**
+- Return price as-is (planned qty is already in gal)
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/lib/planReadinessUtils.ts` | Update `getPlannedUnitPrice()` to handle ton → lbs conversion |
+
+---
+
+## Updated Code
 
 ```typescript
-// Get price per base unit (gal/lbs/g), handling container-based pricing
-function getNormalizedUnitPrice(product: Product): number {
+/**
+ * Get price for valuing PLANNED usage quantities.
+ * 
+ * calculatePlannedUsage() returns quantities in:
+ *   - Container-based products: containers (jugs, bags, etc.) 
+ *   - Standard liquid products: gallons
+ *   - Standard dry products: lbs (NOT tons!)
+ * 
+ * So we need to normalize the price to match these units.
+ */
+export function getPlannedUnitPrice(product: Product | undefined): number {
+  if (!product) return 0;
   const price = product.price || 0;
   
-  // Container-based pricing: divide by container size
-  if (product.containerSize && product.containerSize > 0) {
-    return price / product.containerSize;
+  // Container-based pricing: price is per container, planned qty is in containers
+  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+  if (isContainerPricing) {
+    return price; // Already matches
   }
   
-  // Standard unit-based pricing: use as-is
+  // Ton pricing: convert to per-lb since planned qty is in lbs
+  if (product.priceUnit === 'ton') {
+    return price / 2000;
+  }
+  
+  // Standard per-unit pricing (gal, lbs): already matches
   return price;
 }
-```
-
-### Phase 2: Fix Dashboard Calculations
-
-**File: `src/lib/planReadinessUtils.ts`**
-
-Update the value calculation loop to use normalized prices:
-
-```typescript
-readiness.items.forEach(item => {
-  const product = products.find(p => p.id === item.productId);
-  
-  // Get normalized price (handles container-based pricing)
-  const normalizedPrice = getNormalizedUnitPrice(product);
-  
-  // On-hand value: normalized price × quantity
-  onHandValue += item.onHandQty * normalizedPrice;
-  
-  // On-order value: use ACTUAL purchase line totals (already correct)
-  const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
-  onOrderValue += actualOrderValue;
-  
-  // Planned value: normalized price × required quantity
-  plannedValue += item.requiredQty * normalizedPrice;
-});
-```
-
-### Phase 3: Fix Order Status Page Calculations
-
-**File: `src/components/farm/PlanReadinessView.tsx`**
-
-Update the `valueMetrics` calculation to use the same normalization:
-
-```typescript
-const valueMetrics = useMemo(() => {
-  let onHandValue = 0;
-  let onOrderValue = 0;
-  let plannedValue = 0;
-  
-  // Build on-order value from actual purchase totals
-  const onOrderValueByProduct = new Map<string, number>();
-  scopedPurchases.forEach(p => {
-    (p.lines || []).forEach(line => {
-      if (line.productId && line.totalPrice) {
-        const current = onOrderValueByProduct.get(line.productId) || 0;
-        onOrderValueByProduct.set(line.productId, current + line.totalPrice);
-      }
-    });
-  });
-
-  readiness.items.forEach(item => {
-    const product = products.find(p => p.id === item.productId);
-    
-    // Get normalized price (handles container-based pricing)
-    const normalizedPrice = getNormalizedUnitPrice(product);
-
-    onHandValue += item.onHandQty * normalizedPrice;
-    
-    // Use actual purchase totals for on-order value
-    const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
-    onOrderValue += actualOrderValue;
-    
-    plannedValue += item.requiredQty * normalizedPrice;
-  });
-
-  const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);
-  const coveragePct = plannedValue > 0 
-    ? Math.min(100, ((onHandValue + onOrderValue) / plannedValue) * 100)
-    : 100;
-
-  return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
-}, [readiness.items, products, scopedPurchases]);
 ```
 
 ---
 
-## Technical Details
+## Why This Also Fixes "On Order" Value
 
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/lib/planReadinessUtils.ts` | Add `getNormalizedUnitPrice()`, update value calculations |
-| `src/components/farm/PlanReadinessView.tsx` | Import/add helper, update `valueMetrics`, use purchase totals for on-order |
-
-### Price Normalization Logic
+The "On Order" value uses `line.totalPrice` from actual purchase records, which is already correct. However, when calculating `shortValue`:
 
 ```typescript
-function getNormalizedUnitPrice(product: Product | undefined): number {
-  if (!product) return 0;
-  const price = product.price || 0;
-  
-  // Container-based pricing (jug, bag, case, tote with containerSize)
-  if (product.containerSize && product.containerSize > 0) {
-    return price / product.containerSize;
-  }
-  
-  // Standard per-unit pricing
-  return price;
-}
+shortValue = plannedValue - onHandValue - onOrderValue
 ```
 
-### On-Order Value Strategy
-
-For "On Order Value", we already fixed this in `planReadinessUtils.ts` to use actual purchase line `totalPrice` values. The same fix needs to be applied to `PlanReadinessView.tsx` for consistency.
-
-This ensures that:
-- **On Hand** and **Planned** values use normalized product prices
-- **On Order** values use the actual dollar amounts from purchase records
+If `plannedValue` is inflated 2000x, then `shortValue` is also massively wrong. Fixing `plannedValue` will cascade to fix `shortValue` (the "To Go" amount).
 
 ---
 
 ## Expected Results
 
 ### Before Fix
-- Dashboard: "$22,500 Ordered" (wrong - treating $900/jug as $900/g)
-- Order Status: "$22,500 On Order Value" (same bug)
+- Planned Value: ~$5,544,000 (wrong - treating $420/ton as $420/lb)
+- On Order Value: ~$27,000 (correct - from actual purchases)
+- Short Value (To Go): ~$5,517,000 (wrong)
 
 ### After Fix
-- Dashboard: "$1,800 Ordered" (correct - 2 jugs × $900)
-- Order Status: "$1,800 On Order Value" (consistent with purchases)
+- Planned Value: ~$30,000 (correct - $420/ton ÷ 2000 = $0.21/lb)
+- On Order Value: ~$27,000 (unchanged - already correct)
+- Short Value (To Go): ~$3,000 (correct)
 
-The "To Go" amount will also be corrected since it's calculated as `Planned - OnHand - OnOrder`.
+---
+
+## Testing Checklist
+
+After implementation:
+1. Dashboard Order Status widget should show reasonable $ values
+2. Order Status detail page should show matching values
+3. Products priced per ton (AMS, Urea, KCL, SOP) should contribute proportionally small amounts
+4. Container-priced products (PiKSi Dust) should still calculate correctly
+5. Standard liquid products (Humic Acid 12%) should still calculate correctly
