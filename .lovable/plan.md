@@ -1,200 +1,164 @@
 
-# Inventory Integration Expansion
+# Fix Value Calculations in Order Status
 
-## Problem Statement
+## Problem
 
-Inventory data is currently siloed to the Inventory tab and not surfacing actionable insights where users need them most. The Order Status widget on the Dashboard and detailed view only show product counts (e.g., "3 Ready, 2 Ordered"), not the actual coverage percentages or quantities that would help with decision-making.
+The "Ordered" and "To Go" dollar amounts on the Dashboard and Order Status page are dramatically incorrect. The root cause is that value calculations multiply quantities by `product.price` without accounting for **container-based pricing**.
 
-## Solution Overview
+### Example of the Bug
 
-Expand inventory visibility across the application to make it genuinely useful for operational planning:
+For a product priced at $900/jug (1800g per jug):
+- Inventory on hand: 25g
+- **Buggy calculation:** `25 × $900 = $22,500` (treating $900 as per-gram price)
+- **Correct calculation:** `25 × ($900 ÷ 1800) = 25 × $0.50 = $12.50`
 
-1. **Dashboard Order Status Widget** - Show % coverage by value or volume
-2. **Order Status Detail Page** - Add summary metrics for inventory position
-3. **Demand Rollup View** - Add "On Hand" and "To Order" columns
-4. **Pass Cards in Crop Planning** - Show inventory indicator for products without stock
+The same bug exists in two places:
+1. **Dashboard widget** - `src/lib/planReadinessUtils.ts`
+2. **Order Status page** - `src/components/farm/PlanReadinessView.tsx`
 
 ---
 
-## Phase 1: Dashboard Order Status Enhancement
+## Solution
 
-**File: `src/components/farm/DashboardView.tsx`**
+Create a utility function that normalizes prices to base units, then use it in both locations.
 
-Update the Order Status widget to show meaningful inventory metrics:
+### Phase 1: Create Price Normalization Utility
 
-**Current:**
-```
-[Progress Bar: Ready | Ordered | Need to Order]
-3 Ready • 2 Ordered • 1 Need to Order
-```
+Add a helper function that calculates the correct per-unit price:
 
-**Proposed:**
-```
-[Progress Bar: Covered | On Order | Short]
-
-Coverage: 85% by volume
-$12,400 On Hand · $3,200 Ordered · $1,800 to Go
-
-3 Ready • 2 Ordered • 1 Need to Order
-```
-
-Changes:
-- Add a "coverage percentage" calculation based on inventory quantity vs. planned need
-- Add dollar values for On Hand, Ordered, and remaining "To Go" positions
-- Keep the product count legend for context
-
-**New calculation needed:**
 ```typescript
-// In planReadinessUtils.ts - add volume/value metrics
-interface ReadinessSummary {
-  // ...existing counts
-  onHandValue: number;      // $ value of current inventory
-  onOrderValue: number;     // $ value of pending orders
-  shortValue: number;       // $ value still needed
-  coveragePct: number;      // (onHand + onOrder) / planned * 100
+// Get price per base unit (gal/lbs/g), handling container-based pricing
+function getNormalizedUnitPrice(product: Product): number {
+  const price = product.price || 0;
+  
+  // Container-based pricing: divide by container size
+  if (product.containerSize && product.containerSize > 0) {
+    return price / product.containerSize;
+  }
+  
+  // Standard unit-based pricing: use as-is
+  return price;
 }
 ```
 
----
+### Phase 2: Fix Dashboard Calculations
 
-## Phase 2: Order Status Detailed Page Enhancement
+**File: `src/lib/planReadinessUtils.ts`**
+
+Update the value calculation loop to use normalized prices:
+
+```typescript
+readiness.items.forEach(item => {
+  const product = products.find(p => p.id === item.productId);
+  
+  // Get normalized price (handles container-based pricing)
+  const normalizedPrice = getNormalizedUnitPrice(product);
+  
+  // On-hand value: normalized price × quantity
+  onHandValue += item.onHandQty * normalizedPrice;
+  
+  // On-order value: use ACTUAL purchase line totals (already correct)
+  const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
+  onOrderValue += actualOrderValue;
+  
+  // Planned value: normalized price × required quantity
+  plannedValue += item.requiredQty * normalizedPrice;
+});
+```
+
+### Phase 3: Fix Order Status Page Calculations
 
 **File: `src/components/farm/PlanReadinessView.tsx`**
 
-Add a new summary row showing total quantities and values:
+Update the `valueMetrics` calculation to use the same normalization:
 
-**Current Summary Cards:**
-| Total Products | Ready | Ordered | Need to Order |
-|----------------|-------|---------|---------------|
-| 6 | 3 | 2 | 1 |
+```typescript
+const valueMetrics = useMemo(() => {
+  let onHandValue = 0;
+  let onOrderValue = 0;
+  let plannedValue = 0;
+  
+  // Build on-order value from actual purchase totals
+  const onOrderValueByProduct = new Map<string, number>();
+  scopedPurchases.forEach(p => {
+    (p.lines || []).forEach(line => {
+      if (line.productId && line.totalPrice) {
+        const current = onOrderValueByProduct.get(line.productId) || 0;
+        onOrderValueByProduct.set(line.productId, current + line.totalPrice);
+      }
+    });
+  });
 
-**Proposed - Add second row:**
+  readiness.items.forEach(item => {
+    const product = products.find(p => p.id === item.productId);
+    
+    // Get normalized price (handles container-based pricing)
+    const normalizedPrice = getNormalizedUnitPrice(product);
 
-| On Hand Value | Ordered Value | Still Needed |
-|---------------|---------------|--------------|
-| $12,400 | $3,200 | $1,800 |
+    onHandValue += item.onHandQty * normalizedPrice;
+    
+    // Use actual purchase totals for on-order value
+    const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
+    onOrderValue += actualOrderValue;
+    
+    plannedValue += item.requiredQty * normalizedPrice;
+  });
 
-| Coverage by Volume | Coverage by Value |
-|--------------------|-------------------|
-| 78% | 85% |
+  const shortValue = Math.max(0, plannedValue - onHandValue - onOrderValue);
+  const coveragePct = plannedValue > 0 
+    ? Math.min(100, ((onHandValue + onOrderValue) / plannedValue) * 100)
+    : 100;
 
-This gives users actual financial visibility into their inventory position.
-
----
-
-## Phase 3: Demand Rollup Inventory Integration
-
-**File: `src/components/farm/DemandRollupView.tsx`**
-
-Add "On Hand" and "Net Need" columns to show true purchase requirements:
-
-**Current columns:**
-| Commodity | Total Qty | UOM | Crops |
-
-**Proposed columns:**
-| Commodity | Planned | On Hand | Net Need | UOM | Crops |
-
-Changes:
-- Pass `inventory` prop to DemandRollupView
-- Calculate on-hand quantity per commodity (aggregate across linked products)
-- Show "Net Need" = max(0, Planned - On Hand)
-- Add visual indicator when On Hand covers 100% (green checkmark)
-
----
-
-## Phase 4: Pass Card Inventory Indicator
-
-**File: `src/components/farm/PassCard.tsx`**
-
-Add a subtle indicator when products in a pass are not covered by inventory:
-
-**Visual change in collapsed header:**
-```
-POST PLANT/PRE EMERGE  [Herbicide]  Uniform    ⚠️ 2 short    $9.66/ac
+  return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
+}, [readiness.items, products, scopedPurchases]);
 ```
 
-Changes:
-- Pass `inventory` to PassCard (already passed to CropPlanningView)
-- Calculate how many products in the pass have insufficient inventory
-- Show warning badge: "⚠️ 2 short" if products are uncovered
-- Optional: Make it clickable to open Order Status filtered to those products
-
 ---
 
-## Technical Implementation
+## Technical Details
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/lib/planReadinessUtils.ts` | Add value/coverage calculations |
-| `src/components/farm/DashboardView.tsx` | Enhanced Order Status widget |
-| `src/components/farm/PlanReadinessView.tsx` | Add value summary row |
-| `src/components/farm/DemandRollupView.tsx` | Add On Hand / Net Need columns |
-| `src/components/farm/PassCard.tsx` | Add inventory shortage indicator |
-| `src/components/farm/CropPlanningView.tsx` | Pass inventory to PassCard |
-| `src/lib/procurementCalculations.ts` | Update DemandRollup to include inventory |
-| `src/FarmCalcApp.tsx` | Pass inventory to DemandRollupView |
+| `src/lib/planReadinessUtils.ts` | Add `getNormalizedUnitPrice()`, update value calculations |
+| `src/components/farm/PlanReadinessView.tsx` | Import/add helper, update `valueMetrics`, use purchase totals for on-order |
 
-### New Calculations Needed
+### Price Normalization Logic
 
-**In `planReadinessUtils.ts`:**
 ```typescript
-// Calculate value-based metrics
-const onHandValue = readiness.items.reduce((sum, item) => {
-  const product = products.find(p => p.id === item.productId);
-  const price = product?.price || 0;
-  return sum + (item.onHandQty * price);
-}, 0);
-
-const plannedValue = readiness.items.reduce((sum, item) => {
-  const product = products.find(p => p.id === item.productId);
-  const price = product?.price || 0;
-  return sum + (item.requiredQty * price);
-}, 0);
-
-const coveragePct = plannedValue > 0 
-  ? ((onHandValue + onOrderValue) / plannedValue) * 100 
-  : 100;
+function getNormalizedUnitPrice(product: Product | undefined): number {
+  if (!product) return 0;
+  const price = product.price || 0;
+  
+  // Container-based pricing (jug, bag, case, tote with containerSize)
+  if (product.containerSize && product.containerSize > 0) {
+    return price / product.containerSize;
+  }
+  
+  // Standard per-unit pricing
+  return price;
+}
 ```
+
+### On-Order Value Strategy
+
+For "On Order Value", we already fixed this in `planReadinessUtils.ts` to use actual purchase line `totalPrice` values. The same fix needs to be applied to `PlanReadinessView.tsx` for consistency.
+
+This ensures that:
+- **On Hand** and **Planned** values use normalized product prices
+- **On Order** values use the actual dollar amounts from purchase records
 
 ---
 
-## Visual Summary
+## Expected Results
 
-### Dashboard Widget (After)
-```
-┌─────────────────────────────────────────────────┐
-│  Order Status                              ✓    │
-├─────────────────────────────────────────────────┤
-│  [███████████████░░░░░]                         │
-│                                                 │
-│  Coverage: 78% by volume                        │
-│  $12,400 On Hand · $3,200 Ordered · $1,800 to Go│
-│                                                 │
-│  3 Ready • 2 Ordered • 1 Need to Order          │
-└─────────────────────────────────────────────────┘
-```
+### Before Fix
+- Dashboard: "$22,500 Ordered" (wrong - treating $900/jug as $900/g)
+- Order Status: "$22,500 On Order Value" (same bug)
 
-### Demand Rollup (After)
-```
-| Commodity      | Planned  | On Hand | Net Need | UOM  |
-|----------------|----------|---------|----------|------|
-| 28-0-0 (UAN)   | 1,200    | 800     | 400      | gal  |
-| 10-34-0 (APP)  | 450      | 450     | ✓ 0      | gal  |
-| Glyphosate     | 85       | 0       | 85       | gal  |
-```
+### After Fix
+- Dashboard: "$1,800 Ordered" (correct - 2 jugs × $900)
+- Order Status: "$1,800 On Order Value" (consistent with purchases)
 
-### Pass Card Shortage Indicator
-```
-POST PLANT/PRE EMERGE  [Herbicide]  ⚠️ 1 short  $9.66/ac
-```
-
----
-
-## Benefits
-
-1. **Dashboard becomes actionable** - Users see $ value coverage at a glance
-2. **Demand Rollup shows true needs** - Net quantity after inventory is clear
-3. **Crop planning has inventory context** - Passes show if products are short
-4. **Consistent data flow** - All views use the same readiness engine calculations
+The "To Go" amount will also be corrected since it's calculated as `Planned - OnHand - OnOrder`.
