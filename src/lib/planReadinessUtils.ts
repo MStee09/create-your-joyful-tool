@@ -7,6 +7,24 @@ import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase'
 import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage } from '@/lib/readinessEngine';
 
+/**
+ * Get price per base unit (gal/lbs/g), handling container-based pricing.
+ * For products priced per container (e.g., $900/jug of 1800g), this returns
+ * the per-unit price ($0.50/g) instead of the container price.
+ */
+export function getNormalizedUnitPrice(product: Product | undefined): number {
+  if (!product) return 0;
+  const price = product.price || 0;
+  
+  // Container-based pricing: divide by container size
+  if (product.containerSize && product.containerSize > 0) {
+    return price / product.containerSize;
+  }
+  
+  // Standard per-unit pricing
+  return price;
+}
+
 export interface ReadinessSummary {
   totalProducts: number;
   readyCount: number;
@@ -102,18 +120,18 @@ export function calculateReadinessSummary(
 
   readiness.items.forEach(item => {
     const product = products.find(p => p.id === item.productId);
-    // Use product price for planning/inventory valuation
-    const unitPrice = product?.price || 0;
+    // Use normalized price (handles container-based pricing)
+    const normalizedPrice = getNormalizedUnitPrice(product);
 
-    // On-hand value: use product unit price × quantity
-    onHandValue += item.onHandQty * unitPrice;
+    // On-hand value: normalized price × quantity
+    onHandValue += item.onHandQty * normalizedPrice;
     
     // On-order value: use ACTUAL purchase line totals (not estimated)
     const actualOrderValue = onOrderValueByProduct.get(item.productId) || 0;
     onOrderValue += actualOrderValue;
     
-    // Planned value: use product unit price × required quantity
-    plannedValue += item.requiredQty * unitPrice;
+    // Planned value: normalized price × required quantity
+    plannedValue += item.requiredQty * normalizedPrice;
 
     onHandQtyTotal += item.onHandQty;
     onOrderQtyTotal += item.onOrderQty;
