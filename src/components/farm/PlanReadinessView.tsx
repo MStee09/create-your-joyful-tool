@@ -146,6 +146,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       status: shortAmount > 0 ? 'short' : 'ok',
       shortfall: shortAmount,
       usedIn,
+      canAddToPlan: product.price !== undefined && product.price > 0,
     };
 
     setSelectedProduct(product);

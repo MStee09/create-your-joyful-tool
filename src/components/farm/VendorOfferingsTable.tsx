@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle, TrendingDown } from 'lucide-react';
 import type { VendorOffering, Vendor, ProductMaster } from '@/types';
 import { formatCurrency, generateId, calculateCostPerPound } from '@/lib/calculations';
+import { isLowestPrice } from '@/lib/pricingUtils';
+import { Badge } from '@/components/ui/badge';
 
 interface VendorOfferingsTableProps {
   product: ProductMaster;
@@ -23,7 +25,12 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const [formData, setFormData] = useState<Partial<VendorOffering>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const productOfferings = offerings.filter(o => o.productId === product.id);
+  // Filter and sort offerings by price ascending (lowest first)
+  const productOfferings = useMemo(() => {
+    return offerings
+      .filter(o => o.productId === product.id)
+      .sort((a, b) => (a.price || 0) - (b.price || 0));
+  }, [offerings, product.id]);
 
   const handleAdd = () => {
     if (!formData.vendorId) return;
@@ -172,10 +179,11 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {productOfferings.map(offering => {
+              {productOfferings.map((offering, index) => {
                 const vendor = vendors.find(v => v.id === offering.vendorId);
                 const costPerLb = calculateCostPerPound(offering, product);
                 const isEditing = editingId === offering.id;
+                const isLowest = isLowestPrice(offering, offerings);
 
                 return (
                   <tr
@@ -238,7 +246,15 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                           </select>
                         </div>
                       ) : (
-                        <span>{formatCurrency(offering.price)}/{offering.priceUnit}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>{formatCurrency(offering.price)}/{offering.priceUnit}</span>
+                          {isLowest && productOfferings.length > 1 && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 text-emerald-600 border-emerald-300 bg-emerald-50">
+                              <TrendingDown className="w-2.5 h-2.5 mr-0.5" />
+                              Lowest
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </td>
                     {/* Contents - for container-based pricing */}
