@@ -80,6 +80,15 @@ interface ProductsListViewProps {
 }
 
 type ViewDensity = 'compact' | 'detailed';
+type GroupByOption = 'none' | 'category' | 'active-ingredient' | 'manufacturer' | 'moa-group';
+
+const GROUP_BY_OPTIONS: Array<{ value: GroupByOption; label: string }> = [
+  { value: 'none', label: 'No Grouping' },
+  { value: 'category', label: 'Category' },
+  { value: 'active-ingredient', label: 'Active Ingredient' },
+  { value: 'manufacturer', label: 'Manufacturer' },
+  { value: 'moa-group', label: 'MOA Group' },
+];
 
 export const ProductsListView: React.FC<ProductsListViewProps> = ({
   productMasters,
@@ -103,6 +112,9 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewDensity, setViewDensity] = useState<ViewDensity>(() => {
     return (localStorage.getItem('productsViewDensity') as ViewDensity) || 'compact';
+  });
+  const [groupBy, setGroupBy] = useState<GroupByOption>(() => {
+    return (localStorage.getItem('productsGroupBy') as GroupByOption) || 'none';
   });
   const [compareNutrient, setCompareNutrient] = useState<string | null>(null);
   const [categoryTab, setCategoryTab] = useState<ProductCategory | 'all'>('all');
@@ -140,10 +152,14 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     searchInputRef.current?.focus();
   }, []);
 
-  // Persist view density
+  // Persist view density and group by
   useEffect(() => {
     localStorage.setItem('productsViewDensity', viewDensity);
   }, [viewDensity]);
+
+  useEffect(() => {
+    localStorage.setItem('productsGroupBy', groupBy);
+  }, [groupBy]);
 
   // Get products used in current season
   const usedThisSeasonIds = useMemo(() => {
@@ -242,16 +258,53 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
     { key: 'biological', label: 'Biological' },
   ];
 
-  // Group by category for detailed view
+  // Group products by selected grouping option
   const groupedProducts = useMemo(() => {
+    if (groupBy === 'none') {
+      return { 'All Products': filteredProducts };
+    }
+
     const groups: Record<string, typeof filteredProducts> = {};
+    
     filteredProducts.forEach(product => {
-      const categoryLabel = CATEGORY_LABELS[product.category] || 'Other';
-      if (!groups[categoryLabel]) groups[categoryLabel] = [];
-      groups[categoryLabel].push(product);
+      let groupKey = 'Other';
+      
+      switch (groupBy) {
+        case 'category':
+          groupKey = CATEGORY_LABELS[product.category] || 'Other';
+          break;
+        case 'active-ingredient':
+          // Use first active ingredient name
+          groupKey = product.chemicalData?.activeIngredients?.[0]?.name || 'No Active Ingredient';
+          break;
+        case 'manufacturer':
+          groupKey = product.manufacturer || 'Unknown Manufacturer';
+          break;
+        case 'moa-group':
+          // Use first MOA group
+          groupKey = product.chemicalData?.activeIngredients?.[0]?.moaGroup 
+            ? `Group ${product.chemicalData.activeIngredients[0].moaGroup}` 
+            : 'No MOA Group';
+          break;
+      }
+      
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(product);
     });
-    return groups;
-  }, [filteredProducts]);
+    
+    // Sort groups alphabetically, but put "Other"/"Unknown"/"No X" groups at the end
+    const sortedGroups: Record<string, typeof filteredProducts> = {};
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const aIsOther = a.startsWith('No ') || a === 'Other' || a.startsWith('Unknown');
+      const bIsOther = b.startsWith('No ') || b === 'Other' || b.startsWith('Unknown');
+      if (aIsOther && !bIsOther) return 1;
+      if (!aIsOther && bIsOther) return -1;
+      return a.localeCompare(b);
+    });
+    sortedKeys.forEach(key => { sortedGroups[key] = groups[key]; });
+    
+    return sortedGroups;
+  }, [filteredProducts, groupBy]);
 
   // Separate used this season vs other products for compact view
   const { usedThisSeasonProducts, otherProducts } = useMemo(() => {
@@ -701,6 +754,21 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
           </button>
         </div>
         
+        {/* Group By dropdown */}
+        <Select 
+          value={groupBy} 
+          onValueChange={(val) => setGroupBy(val as GroupByOption)}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Group by" />
+          </SelectTrigger>
+          <SelectContent>
+            {GROUP_BY_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
         {/* Compare by Nutrient dropdown */}
         <Select 
           value={compareNutrient || 'normal'} 
@@ -828,38 +896,63 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
       {/* Products List - Compact Mode */}
       {viewDensity === 'compact' && (
         <div className="space-y-4">
-          {/* Used This Season - Pinned at top when no filters/search */}
-          {!hasActiveFiltersOrSearch && usedThisSeasonProducts.length > 0 && (
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-              <div className="px-4 py-2 border-b border-border bg-emerald-50 dark:bg-emerald-950/20">
-                <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                  Used This Season
-                </h3>
-              </div>
-              <div>
-                {usedThisSeasonProducts.map(product => (
-                  <CompactProductRow key={product.id} product={product} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Other Products / All Products */}
-          {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).length > 0 && (
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+          {/* When grouping is enabled, show grouped view */}
+          {groupBy !== 'none' ? (
+            <>
+              {Object.entries(groupedProducts).map(([groupName, products]) => (
+                <div key={groupName} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                  <div className="px-4 py-2 border-b border-border bg-muted/50">
+                    <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                      {groupName}
+                      <span className="text-xs text-muted-foreground font-normal">
+                        ({products.length})
+                      </span>
+                    </h3>
+                  </div>
+                  <div>
+                    {products.map(product => (
+                      <CompactProductRow key={product.id} product={product} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* Used This Season - Pinned at top when no filters/search/grouping */}
               {!hasActiveFiltersOrSearch && usedThisSeasonProducts.length > 0 && (
-                <div className="px-4 py-2 border-b border-border bg-muted/50">
-                  <h3 className="text-sm font-medium text-muted-foreground">
-                    Other Products
-                  </h3>
+                <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                  <div className="px-4 py-2 border-b border-border bg-emerald-50 dark:bg-emerald-950/20">
+                    <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                      Used This Season
+                    </h3>
+                  </div>
+                  <div>
+                    {usedThisSeasonProducts.map(product => (
+                      <CompactProductRow key={product.id} product={product} />
+                    ))}
+                  </div>
                 </div>
               )}
-              <div>
-                {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).map(product => (
-                  <CompactProductRow key={product.id} product={product} />
-                ))}
-              </div>
-            </div>
+
+              {/* Other Products / All Products */}
+              {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).length > 0 && (
+                <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                  {!hasActiveFiltersOrSearch && usedThisSeasonProducts.length > 0 && (
+                    <div className="px-4 py-2 border-b border-border bg-muted/50">
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Other Products
+                      </h3>
+                    </div>
+                  )}
+                  <div>
+                    {(hasActiveFiltersOrSearch ? filteredProducts : otherProducts).map(product => (
+                      <CompactProductRow key={product.id} product={product} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {filteredProducts.length === 0 && (
@@ -873,7 +966,7 @@ export const ProductsListView: React.FC<ProductsListViewProps> = ({
         </div>
       )}
 
-      {/* Products List - Detailed Mode (existing grouped view) */}
+      {/* Products List - Detailed Mode (grouped view) */}
       {viewDensity === 'detailed' && (
         <div className="space-y-6">
           {Object.entries(groupedProducts).map(([category, products]) => (
