@@ -9,11 +9,20 @@ const corsHeaders = {
 
 const EXTRACTION_PROMPT = `You are an agricultural product label and SDS analyst. Extract ALL available structured data from this document.
 
+CRITICAL EXTRACTION RULES:
+1. Manufacturer is ALWAYS on page 1 - extract it (e.g., "BASF Corporation", "Corteva Agriscience")
+2. If PHI varies by crop, set phiDays to null and populate phiByCrop array with ALL crop-specific intervals
+3. If rates vary by soil type or organic matter, populate rateRange.byCondition array
+4. Look for buffer zone tables - differentiate aerial vs ground, standard vs endangered species
+5. Extract ALL adjuvant requirements (COC, NIS, AMS, UAN, MSO) with their rates
+6. Look for grazing/feeding restrictions in addition to PHI
+
 Return a JSON object with the following structure:
 {
   "productName": "<exact product name from label>",
   "form": "<'liquid' | 'dry' | null>",
   "category": "<'biological' | 'micronutrient' | 'herbicide' | 'fungicide' | 'insecticide' | 'seed-treatment' | 'adjuvant' | 'fertilizer-liquid' | 'fertilizer-dry' | 'other' | null>",
+  "manufacturer": "<company/manufacturer name - ALWAYS extract from page 1>",
   "npks": {
     "n": <number 0-100>,
     "nForm": "<'urea' | 'nh4' | 'no3' | 'mixed' | null>",
@@ -58,7 +67,6 @@ Return a JSON object with the following structure:
   "mixingInstructions": "<string mixing/compatibility notes>",
   "storageHandling": "<string storage and handling notes>",
   "cautions": "<string cautions, precautions, or safety notes>",
-  "manufacturer": "<company/manufacturer name>",
   "extractionConfidence": "<high | medium | low>",
   "suggestedRoles": ["<fertility-macro, fertility-micro, biostimulant, carbon-biology-food, stress-mitigation, uptake-translocation, nitrogen-conversion, rooting-vigor, water-conditioning, adjuvant>"],
   
@@ -66,53 +74,127 @@ Return a JSON object with the following structure:
     "activeIngredients": [
       {
         "name": "<active ingredient name>",
-        "concentration": "<e.g., 41%, 4 lb/gal>",
+        "concentration": "<e.g., 41%, 4 lb/gal, 63.9%>",
+        "concentrationLbPerGal": <number if stated as lb/gal>,
         "unit": "<'ae' | 'ai' | 'lbs/gal' | '%'>",
-        "chemicalClass": "<e.g., Group 9, glycine>",
-        "moaGroup": "<Mode of Action group number if stated>"
+        "chemicalClass": "<e.g., chloroacetamide, glycine>",
+        "moaGroup": "<Mode of Action group number, e.g., 15, 9>",
+        "moaGroupName": "<Name like VLCFA Inhibitor, EPSP synthase inhibitor>",
+        "chemicalFamily": "<e.g., glycine, triazine>"
       }
     ],
+    
+    "rateRange": {
+      "min": <minimum rate number>,
+      "max": <maximum rate number>,
+      "typical": <typical/recommended rate or null>,
+      "unit": "<fl oz/ac, pt/ac, oz/ac, etc>",
+      "notes": "<rate guidance notes>",
+      "byCondition": [
+        {
+          "condition": "<e.g., Coarse soils <3% OM, Medium/Fine soils ≥3% OM>",
+          "min": <min rate>,
+          "max": <max rate>,
+          "unit": "<fl oz/ac, etc>",
+          "notes": "<any notes>"
+        }
+      ]
+    },
+    
+    "applicationRequirements": {
+      "carrierGpaMinAerial": <minimum gal/ac for aerial application>,
+      "carrierGpaMinGround": <minimum gal/ac for ground application>,
+      "carrierGpaMin": <general minimum if not split>,
+      "carrierGpaMax": <maximum carrier volume or null>,
+      "dropletSize": "<'fine' | 'medium' | 'coarse' | 'very-coarse' | 'extremely-coarse' | 'ultra-coarse'>",
+      "sprayPressureMin": <min PSI>,
+      "sprayPressureMax": <max PSI>,
+      "applicationMethods": ["<Preplant, Preplant Incorporated, Preemergence, Postemergence, etc>"],
+      "applicationTiming": "<description of when to apply, growth stages, etc>",
+      "notes": "<any additional application notes>"
+    },
+    
+    "adjuvantRequirements": [
+      {
+        "type": "<'MSO' | 'COC' | 'NIS' | 'AMS' | 'UAN' | 'oil-adjuvant' | 'surfactant' | 'drift-retardant' | 'water-conditioner' | 'other'>",
+        "isRequired": <true if required, false if recommended/optional>,
+        "rate": "<rate with unit, e.g., 1 qt/ac, 0.25% v/v, 2.5 lb/100 gal>",
+        "notes": "<when to use, conditions>"
+      }
+    ],
+    
     "restrictions": {
-      "phiDays": <pre-harvest interval in days or null>,
+      "phiDays": <pre-harvest interval in days, or null if varies by crop>,
+      "phiByCrop": [
+        {
+          "crop": "<crop name>",
+          "days": <PHI days>,
+          "notes": "<any notes>"
+        }
+      ],
+      "reiHours": <Restricted Entry Interval in hours>,
+      "maxRatePerApplication": { "value": <number>, "unit": "<fl oz/ac, pt/ac, lb ai/ac>" },
+      "maxRatePerSeason": { "value": <number>, "unit": "<fl oz/ac, pt/ac, lb ai/ac>" },
+      "maxApplicationsPerSeason": <number or null>,
+      "minDaysBetweenApplications": <number or null>,
+      
+      "bufferZoneAerialFeet": <standard buffer for aerial>,
+      "bufferZoneGroundFeet": <standard buffer for ground>,
+      "endangeredSpeciesBufferAerialFeet": <endangered species buffer for aerial>,
+      "endangeredSpeciesBufferGroundFeet": <endangered species buffer for ground>,
+      "bufferZoneFeet": <single buffer if not differentiated>,
+      
+      "groundwaterAdvisory": <true if groundwater advisory mentioned>,
+      "groundwaterNotes": "<specific groundwater restrictions>",
+      "pollinator": "<pollinator protection statement or null>",
+      "rainfast": "<rainfast period, e.g., 1 hour, 4 hours>",
+      
       "rotationRestrictions": [
         {
           "crop": "<crop name>",
           "days": <days or null>,
           "months": <months or null>,
+          "conditions": "<e.g., if rate <16 fl oz/ac>",
           "notes": "<any additional info>"
         }
       ],
-      "maxRatePerApplication": { "value": <number>, "unit": "<oz/ac, pt/ac, etc>" },
-      "maxRatePerSeason": { "value": <number>, "unit": "<oz/ac, pt/ac, etc>" },
-      "maxApplicationsPerSeason": <number or null>,
-      "reiHours": <Restricted Entry Interval in hours or null>,
-      "bufferZoneFeet": <buffer zone distance or null>,
-      "groundwaterAdvisory": <true if groundwater advisory mentioned, else null>,
-      "pollinator": "<pollinator protection statement or null>",
+      
+      "grazingRestrictions": [
+        {
+          "crop": "<crop name>",
+          "days": <days before grazing/feeding>,
+          "notes": "<notes>"
+        }
+      ],
+      
       "notes": "<any other restriction notes>"
     },
+    
     "mixingOrder": {
       "priority": <1-10 based on formulation type>,
       "category": "<'water-conditioner' | 'compatibility-agent' | 'dry-flowable' | 'wettable-powder' | 'suspension' | 'emulsifiable-concentrate' | 'solution' | 'surfactant' | 'drift-retardant' | 'other'>",
       "notes": "<mixing order instructions from label>"
     },
+    
     "compatibility": {
       "antagonists": ["<products that reduce efficacy>"],
       "synergists": ["<products that enhance efficacy>"],
-      "incompatible": ["<products causing physical incompatibility>"],
+      "incompatible": ["<products causing physical incompatibility, fertilizers to avoid>"],
       "jarTest": <true if jar test recommended>,
       "notes": "<compatibility notes>"
     },
+    
     "signalWord": "<'danger' | 'warning' | 'caution' | 'none'>",
-    "epaRegNumber": "<EPA registration number>",
+    "epaRegNumber": "<EPA registration number, format XXXXX-XXX>",
     "formulationType": "<'EC' | 'SC' | 'SL' | 'WDG' | 'DF' | 'WP' | 'ME' | 'SE' | 'G' | 'L' | other>"
   }
 }
 
-Rules:
+EXTRACTION RULES:
 - Extract EVERYTHING explicitly stated on the label/SDS
 - Use null for values not found
 - For productName, use the main product name displayed on the label
+- For manufacturer, look on page 1 - it's usually at the top or bottom
 - For form, determine if it's a liquid or dry product based on packaging description, density info, or application instructions
 - For category, infer from the product type and use
 - Set extractionConfidence to "high" if most key data is clearly found, "medium" if some is ambiguous, "low" if document is hard to read
@@ -125,15 +207,40 @@ Rules:
 - For secondary nutrients (Ca, Mg, C), look for Calcium, Magnesium, Carbon, Organic Matter percentages
 - For micros, look for trace element percentages - they are often listed as small decimals like 0.05%
 
-PESTICIDE-SPECIFIC EXTRACTION (for herbicides, fungicides, insecticides):
-- Look for "Active Ingredient(s)" or "Active Ingredients" section for detailed ingredient data
+PESTICIDE-SPECIFIC EXTRACTION:
+- Look for "Active Ingredient(s)" section for detailed ingredient data
 - PHI (Pre-Harvest Interval) is often in "Directions for Use" or "Restrictions" section
+- If PHI varies by crop, set phiDays to null and populate phiByCrop array with ALL crops
 - REI (Restricted Entry Interval) is usually stated in hours
 - Rotational crop restrictions are in "Rotational Crop Restrictions" or "Crop Rotation" section
 - EPA Reg. No. is usually on the front of the label
 - Signal word (DANGER, WARNING, CAUTION) is prominently displayed
 - Formulation type (EC, SC, WDG, etc.) is often in the product name or near active ingredients
 - For mixing order priority: EC=6, SC/F=5, SL/S=7, WDG/DF=3, WP=4
+
+RATE EXTRACTION:
+- Look for rate tables with soil type columns
+- "Coarse soils" vs "Medium/Fine soils"
+- "<3% OM" vs "≥3% OM"
+- Extract ALL rate variations into byCondition array
+
+CARRIER VOLUME:
+- Often stated as "minimum carrier volume"
+- May differ for aerial vs ground application
+- Ground is usually higher than aerial
+
+ADJUVANT EXTRACTION:
+- Look for "Adjuvants", "Surfactants", "Tank Mix Partners" sections
+- COC: crop oil concentrate (1 qt/ac typical)
+- NIS: non-ionic surfactant (0.25% v/v typical)
+- AMS: ammonium sulfate (2-4 lb/100 gal typical)
+- MSO: methylated seed oil
+- UAN: urea ammonium nitrate
+
+BUFFER ZONES:
+- Standard buffer zones (all applications)
+- Endangered species buffer zones (separate section, often higher)
+- Differentiate aerial vs ground application buffers
 
 IMPORTANT: Return ONLY valid JSON, no markdown code blocks, no explanation. Just the JSON object.`;
 

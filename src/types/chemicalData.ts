@@ -21,6 +21,29 @@ export interface RotationRestriction {
   notes?: string;
 }
 
+// Crop-specific PHI (Pre-Harvest Interval)
+export interface CropSpecificPHI {
+  crop: string;
+  days: number;
+  notes?: string;
+}
+
+// Rate by condition (soil type, organic matter, etc.)
+export interface RateByCondition {
+  condition: string; // e.g., "Coarse soils, <3% OM"
+  min?: number;
+  max?: number;
+  unit: string;
+  notes?: string;
+}
+
+// Grazing restriction per crop
+export interface GrazingRestriction {
+  crop: string;
+  days: number;
+  notes?: string;
+}
+
 export interface MaxRate {
   value: number;
   unit: string; // "oz/ac", "pt/ac", "lb ai/ac"
@@ -33,6 +56,7 @@ export interface RateRange {
   typical?: number;
   unit: string; // "oz/ac", "pt/ac", "fl oz/ac"
   notes?: string;
+  byCondition?: RateByCondition[]; // Rates by soil type, OM, etc.
 }
 
 // Application requirements
@@ -40,12 +64,15 @@ export interface ApplicationRequirements {
   carrierGpaMin?: number;
   carrierGpaMax?: number;
   carrierGpaTypical?: number;
+  carrierGpaMinAerial?: number; // Minimum for aerial application
+  carrierGpaMinGround?: number; // Minimum for ground application
   dropletSize?: 'fine' | 'medium' | 'coarse' | 'very-coarse' | 'extremely-coarse' | 'ultra-coarse';
   sprayPressureMin?: number; // PSI
   sprayPressureMax?: number;
   groundSpeed?: string; // "5-10 mph"
   nozzleTypes?: string[]; // Recommended nozzle types
   applicationTiming?: string; // "Pre-emerge", "Post-emerge V2-V6"
+  applicationMethods?: string[]; // "Preplant", "Preemergence", "Postemergence", etc.
   notes?: string;
 }
 
@@ -63,15 +90,22 @@ export interface AdjuvantRequirement {
 }
 
 export interface Restrictions {
-  phiDays?: number; // Pre-harvest interval in days
+  phiDays?: number | null; // Pre-harvest interval in days, null = varies by crop
+  phiByCrop?: CropSpecificPHI[]; // Crop-specific PHI when it varies
   rotationRestrictions?: RotationRestriction[];
+  grazingRestrictions?: GrazingRestriction[]; // Grazing/feeding restrictions
   maxRatePerApplication?: MaxRate;
   maxRatePerSeason?: MaxRate;
   maxApplicationsPerSeason?: number;
   minDaysBetweenApplications?: number;
   reiHours?: number; // Restricted Entry Interval
-  bufferZoneFeet?: number;
+  bufferZoneFeet?: number; // Legacy single buffer
+  bufferZoneAerialFeet?: number; // Buffer for aerial application
+  bufferZoneGroundFeet?: number; // Buffer for ground application
+  endangeredSpeciesBufferAerialFeet?: number; // Endangered species buffer - aerial
+  endangeredSpeciesBufferGroundFeet?: number; // Endangered species buffer - ground
   groundwaterAdvisory?: boolean;
+  groundwaterNotes?: string; // Specific groundwater restrictions
   pollinator?: string; // e.g., "Do not apply during bloom"
   rainfast?: string; // e.g., "1 hour", "4 hours"
   notes?: string;
