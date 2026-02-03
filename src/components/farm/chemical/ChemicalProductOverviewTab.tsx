@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { ActiveIngredientsTable } from './ActiveIngredientsTable';
+import { getPHIDisplay } from '@/lib/chemicalMerge';
 import type { ProductMaster, VendorOffering, Vendor } from '@/types';
 import type { ChemicalData } from '@/types/chemicalData';
 import { SIGNAL_WORD_LABELS, FORMULATION_TYPES, ADJUVANT_TYPE_LABELS } from '@/types/chemicalData';
@@ -36,11 +37,15 @@ export function ChemicalProductOverviewTab({
   const preferredOffering = vendorOfferings.find(o => o.isPreferred) || vendorOfferings[0];
   const preferredVendor = preferredOffering ? vendors.find(v => v.id === preferredOffering.vendorId) : null;
 
+  // Get formatted PHI display (handles crop-specific PHI)
+  const phiDisplay = getPHIDisplay(chemicalData);
+  const hasPHI = phiDisplay !== '—';
+
   // Quick reference cards
   const quickRefs = [
     { 
       label: 'PHI', 
-      value: restrictions.phiDays !== undefined ? `${restrictions.phiDays} days` : null,
+      value: hasPHI ? phiDisplay : null,
       icon: Clock,
       color: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
     },
