@@ -34,15 +34,31 @@ export function getInventoryUnitPrice(product: Product | undefined): number {
 
 /**
  * Get price for valuing PLANNED usage quantities.
- * Planned usage is expressed in the product's native unit:
- *   - Container-based products: quantity is in containers (jugs, bags, etc.)
- *   - Standard products: quantity is in base units (gal, lbs)
  * 
- * So we just return the product price as-is - it matches the planned unit.
+ * calculatePlannedUsage() returns quantities in:
+ *   - Container-based products: containers (jugs, bags, etc.) 
+ *   - Standard liquid products: gallons
+ *   - Standard dry products: lbs (NOT tons!)
+ * 
+ * So we need to normalize the price to match these units.
  */
 export function getPlannedUnitPrice(product: Product | undefined): number {
   if (!product) return 0;
-  return product.price || 0;
+  const price = product.price || 0;
+  
+  // Container-based pricing: price is per container, planned qty is in containers
+  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+  if (isContainerPricing) {
+    return price; // Already matches
+  }
+  
+  // Ton pricing: convert to per-lb since planned qty is in lbs
+  if (product.priceUnit === 'ton') {
+    return price / 2000;
+  }
+  
+  // Standard per-unit pricing (gal, lbs): already matches
+  return price;
 }
 
 export interface ReadinessSummary {
