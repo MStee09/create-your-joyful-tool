@@ -159,7 +159,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           
           {/* Legend */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>{readiness.readyCount} On Hand</span>
+            <span>{readiness.readyCount} Ready</span>
             <span>•</span>
             <span>{readiness.onOrderCount} Ordered</span>
             <span>•</span>
