@@ -918,17 +918,24 @@ export type Database = {
           density_lbs_per_gal: number | null
           estimated_price: number | null
           estimated_price_unit: string | null
+          extraction_confidence: string | null
+          extraction_source: string | null
           form: string
           general_notes: string | null
           id: string
           is_bid_eligible: boolean
           is_commodity: boolean | null
           label_file_name: string | null
+          label_pdf_url: string | null
+          last_extracted_at: string | null
+          manufacturer: string | null
+          manufacturer_website: string | null
           mixing_notes: string | null
           name: string
           product_type: string | null
           reorder_point: number | null
           sds_file_name: string | null
+          sds_pdf_url: string | null
           updated_at: string
           user_id: string
         }
@@ -947,17 +954,24 @@ export type Database = {
           density_lbs_per_gal?: number | null
           estimated_price?: number | null
           estimated_price_unit?: string | null
+          extraction_confidence?: string | null
+          extraction_source?: string | null
           form?: string
           general_notes?: string | null
           id?: string
           is_bid_eligible?: boolean
           is_commodity?: boolean | null
           label_file_name?: string | null
+          label_pdf_url?: string | null
+          last_extracted_at?: string | null
+          manufacturer?: string | null
+          manufacturer_website?: string | null
           mixing_notes?: string | null
           name: string
           product_type?: string | null
           reorder_point?: number | null
           sds_file_name?: string | null
+          sds_pdf_url?: string | null
           updated_at?: string
           user_id: string
         }
@@ -976,17 +990,24 @@ export type Database = {
           density_lbs_per_gal?: number | null
           estimated_price?: number | null
           estimated_price_unit?: string | null
+          extraction_confidence?: string | null
+          extraction_source?: string | null
           form?: string
           general_notes?: string | null
           id?: string
           is_bid_eligible?: boolean
           is_commodity?: boolean | null
           label_file_name?: string | null
+          label_pdf_url?: string | null
+          last_extracted_at?: string | null
+          manufacturer?: string | null
+          manufacturer_website?: string | null
           mixing_notes?: string | null
           name?: string
           product_type?: string | null
           reorder_point?: number | null
           sds_file_name?: string | null
+          sds_pdf_url?: string | null
           updated_at?: string
           user_id?: string
         }
