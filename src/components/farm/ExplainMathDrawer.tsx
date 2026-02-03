@@ -73,8 +73,8 @@ export const ExplainMathDrawer: React.FC<ExplainMathDrawerProps> = ({
             <div className="flex items-center gap-3">
               <StatusIcon className={`w-5 h-5 ${colors.text}`} />
               <div>
-                <p className={`font-semibold ${colors.text}`}>
-                  {derivedStatus === 'READY' && 'Ready to Execute'}
+              <p className={`font-semibold ${colors.text}`}>
+                  {derivedStatus === 'READY' && 'Ready - Fully Covered'}
                   {derivedStatus === 'ON_ORDER' && 'Covered by On-Order'}
                   {derivedStatus === 'BLOCKING' && 'Blocking - Action Required'}
                 </p>

@@ -27,7 +27,7 @@ const fmt = (n: number, decimals = 1) =>
   });
 
 function statusPill(status: ReadinessStatus) {
-  if (status === 'READY') return { label: 'On Hand', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
+  if (status === 'READY') return { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
   if (status === 'ON_ORDER') return { label: 'Ordered', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
   return { label: 'Need to Order', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
 }
@@ -258,7 +258,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               </div>
               <div>
                 <p className="text-2xl font-bold text-emerald-600">{readiness.readyCount}</p>
-                <p className="text-sm text-stone-500">On Hand</p>
+                <p className="text-sm text-stone-500">Ready</p>
               </div>
             </div>
           </div>
@@ -302,7 +302,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
           <div className="mt-3 flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-              <span className="text-stone-600">On Hand ({readiness.readyCount})</span>
+              <span className="text-stone-600">Ready ({readiness.readyCount})</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-amber-500 rounded-full" />
@@ -318,11 +318,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
       {/* Filter Tabs */}
       <div className="flex flex-wrap gap-2">
-        {([
+      {([
           { id: 'all', label: 'All', count: readiness.totalCount },
           { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
           { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
-          { id: 'ready', label: 'On Hand', count: readiness.readyCount },
+          { id: 'ready', label: 'Ready', count: readiness.readyCount },
         ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
           <button
             key={t.id}
