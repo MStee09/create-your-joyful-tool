@@ -1,124 +1,193 @@
 
 
-# Chemical Product View & Vendor/Manufacturer Separation
+# Enhanced Chemical Label Extraction
 
 ## Overview
 
-This plan implements two interconnected improvements from the PRD:
-1. Products can be created without a vendor upfront (manufacturer + estimated price as fallback)
-2. Pricing hierarchy: lowest vendor price wins, else estimated price
-3. Plan-blocking when no price exists
+This plan addresses the gaps identified in the current AI extraction system for chemical product labels. The user's analysis of the Outlook Herbicide label revealed significant missing data:
+- Crop-specific PHI (Pre-Harvest Intervals) not extracted
+- Rate ranges by soil type not captured
+- Carrier volume requirements missing
+- Adjuvant recommendations not extracted
+- Buffer zones for endangered species missing
+- Manufacturer not reliably extracted
+- SDS potentially overwriting label data
 
-## What Already Exists (from previous phases)
+---
 
-- ChemicalProductDetailView with tabbed layout (Overview, Rates, Restrictions, Mixing, Documents)
-- Chemical data types and reusable table components
-- Category filter tabs and data status indicators in ProductsListView
-- Manufacturer tracking utilities
-- Database columns for manufacturer/extraction metadata
-- Routing for chemical products to dedicated view
-- Extract-label edge function already extracts manufacturer
+## Current State
+
+### What the Extract-Label Edge Function Does Now
+- Extracts basic chemical data structure (active ingredients, PHI, REI)
+- Uses a single `phiDays` field (not crop-specific)
+- Basic rate extraction without soil-type conditions
+- No dedicated adjuvant extraction
+- No carrier volume extraction
+- No buffer zone differentiation (aerial vs ground)
+- Treats all document types the same (no label vs SDS distinction)
+
+### Data Types Already Support (Partially)
+- `ChemicalData.adjuvantRequirements` - array exists but not populated
+- `ChemicalData.applicationRequirements` - has carrier fields but not aerial/ground split
+- `ChemicalData.rateRange` - exists but no by-condition array
+- `ChemicalData.restrictions.rotationRestrictions` - exists but conditions field rarely populated
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Pricing Utility (New File)
+### Phase 1: Extended ChemicalData Types
 
-Create `src/lib/pricingUtils.ts` with:
-- `getEffectivePrice()` - returns lowest vendor price or falls back to estimatedPrice
-- `canAddToPlan()` - checks if product can be added to crop plan (has vendor price OR estimated price)
-- `getPricingStatus()` - returns status indicator for UI display
+**Modify `src/types/chemicalData.ts`:**
 
-```text
-Price Hierarchy:
-  1. Lowest vendor offering price (if any)
-  2. Product estimatedPrice (fallback)
-  3. null (cannot add to plan)
+Add new interfaces for crop-specific data:
+
+```typescript
+// Crop-specific PHI
+interface CropSpecificPHI {
+  crop: string;
+  days: number;
+  notes?: string;
+}
+
+// Rate by condition (soil type, etc.)
+interface RateByCondition {
+  condition: string; // "Coarse soils, <3% OM"
+  min?: number;
+  max?: number;
+  unit: string;
+  notes?: string;
+}
+
+// Extended Restrictions
+interface Restrictions {
+  // Existing...
+  phiDays?: number | null; // null = varies by crop
+  phiByCrop?: CropSpecificPHI[];
+  
+  // Buffer zones
+  bufferZoneAerialFeet?: number;
+  bufferZoneGroundFeet?: number;
+  endangeredSpeciesBufferAerialFeet?: number;
+  endangeredSpeciesBufferGroundFeet?: number;
+}
+
+// Extended RateRange
+interface RateRange {
+  // Existing...
+  byCondition?: RateByCondition[];
+}
+
+// Extended ApplicationRequirements
+interface ApplicationRequirements {
+  // Existing carrier fields...
+  carrierGpaMinAerial?: number;
+  carrierGpaMinGround?: number;
+  applicationMethods?: string[]; // "Preplant", "Preemergence", etc.
+}
 ```
 
-### Phase 2: Add Product Flow Simplification
+### Phase 2: Enhanced Extraction Prompt
 
-Modify `ProductsListView.tsx`:
-- Remove step 2 entirely (no vendor requirement)
-- Single-step modal with:
-  - Product Name (required)
-  - Category (required)
-  - Form (required)
-  - Manufacturer (required for pesticides, optional otherwise)
-  - EPA Registration # (optional, for chemicals)
-  - Estimated Price + Unit (optional fallback)
-  - Density (optional, for liquids)
-- After save: navigate to product detail page
-- Add manufacturer autocomplete using existing KNOWN_MANUFACTURERS
+**Modify `supabase/functions/extract-label/index.ts`:**
 
-Modal wireframe:
+Update `EXTRACTION_PROMPT` to be more comprehensive:
+
+Key additions:
+1. **Manufacturer extraction** - Explicitly state it's always on page 1
+2. **Crop-specific PHI** - Array format when PHI varies
+3. **Rate-by-condition** - Capture soil type variations
+4. **Carrier volume split** - Aerial vs ground minimums
+5. **Adjuvant extraction** - COC, NIS, AMS, UAN with rates/requirements
+6. **Buffer zones** - Standard vs endangered species, aerial vs ground
+7. **Application methods** - Pre-emerge, post-emerge, timing windows
+8. **Grazing restrictions** - Often missed
+
+### Phase 3: Label vs SDS Merge Logic
+
+**Modify `src/components/farm/chemical/ChemicalProductDocumentsTab.tsx`:**
+
+Add intelligent merge logic:
+
 ```text
-+--------------------------------------------------+
-| Add Product                                  [X] |
-+--------------------------------------------------+
-| Product Name *                                   |
-| [                                           ]    |
-|                                                  |
-| Category *                [Herbicide        v]   |
-|                                                  |
-| Form *    ( ) Liquid    (o) Dry                  |
-|                                                  |
-| --- Manufacturer (shown for chemicals) ---       |
-| Manufacturer *            [BASF             v]   |
-| EPA Reg. #               [                  ]    |
-|                                                  |
-| --- Optional ---                                 |
-| Estimated Price (for planning before quotes)     |
-| [$           ] per [gal v]                       |
-|                                                  |
-| Density (lbs/gal)                                |
-| [              ]                                 |
-|                                                  |
-| [Cancel]                  [Save & View Product]  |
-+--------------------------------------------------+
+Label Priority (always wins):
+- Active ingredients, concentrations
+- Rate ranges, by-condition rates
+- PHI (all crop-specific values)
+- REI
+- Max rates, max applications
+- Rotation restrictions
+- Carrier volumes
+- Adjuvant requirements
+- Application timing/methods
+- Buffer zones (including endangered species)
+
+SDS Supplement (fills gaps only):
+- Signal word (if missing from label)
+- First aid/emergency info
+- PPE requirements
+- Storage/handling (supplemental)
 ```
 
-### Phase 3: VendorOfferingsTable Enhancements
+The merge function will:
+1. Check document type being uploaded (label vs SDS)
+2. If label: fully replace agronomic fields
+3. If SDS: only fill null fields, never overwrite
 
-Modify `VendorOfferingsTable.tsx`:
-- Add "Lowest" badge next to lowest-priced offering
-- Sort offerings by price ascending
-- Show effective price summary at top when multiple offerings exist
+### Phase 4: Review Modal for Chemical Data
 
-### Phase 4: ProductsListView Price Display
+**Create `src/components/farm/ChemicalDataReviewModal.tsx`:**
 
-Modify `ProductsListView.tsx`:
-- Use `getEffectivePrice()` to display pricing
-- Show source indicator: `$148/gal` (vendor) vs `$150/gal (est)`
-- Show "No price" with amber warning for products without any pricing
-- Add vendor status column/indicator:
-  - Check: Has vendor(s) with price
-  - Warning: No vendor, has estimated price
-  - X: No vendor, no price
+New modal for reviewing extracted chemical data with:
 
-### Phase 5: ChemicalProductDetailView - Add Vendors Tab
+1. **Active Ingredients Section**
+   - Editable name, concentration, MOA group
+   - Add/remove ingredients
 
-Modify `ChemicalProductDetailView.tsx`:
-- Add "Vendors" tab between Mixing and Documents
-- Tab content includes:
-  - Effective price display with source
-  - Editable estimated price field (fallback)
-  - VendorOfferingsTable component
-  - Price history chart (if available)
+2. **Rate Range Section**
+   - Min/max/typical with unit
+   - Expandable "By Condition" table for soil-type rates
 
-### Phase 6: ProductSelectorModal - Block Without Price
+3. **Restrictions Section**
+   - PHI display with crop-specific toggle
+   - Table for crop-specific PHI when applicable
+   - REI, max rates, max apps
+   - Buffer zones (standard vs endangered species)
 
-Modify `ProductSelectorModal.tsx`:
-- Use `canAddToPlan()` before allowing selection
-- Show toast error if product has no price
-- Visual indicator on products without pricing
+4. **Adjuvants Section**
+   - Table of adjuvant requirements
+   - Required vs recommended indicator
+   - Rate + unit
 
-### Phase 7: Product List Grouping (Optional Enhancement)
+5. **Carrier & Application Section**
+   - Aerial/ground minimums
+   - Droplet size
+   - Application methods checkboxes
 
-Add grouping dropdown to ProductsListView:
-- Group by: None | Category | Active Ingredient | Manufacturer | MOA Group
-- Active ingredient grouping uses chemicalData.activeIngredients[0].name
+6. **Confidence Indicators**
+   - Per-field "?" icon for low-confidence values
+   - Overall extraction confidence badge
+
+### Phase 5: Update ChemicalProductRestrictionsTab
+
+**Modify `src/components/farm/chemical/ChemicalProductRestrictionsTab.tsx`:**
+
+Update to display new data:
+
+1. Crop-specific PHI table (when applicable)
+2. Buffer zones section with aerial/ground breakdown
+3. Endangered species restrictions callout
+4. Grazing restrictions table
+
+### Phase 6: Update ChemicalProductRatesTab
+
+**Modify `src/components/farm/chemical/ChemicalProductRatesTab.tsx`:**
+
+Update to display:
+
+1. Rate-by-condition table showing soil type variations
+2. Carrier volume requirements (aerial vs ground)
+3. Adjuvant requirements table
 
 ---
 
@@ -128,77 +197,76 @@ Add grouping dropdown to ProductsListView:
 
 | File | Purpose |
 |------|---------|
-| `src/lib/pricingUtils.ts` | Pricing hierarchy logic, canAddToPlan check |
+| `src/components/farm/ChemicalDataReviewModal.tsx` | Review modal for extracted chemical data |
+| `src/lib/chemicalMerge.ts` | Label vs SDS merge logic |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/farm/ProductsListView.tsx` | Single-step modal, manufacturer field, effective price display, navigate to product after create |
-| `src/components/farm/VendorOfferingsTable.tsx` | "Lowest" badge, price-sorted display |
-| `src/components/farm/chemical/ChemicalProductDetailView.tsx` | Add Vendors tab with pricing section |
-| `src/components/farm/ProductSelectorModal.tsx` | Block selection without price |
+| `src/types/chemicalData.ts` | Extended interfaces for crop-specific PHI, rate conditions, buffer zones, aerial/ground splits |
+| `supabase/functions/extract-label/index.ts` | Enhanced extraction prompt with all fields |
+| `src/components/farm/chemical/ChemicalProductDocumentsTab.tsx` | Add merge logic, trigger review modal |
+| `src/components/farm/chemical/ChemicalProductRestrictionsTab.tsx` | Display crop-specific PHI, buffer zones |
+| `src/components/farm/chemical/ChemicalProductRatesTab.tsx` | Display rate-by-condition, adjuvants |
 
-### Pricing Logic
+### Enhanced Extraction Prompt (Key Sections)
+
+```text
+IDENTITY EXTRACTION:
+- Manufacturer is ALWAYS on page 1 - extract it
+- EPA Reg. No. format: XXXXX-XXX
+- Formulation type often in product name
+
+PHI EXTRACTION:
+- If PHI varies by crop, set phiDays to null
+- Populate phiByCrop array with ALL crop-specific intervals
+- Common crops: corn, soybeans, wheat, sorghum, cotton, etc.
+
+RATE EXTRACTION:
+- Look for rate tables with soil type columns
+- "Coarse soils" vs "Medium/Fine soils"
+- "<3% OM" vs "≥3% OM"
+- Extract ALL rate variations
+
+ADJUVANT EXTRACTION:
+- Look for "Adjuvants", "Surfactants", "Tank Mix Partners" sections
+- COC: crop oil concentrate (1 qt/ac typical)
+- NIS: non-ionic surfactant (0.25% v/v typical)
+- AMS: ammonium sulfate (2-4 lb/100 gal typical)
+- MSO: methylated seed oil
+
+BUFFER ZONES:
+- Standard buffer zones (all applications)
+- Endangered species buffer zones (separate section)
+- Differentiate aerial vs ground application buffers
+```
+
+### Merge Logic Detail
 
 ```typescript
-interface EffectivePrice {
-  price: number;
-  unit: string;
-  source: 'vendor' | 'estimated';
-  vendorId?: string;
-  vendorName?: string;
-}
-
-function getEffectivePrice(
-  product: ProductMaster,
-  vendorOfferings: VendorOffering[],
-  vendors: Vendor[]
-): EffectivePrice | null {
-  // 1. Get offerings for this product with valid prices
-  const offerings = vendorOfferings
-    .filter(o => o.productId === product.id && o.price > 0)
-    .sort((a, b) => a.price - b.price);
-  
-  // 2. Lowest vendor price wins
-  if (offerings.length > 0) {
-    const lowest = offerings[0];
-    const vendor = vendors.find(v => v.id === lowest.vendorId);
+function mergeChemicalData(
+  existing: ChemicalData | undefined,
+  extracted: ChemicalData,
+  source: 'label' | 'sds'
+): ChemicalData {
+  if (source === 'label') {
+    // Label is authoritative - full replacement
     return {
-      price: lowest.price,
-      unit: lowest.priceUnit,
-      source: 'vendor',
-      vendorId: lowest.vendorId,
-      vendorName: vendor?.name,
+      ...extracted,
+      // Keep any SDS-only safety data
+      signalWord: extracted.signalWord || existing?.signalWord,
     };
   }
   
-  // 3. Fall back to estimated price
-  if (product.estimatedPrice && product.estimatedPrice > 0) {
-    return {
-      price: product.estimatedPrice,
-      unit: product.estimatedPriceUnit || product.defaultUnit || 'gal',
-      source: 'estimated',
-    };
-  }
-  
-  return null;
+  // SDS only fills gaps - never overwrites
+  return {
+    ...existing,
+    signalWord: existing?.signalWord || extracted.signalWord,
+    // Only add SDS data where existing is null/undefined
+  };
 }
 ```
-
-### Add Product Flow Changes
-
-Current flow:
-```text
-Step 1 (Name, Category, Form) -> Step 2 (Vendor, Price) -> Save
-```
-
-New flow:
-```text
-Single Step (Name, Category, Form, Manufacturer*, EstPrice) -> Save -> Navigate to Detail
-```
-
-The key change is that products can now exist without vendor offerings. The product detail page prompts users to add vendors when none exist.
 
 ---
 
@@ -206,13 +274,27 @@ The key change is that products can now exist without vendor offerings. The prod
 
 | Phase | Effort |
 |-------|--------|
-| Phase 1: Pricing Utility | Small |
-| Phase 2: Add Product Flow | Medium |
-| Phase 3: VendorOfferingsTable | Small |
-| Phase 4: ProductsListView Price Display | Medium |
-| Phase 5: Vendors Tab in Chemical View | Medium |
-| Phase 6: ProductSelectorModal | Small |
-| Phase 7: Grouping (Optional) | Medium |
+| Phase 1: Extended Types | Small |
+| Phase 2: Enhanced Prompt | Medium |
+| Phase 3: Merge Logic | Small |
+| Phase 4: Review Modal | Large |
+| Phase 5: Restrictions Tab | Medium |
+| Phase 6: Rates Tab | Medium |
 
-**Total: 5-6 sessions**
+**Total: 4-5 sessions**
+
+---
+
+## Expected Improvements
+
+After implementation, the Outlook Herbicide example would extract:
+
+| Field | Before | After |
+|-------|--------|-------|
+| Manufacturer | Missing | BASF Corporation |
+| PHI | "null days" | Array of 9 crop-specific values |
+| Rate Range | Not shown | "12-21 fl oz/ac with soil conditions" |
+| Carrier Volume | Missing | "2+ gal/ac aerial, 5+ gal/ac ground" |
+| Adjuvants | Missing | COC, NIS, AMS, UAN with rates |
+| Buffer Zones | Missing | "150 ft aerial, 35 ft ground (endangered species)" |
 
