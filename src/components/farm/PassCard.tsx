@@ -243,12 +243,17 @@ export const PassCard: React.FC<PassCardProps> = ({
     });
     
     // Count products in this pass that have 0 inventory
+    // Skip orphan applications (product no longer exists)
     let shortCount = 0;
     const seenProducts = new Set<string>();
     
     summary.applications.forEach(app => {
       if (seenProducts.has(app.productId)) return;
       seenProducts.add(app.productId);
+      
+      // Skip orphan applications - product must exist
+      const productExists = products.some(p => p.id === app.productId);
+      if (!productExists) return;
       
       const onHand = invByProduct.get(app.productId) || 0;
       if (onHand <= 0) {
@@ -257,7 +262,7 @@ export const PassCard: React.FC<PassCardProps> = ({
     });
     
     return shortCount;
-  }, [summary.applications, inventory]);
+  }, [summary.applications, inventory, products]);
 
   // Calculate pass type from product categories
   const passType = useMemo(() => 
