@@ -1,105 +1,174 @@
 
-# Fix "% Ready" to Include Partial On-Hand Coverage
+# Add "Create New Product" Option in Pass Product Selector
 
-## Problem
+## Overview
 
-The Order Status progress bar shows "X% ready" but this percentage is calculated based on **count of fully-covered products**, not actual inventory coverage.
+When adding a product to a pass, users need the ability to create a new product if it doesn't already exist in the dropdown. This will integrate the `AddProductModal` into the `EntryModePanel` product selection flow.
 
-**Example of the issue:**
-- 10 products in plan
-- 8 products have 80% of needed inventory on-hand (but need orders to complete)
-- 2 products are fully covered on-hand
+## Current Flow
 
-**Current display:** "20% ready" (only 2/10 are fully covered)  
-**Better display:** "66% ready" (based on actual on-hand value coverage)
+1. User clicks "+ Add Product" on a pass card
+2. `handleAddApplication` creates a placeholder application with the first product
+3. `EntryModePanel` opens with a product dropdown (grouped by vendor)
+4. User must select from existing products only - **no way to add new products**
 
-## Solution
+## Proposed Flow
 
-Change the "% ready" progress bar display to show **value-based on-hand coverage** instead of product count. This gives a more accurate picture of how prepared you are.
-
-### Current vs Proposed
-
-| Metric | Current Calculation | Proposed Calculation |
-|--------|---------------------|----------------------|
-| % Ready | `readyCount / totalCount` | `onHandValue / plannedValue` |
-| Progress bar green segment | Products fully covered by on-hand | Proportion of planned $ value on-hand |
+1. User clicks "+ Add Product" on a pass card
+2. `EntryModePanel` opens with product dropdown
+3. At the top of the dropdown, a **"+ Add New Product..."** option appears
+4. Clicking it opens `AddProductModal`
+5. After saving, the new product is automatically selected in the panel
+6. User continues configuring rate, acres, etc.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/PlanReadinessView.tsx` | Update progress bar to use `onHandValue / plannedValue` for the "ready" percentage |
+| `src/components/farm/EntryModePanel.tsx` | Add "Add New Product" option, integrate `AddProductModal`, add callback for new products |
+| `src/components/farm/CropPlanningView.tsx` | Pass `onAddProduct` callback and `productMasters` to EntryModePanel |
 
-## Implementation Details
+---
 
-### Update Progress Bar Logic (lines 263-267)
+## Technical Details
 
-**Before:**
+### EntryModePanel Changes
+
+**New Props:**
 ```typescript
-const total = readiness.totalCount || 1;
-const readyPct = (readiness.readyCount / total) * 100;
-const onOrderPct = (readiness.onOrderCount / total) * 100;
-const blockingPct = (readiness.blockingCount / total) * 100;
+interface EntryModePanelProps {
+  // ...existing props...
+  productMasters?: ProductMaster[];
+  onAddProduct?: (product: ProductMaster) => void;
+}
 ```
 
-**After:**
+**State & Logic:**
+- Add `showAddProductModal` state
+- Import and render `AddProductModal`
+- Add a "special" item at the top of the product select that triggers the modal
+- When `AddProductModal.onSave` fires:
+  1. Call `onAddProduct` to persist the new ProductMaster
+  2. Create a temporary Product object from the ProductMaster for immediate selection
+  3. Set `productId` to the new product's ID
+
+**Dropdown Structure:**
+```tsx
+<SelectContent>
+  {/* Add New Product option - always first */}
+  <SelectItem value="__add_new__" className="text-primary font-medium">
+    <div className="flex items-center gap-2">
+      <Plus className="h-3.5 w-3.5" />
+      Add New Product...
+    </div>
+  </SelectItem>
+  
+  <Separator className="my-1" />
+  
+  {/* Existing products grouped by vendor */}
+  {productsByVendor.map(...)}
+</SelectContent>
+```
+
+**Handler:**
 ```typescript
-// Value-based progress percentages
-const onHandPct = valueMetrics.plannedValue > 0 
-  ? (valueMetrics.onHandValue / valueMetrics.plannedValue) * 100 
-  : 0;
-const onOrderPct = valueMetrics.plannedValue > 0 
-  ? (valueMetrics.onOrderValue / valueMetrics.plannedValue) * 100 
-  : 0;
-// Ensure percentages don't exceed 100% total
-const cappedOnHandPct = Math.min(100, onHandPct);
-const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
-const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
+const handleProductChange = (value: string) => {
+  if (value === '__add_new__') {
+    setShowAddProductModal(true);
+    return;
+  }
+  setProductId(value);
+};
+
+const handleNewProductSave = (newProductMaster: ProductMaster) => {
+  // Notify parent to persist the new product
+  onAddProduct?.(newProductMaster);
+  
+  // Create a Product from ProductMaster for immediate use
+  const newProduct: Product = {
+    id: newProductMaster.id,
+    name: newProductMaster.name,
+    form: newProductMaster.form,
+    category: newProductMaster.category,
+    price: newProductMaster.estimatedPrice || 0,
+    priceUnit: newProductMaster.estimatedPriceUnit || 
+               (newProductMaster.form === 'liquid' ? 'gal' : 'lbs'),
+    vendorId: '', // No vendor yet
+  };
+  
+  // Add to local products list and select it
+  setProductId(newProductMaster.id);
+  setShowAddProductModal(false);
+};
 ```
 
-### Update Progress Bar Display (line 388)
+### CropPlanningView Changes
 
-**Before:**
+Pass the required props to `EntryModePanel`:
+
 ```tsx
-<span>{Math.round(readyPct)}% ready</span>
+<EntryModePanel
+  application={editingApplication}
+  crop={crop}
+  products={products}
+  vendors={vendors}
+  productMasters={productMasters}
+  onAddProduct={handleAddNewProduct}
+  onSave={handleSaveApplication}
+  onDelete={handleDeleteApplication}
+  onClose={() => setEditingApplication(null)}
+/>
 ```
 
-**After:**
-```tsx
-<span>{Math.round(cappedOnHandPct)}% on hand</span>
+Add handler (or receive from parent):
+```typescript
+const handleAddNewProduct = (product: ProductMaster) => {
+  // This will bubble up to FarmCalcApp through existing patterns
+  // or use a prop passed down from parent
+};
 ```
 
-### Update Progress Bar Segments (lines 390-394)
+---
 
-**Before:**
-```tsx
-<div className="bg-emerald-500 transition-all" style={{ width: `${readyPct}%` }} />
-<div className="bg-amber-500 transition-all" style={{ width: `${onOrderPct}%` }} />
-<div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
+## UI Preview
+
+The product dropdown will look like:
+
+```text
+┌─────────────────────────────────────────┐
+│ Product                                  │
+├─────────────────────────────────────────┤
+│ [+] Add New Product...                   │ ← Primary color, clickable
+├─────────────────────────────────────────┤
+│ AGRISOLUTIONS                            │ ← Vendor group header
+│   💧 Humic Acid 12%                      │
+│   💧 Fulvic Acid 6%                      │
+├─────────────────────────────────────────┤
+│ NACHURS                                  │
+│   💧 Bio-K                               │
+│   ⚖️ AMS                                │
+└─────────────────────────────────────────┘
 ```
 
-**After:**
-```tsx
-<div className="bg-emerald-500 transition-all" style={{ width: `${cappedOnHandPct}%` }} />
-<div className="bg-amber-500 transition-all" style={{ width: `${cappedOnOrderPct}%` }} />
-<div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
-```
+---
 
-### Update Legend Text (lines 396-407)
+## Edge Cases
 
-Update labels to reflect value-based coverage:
-- "On Hand (X%)" instead of "Ready (count)"
-- "Ordered (X%)" instead of "Ordered (count)"
-- "To Go (X%)" instead of "Need to Order (count)"
+1. **New product has no price** - The new product may only have an `estimatedPrice`. The EntryModePanel cost preview will still work since it already handles `product.price || 0`.
 
-## Expected Results
+2. **Vendor not assigned** - New products won't have a `vendorId` initially. The product will appear under "Unknown Vendor" group until a vendor offering is added.
 
-### Before Fix
-- Progress bar: 20% green (only fully-covered products)
-- Display: "20% ready"
+3. **Products list sync** - The parent component needs to refresh the `products` list after the new ProductMaster is saved. The existing data flow via `onAddProduct` → FarmCalcApp should handle this.
 
-### After Fix
-- Progress bar: Proportional to actual $ coverage
-- Display: "66% on hand" (if $20k of $30k planned value is on-hand)
+---
 
-This gives you an instant visual of how much of your **budget** is covered, not just product counts.
+## Testing Checklist
+
+1. Click "+ Add Product" on a pass
+2. Open the product dropdown
+3. Click "Add New Product..." at top
+4. Fill in product details and save
+5. Verify the new product is auto-selected
+6. Set rate and save application
+7. Verify the product appears in the pass
+8. Verify the product appears in the Products list (sidebar)
