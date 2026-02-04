@@ -1467,6 +1467,7 @@ const AppContent: React.FC = () => {
               // Navigate to mix calculator - could store context for pre-population
               setActiveView('mix-calculator');
             }}
+            onAddProduct={handleAddProduct}
           />
         );
       case 'fields':

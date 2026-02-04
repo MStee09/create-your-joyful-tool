@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Trash2, Droplet, Weight, ChevronDown } from 'lucide-react';
+import { X, Trash2, Droplet, Weight, ChevronDown, Plus } from 'lucide-react';
 import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor, TierLabel } from '@/types/farm';
+import type { ProductMaster } from '@/types';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { ACRES_PRESETS, getApplicationAcresPercentage, calculateAutoTier, getTierDisplayLabel } from '@/lib/cropCalculations';
 import {
@@ -12,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SelectSeparator } from '@/components/ui/select';
+import { AddProductModal } from './AddProductModal';
 
 interface EntryModePanelProps {
   application: Application | null;
@@ -21,6 +24,7 @@ interface EntryModePanelProps {
   onSave: (app: Application) => void;
   onDelete: (appId: string) => void;
   onClose: () => void;
+  onAddProduct?: (product: ProductMaster) => void;
 }
 
 export const EntryModePanel: React.FC<EntryModePanelProps> = ({
@@ -31,6 +35,7 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
   onSave,
   onDelete,
   onClose,
+  onAddProduct,
 }) => {
   const [productId, setProductId] = useState(application?.productId || products[0]?.id || '');
   const [rate, setRate] = useState(application?.rate || 0);
@@ -42,15 +47,22 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
   const [showCustomAcres, setShowCustomAcres] = useState(false);
   const [tierOverride, setTierOverride] = useState<TierLabel | undefined>(application?.tierOverride);
   const [showTierOverride, setShowTierOverride] = useState(!!application?.tierOverride);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
 
-  const product = products.find(p => p.id === productId);
+  // Sync local products when parent products change
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
+  const product = localProducts.find(p => p.id === productId);
 
   // Group products by vendor, sorted alphabetically by vendor name
   const productsByVendor = useMemo(() => {
     // Create a map of vendorId -> { vendor, products }
     const vendorMap = new Map<string, { vendor: Vendor | undefined; products: Product[] }>();
     
-    products.forEach(p => {
+    localProducts.forEach(p => {
       const vendor = vendors.find(v => v.id === p.vendorId);
       const vendorId = p.vendorId || 'unknown';
       
@@ -179,9 +191,39 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
     }
   };
 
+  const handleProductChange = (value: string) => {
+    if (value === '__add_new__') {
+      setShowAddProductModal(true);
+      return;
+    }
+    setProductId(value);
+  };
+
+  const handleNewProductSave = (newProductMaster: ProductMaster) => {
+    // Notify parent to persist the new product
+    onAddProduct?.(newProductMaster);
+    
+    // Create a temporary Product from ProductMaster for immediate use
+    const newProduct: Product = {
+      id: newProductMaster.id,
+      name: newProductMaster.name,
+      form: newProductMaster.form,
+      price: newProductMaster.estimatedPrice || 0,
+      priceUnit: (newProductMaster.estimatedPriceUnit || 
+                 (newProductMaster.form === 'liquid' ? 'gal' : 'lbs')) as Product['priceUnit'],
+      vendorId: '', // No vendor yet
+    };
+    
+    // Add to local products list and select it
+    setLocalProducts(prev => [...prev, newProduct]);
+    setProductId(newProductMaster.id);
+    setShowAddProductModal(false);
+  };
+
   if (!application) return null;
 
   return (
+    <>
     <div className="fixed inset-y-0 right-0 w-96 bg-card border-l border-border shadow-xl z-50 flex flex-col animate-slide-in-right">
       {/* Header */}
       <div className="px-6 py-4 border-b border-border flex items-center justify-between">
@@ -199,7 +241,7 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
         {/* Product Select - Grouped by Vendor */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Product</label>
-          <Select value={productId} onValueChange={setProductId}>
+          <Select value={productId} onValueChange={handleProductChange}>
             <SelectTrigger className="w-full bg-background border border-input">
               <SelectValue placeholder="Select a product">
                 {product && (
@@ -215,6 +257,19 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
               </SelectValue>
             </SelectTrigger>
             <SelectContent className="bg-popover border border-border shadow-lg z-[100] max-h-[400px]">
+              {/* Add New Product option - always first */}
+              {onAddProduct && (
+                <>
+                  <SelectItem value="__add_new__" className="cursor-pointer text-primary font-medium">
+                    <div className="flex items-center gap-2 py-0.5">
+                      <Plus className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>Add New Product...</span>
+                    </div>
+                  </SelectItem>
+                  <SelectSeparator />
+                </>
+              )}
+              
               {productsByVendor.map(({ vendor, products: vendorProducts }) => (
                 <SelectGroup key={vendor?.id || 'unknown'}>
                   <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-1.5 -mx-1 sticky top-0">
@@ -411,5 +466,13 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
         </div>
       </div>
     </div>
+
+      {/* Add Product Modal */}
+      <AddProductModal
+        open={showAddProductModal}
+        onOpenChange={setShowAddProductModal}
+        onSave={handleNewProductSave}
+      />
+    </>
   );
 };
