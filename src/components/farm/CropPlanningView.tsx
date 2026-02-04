@@ -77,6 +77,7 @@ interface CropPlanningViewProps {
   onUpdateFieldAssignments: (assignments: FieldAssignment[]) => void;
   onUpdateFieldCropOverrides: (overrides: FieldCropOverride[]) => void;
   onNavigateToMixCalculator?: (fieldId: string, acres: number) => void;
+  onAddProduct?: (product: ProductMaster) => void;
 }
 
 export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
@@ -95,6 +96,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   onUpdateFieldAssignments,
   onUpdateFieldCropOverrides,
   onNavigateToMixCalculator,
+  onAddProduct,
 }) => {
   const [editingAcres, setEditingAcres] = useState(false);
   const [acresValue, setAcresValue] = useState(crop.totalAcres);
@@ -887,9 +889,11 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
           application={editingApplication}
           crop={crop}
           products={products}
+          vendors={vendors}
           onSave={handleSaveApplication}
           onDelete={handleDeleteApplication}
           onClose={() => setEditingApplication(null)}
+          onAddProduct={onAddProduct}
         />
       )}
       
