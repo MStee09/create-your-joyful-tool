@@ -260,11 +260,17 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
   }, [readiness.items, products, scopedPurchases]);
 
-  // Progress bar percentages
-  const total = readiness.totalCount || 1;
-  const readyPct = (readiness.readyCount / total) * 100;
-  const onOrderPct = (readiness.onOrderCount / total) * 100;
-  const blockingPct = (readiness.blockingCount / total) * 100;
+  // Value-based progress bar percentages
+  const onHandPct = valueMetrics.plannedValue > 0 
+    ? (valueMetrics.onHandValue / valueMetrics.plannedValue) * 100 
+    : 0;
+  const onOrderPct = valueMetrics.plannedValue > 0 
+    ? (valueMetrics.onOrderValue / valueMetrics.plannedValue) * 100 
+    : 0;
+  // Ensure percentages don't exceed 100% total
+  const cappedOnHandPct = Math.min(100, onHandPct);
+  const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
+  const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
   return (
     <div className="p-8 space-y-6">
@@ -385,25 +391,25 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         <div className="mt-6">
           <div className="flex items-center justify-between text-sm text-stone-500 mb-2">
             <span>Plan Coverage</span>
-            <span>{Math.round(readyPct)}% ready</span>
+            <span>{Math.round(cappedOnHandPct)}% on hand</span>
           </div>
           <div className="h-3 bg-stone-100 rounded-full overflow-hidden flex">
-            <div className="bg-emerald-500 transition-all" style={{ width: `${readyPct}%` }} />
-            <div className="bg-amber-500 transition-all" style={{ width: `${onOrderPct}%` }} />
+            <div className="bg-emerald-500 transition-all" style={{ width: `${cappedOnHandPct}%` }} />
+            <div className="bg-amber-500 transition-all" style={{ width: `${cappedOnOrderPct}%` }} />
             <div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
           </div>
           <div className="mt-3 flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-              <span className="text-stone-600">Ready ({readiness.readyCount})</span>
+              <span className="text-stone-600">On Hand ({Math.round(cappedOnHandPct)}%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-amber-500 rounded-full" />
-              <span className="text-stone-600">Ordered ({readiness.onOrderCount})</span>
+              <span className="text-stone-600">Ordered ({Math.round(cappedOnOrderPct)}%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-rose-500 rounded-full" />
-              <span className="text-stone-600">Need to Order ({readiness.blockingCount})</span>
+              <span className="text-stone-600">To Go ({Math.round(blockingPct)}%)</span>
             </div>
           </div>
         </div>
