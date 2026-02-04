@@ -1,121 +1,105 @@
 
-# Fix Value Calculations for Ton-Priced Products
+# Fix "% Ready" to Include Partial On-Hand Coverage
 
-## Root Cause Identified
+## Problem
 
-The **"On Order"** and **"To Go"** dollar amounts are massively inflated because `getPlannedUnitPrice()` returns the raw product price without considering unit conversions.
+The Order Status progress bar shows "X% ready" but this percentage is calculated based on **count of fully-covered products**, not actual inventory coverage.
 
-### The Bug
+**Example of the issue:**
+- 10 products in plan
+- 8 products have 80% of needed inventory on-hand (but need orders to complete)
+- 2 products are fully covered on-hand
 
-For a product like **AMS** (Ammonium Sulfate):
-- Price: **$420/ton**
-- Planned usage calculated in **lbs** (e.g., 13,200 lbs)
-
-Current calculation:
-```
-plannedValue = 13,200 lbs × $420 = $5,544,000 ❌
-```
-
-Correct calculation:
-```
-pricePerLb = $420 / 2000 = $0.21/lb
-plannedValue = 13,200 lbs × $0.21 = $2,772 ✓
-```
-
-This bug affects all products priced per **ton** but measured in **lbs**, causing values to be inflated by ~2000x.
-
----
+**Current display:** "20% ready" (only 2/10 are fully covered)  
+**Better display:** "66% ready" (based on actual on-hand value coverage)
 
 ## Solution
 
-Update `getPlannedUnitPrice()` in `src/lib/planReadinessUtils.ts` to normalize prices to match the unit returned by `calculatePlannedUsage()`:
+Change the "% ready" progress bar display to show **value-based on-hand coverage** instead of product count. This gives a more accurate picture of how prepared you are.
 
-**For standard dry products (priced per ton):**
-- Divide price by 2000 to get per-lb price
-- The planned quantity is always in lbs
+### Current vs Proposed
 
-**For container-based products (priced per jug/bag):**
-- Return price as-is (planned qty is already in containers)
-
-**For standard liquid products (priced per gal):**
-- Return price as-is (planned qty is already in gal)
-
----
+| Metric | Current Calculation | Proposed Calculation |
+|--------|---------------------|----------------------|
+| % Ready | `readyCount / totalCount` | `onHandValue / plannedValue` |
+| Progress bar green segment | Products fully covered by on-hand | Proportion of planned $ value on-hand |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/planReadinessUtils.ts` | Update `getPlannedUnitPrice()` to handle ton → lbs conversion |
+| `src/components/farm/PlanReadinessView.tsx` | Update progress bar to use `onHandValue / plannedValue` for the "ready" percentage |
 
----
+## Implementation Details
 
-## Updated Code
+### Update Progress Bar Logic (lines 263-267)
 
+**Before:**
 ```typescript
-/**
- * Get price for valuing PLANNED usage quantities.
- * 
- * calculatePlannedUsage() returns quantities in:
- *   - Container-based products: containers (jugs, bags, etc.) 
- *   - Standard liquid products: gallons
- *   - Standard dry products: lbs (NOT tons!)
- * 
- * So we need to normalize the price to match these units.
- */
-export function getPlannedUnitPrice(product: Product | undefined): number {
-  if (!product) return 0;
-  const price = product.price || 0;
-  
-  // Container-based pricing: price is per container, planned qty is in containers
-  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
-  if (isContainerPricing) {
-    return price; // Already matches
-  }
-  
-  // Ton pricing: convert to per-lb since planned qty is in lbs
-  if (product.priceUnit === 'ton') {
-    return price / 2000;
-  }
-  
-  // Standard per-unit pricing (gal, lbs): already matches
-  return price;
-}
+const total = readiness.totalCount || 1;
+const readyPct = (readiness.readyCount / total) * 100;
+const onOrderPct = (readiness.onOrderCount / total) * 100;
+const blockingPct = (readiness.blockingCount / total) * 100;
 ```
 
----
-
-## Why This Also Fixes "On Order" Value
-
-The "On Order" value uses `line.totalPrice` from actual purchase records, which is already correct. However, when calculating `shortValue`:
-
+**After:**
 ```typescript
-shortValue = plannedValue - onHandValue - onOrderValue
+// Value-based progress percentages
+const onHandPct = valueMetrics.plannedValue > 0 
+  ? (valueMetrics.onHandValue / valueMetrics.plannedValue) * 100 
+  : 0;
+const onOrderPct = valueMetrics.plannedValue > 0 
+  ? (valueMetrics.onOrderValue / valueMetrics.plannedValue) * 100 
+  : 0;
+// Ensure percentages don't exceed 100% total
+const cappedOnHandPct = Math.min(100, onHandPct);
+const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
+const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 ```
 
-If `plannedValue` is inflated 2000x, then `shortValue` is also massively wrong. Fixing `plannedValue` will cascade to fix `shortValue` (the "To Go" amount).
+### Update Progress Bar Display (line 388)
 
----
+**Before:**
+```tsx
+<span>{Math.round(readyPct)}% ready</span>
+```
+
+**After:**
+```tsx
+<span>{Math.round(cappedOnHandPct)}% on hand</span>
+```
+
+### Update Progress Bar Segments (lines 390-394)
+
+**Before:**
+```tsx
+<div className="bg-emerald-500 transition-all" style={{ width: `${readyPct}%` }} />
+<div className="bg-amber-500 transition-all" style={{ width: `${onOrderPct}%` }} />
+<div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
+```
+
+**After:**
+```tsx
+<div className="bg-emerald-500 transition-all" style={{ width: `${cappedOnHandPct}%` }} />
+<div className="bg-amber-500 transition-all" style={{ width: `${cappedOnOrderPct}%` }} />
+<div className="bg-rose-500 transition-all" style={{ width: `${blockingPct}%` }} />
+```
+
+### Update Legend Text (lines 396-407)
+
+Update labels to reflect value-based coverage:
+- "On Hand (X%)" instead of "Ready (count)"
+- "Ordered (X%)" instead of "Ordered (count)"
+- "To Go (X%)" instead of "Need to Order (count)"
 
 ## Expected Results
 
 ### Before Fix
-- Planned Value: ~$5,544,000 (wrong - treating $420/ton as $420/lb)
-- On Order Value: ~$27,000 (correct - from actual purchases)
-- Short Value (To Go): ~$5,517,000 (wrong)
+- Progress bar: 20% green (only fully-covered products)
+- Display: "20% ready"
 
 ### After Fix
-- Planned Value: ~$30,000 (correct - $420/ton ÷ 2000 = $0.21/lb)
-- On Order Value: ~$27,000 (unchanged - already correct)
-- Short Value (To Go): ~$3,000 (correct)
+- Progress bar: Proportional to actual $ coverage
+- Display: "66% on hand" (if $20k of $30k planned value is on-hand)
 
----
-
-## Testing Checklist
-
-After implementation:
-1. Dashboard Order Status widget should show reasonable $ values
-2. Order Status detail page should show matching values
-3. Products priced per ton (AMS, Urea, KCL, SOP) should contribute proportionally small amounts
-4. Container-priced products (PiKSi Dust) should still calculate correctly
-5. Standard liquid products (Humic Acid 12%) should still calculate correctly
+This gives you an instant visual of how much of your **budget** is covered, not just product counts.
