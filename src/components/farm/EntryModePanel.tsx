@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Trash2, Droplet, Weight, ChevronDown, Plus } from 'lucide-react';
+import { X, Trash2, Droplet, Weight, Plus, Check, ChevronsUpDown } from 'lucide-react';
 import type { Application, Product, Crop, RateUnit, LiquidUnit, DryUnit, Vendor, TierLabel } from '@/types/farm';
 import type { ProductMaster } from '@/types';
 import { formatNumber, formatCurrency, convertToGallons, convertToPounds } from '@/utils/farmUtils';
@@ -7,13 +7,26 @@ import { ACRES_PRESETS, getApplicationAcresPercentage, calculateAutoTier, getTie
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SelectSeparator } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { AddProductModal } from './AddProductModal';
 
 interface EntryModePanelProps {
@@ -49,6 +62,8 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
   const [showTierOverride, setShowTierOverride] = useState(!!application?.tierOverride);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   // Sync local products when parent products change
   useEffect(() => {
@@ -84,7 +99,22 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
         // Sort products within each vendor alphabetically
         products: group.products.slice().sort((a, b) => a.name.localeCompare(b.name))
       }));
-  }, [products, vendors]);
+  }, [localProducts, vendors]);
+
+  // Filter products based on search term
+  const filteredProductsByVendor = useMemo(() => {
+    if (!productSearch.trim()) return productsByVendor;
+    
+    const searchLower = productSearch.toLowerCase();
+    return productsByVendor
+      .map(group => ({
+        ...group,
+        products: group.products.filter(p => 
+          p.name.toLowerCase().includes(searchLower)
+        )
+      }))
+      .filter(group => group.products.length > 0);
+  }, [productsByVendor, productSearch]);
   
   // Calculate live cost preview
   let costPerAcre = 0;
@@ -191,13 +221,6 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
     }
   };
 
-  const handleProductChange = (value: string) => {
-    if (value === '__add_new__') {
-      setShowAddProductModal(true);
-      return;
-    }
-    setProductId(value);
-  };
 
   const handleNewProductSave = (newProductMaster: ProductMaster) => {
     // Notify parent to persist the new product
@@ -238,63 +261,95 @@ export const EntryModePanel: React.FC<EntryModePanelProps> = ({
 
       {/* Form */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Product Select - Grouped by Vendor */}
+        {/* Product Select - Searchable Combobox */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Product</label>
-          <Select value={productId} onValueChange={handleProductChange}>
-            <SelectTrigger className="w-full bg-background border border-input">
-              <SelectValue placeholder="Select a product">
-                {product && (
+          <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={productSearchOpen}
+                className="w-full justify-between font-normal bg-background border-input"
+              >
+                {product ? (
                   <div className="flex items-center gap-2">
                     {product.form === 'liquid' ? (
-                      <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      <Droplet className="h-3.5 w-3.5 text-sky-500 flex-shrink-0" />
                     ) : (
-                      <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                      <Weight className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
                     )}
                     <span className="truncate">{product.name}</span>
                   </div>
+                ) : (
+                  "Select product..."
                 )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="bg-popover border border-border shadow-lg z-[100] max-h-[400px]">
-              {/* Add New Product option - always first */}
-              {onAddProduct && (
-                <>
-                  <SelectItem value="__add_new__" className="cursor-pointer text-primary font-medium">
-                    <div className="flex items-center gap-2 py-0.5">
-                      <Plus className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>Add New Product...</span>
-                    </div>
-                  </SelectItem>
-                  <SelectSeparator />
-                </>
-              )}
-              
-              {productsByVendor.map(({ vendor, products: vendorProducts }) => (
-                <SelectGroup key={vendor?.id || 'unknown'}>
-                  <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-1.5 -mx-1 sticky top-0">
-                    {vendor?.name || 'Unknown Vendor'}
-                  </SelectLabel>
-                  {vendorProducts.map(p => (
-                    <SelectItem 
-                      key={p.id} 
-                      value={p.id}
-                      className="cursor-pointer pl-4"
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput 
+                  placeholder="Search products..." 
+                  value={productSearch}
+                  onValueChange={setProductSearch}
+                />
+                <CommandList className="max-h-[300px]">
+                  {/* Add New Product - always visible */}
+                  {onAddProduct && (
+                    <>
+                      <CommandItem
+                        onSelect={() => {
+                          setShowAddProductModal(true);
+                          setProductSearchOpen(false);
+                        }}
+                        className="text-primary font-medium"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add New Product...
+                      </CommandItem>
+                      <CommandSeparator />
+                    </>
+                  )}
+                  
+                  {/* Empty state */}
+                  <CommandEmpty>No products found</CommandEmpty>
+                  
+                  {/* Vendor-grouped products */}
+                  {filteredProductsByVendor.map(({ vendor, products: vendorProducts }) => (
+                    <CommandGroup 
+                      key={vendor?.id || 'unknown'} 
+                      heading={vendor?.name || 'Unknown Vendor'}
                     >
-                      <div className="flex items-center gap-2 py-0.5">
-                        {p.form === 'liquid' ? (
-                          <Droplet className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                        ) : (
-                          <Weight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                        )}
-                        <span className="font-medium">{p.name}</span>
-                      </div>
-                    </SelectItem>
+                      {vendorProducts.map(p => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.id}
+                          onSelect={() => {
+                            setProductId(p.id);
+                            setProductSearchOpen(false);
+                            setProductSearch('');
+                          }}
+                        >
+                          <Check className={cn(
+                            "mr-2 h-4 w-4",
+                            productId === p.id ? "opacity-100" : "opacity-0"
+                          )} />
+                          {p.form === 'liquid' ? (
+                            <Droplet className="mr-2 h-3.5 w-3.5 text-sky-500" />
+                          ) : (
+                            <Weight className="mr-2 h-3.5 w-3.5 text-orange-500" />
+                          )}
+                          {p.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
                   ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Rate */}
