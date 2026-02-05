@@ -1,174 +1,232 @@
 
-# Add "Create New Product" Option in Pass Product Selector
+
+# Add Fuzzy Search to Product Selector in EntryModePanel
 
 ## Overview
 
-When adding a product to a pass, users need the ability to create a new product if it doesn't already exist in the dropdown. This will integrate the `AddProductModal` into the `EntryModePanel` product selection flow.
+Replace the current `Select` dropdown with a searchable `Popover` + `Command` combobox that provides fuzzy filtering as you type. This pattern is already used in `AddProductModal.tsx` for the manufacturer field.
 
-## Current Flow
+## Current State
 
-1. User clicks "+ Add Product" on a pass card
-2. `handleAddApplication` creates a placeholder application with the first product
-3. `EntryModePanel` opens with a product dropdown (grouped by vendor)
-4. User must select from existing products only - **no way to add new products**
+- Product selection uses a `Select` dropdown with vendor-grouped items
+- No way to filter/search - users must scroll through all products
+- With many products, finding the right one is slow
 
-## Proposed Flow
+## Proposed UX
 
-1. User clicks "+ Add Product" on a pass card
-2. `EntryModePanel` opens with product dropdown
-3. At the top of the dropdown, a **"+ Add New Product..."** option appears
-4. Clicking it opens `AddProductModal`
-5. After saving, the new product is automatically selected in the panel
-6. User continues configuring rate, acres, etc.
+1. User clicks the product input field
+2. A popover opens with a search box at top
+3. Typing filters products in real-time (fuzzy matching on product name)
+4. Vendor groupings are preserved for matching products
+5. "Add New Product..." option always visible at top
+6. Clicking a product selects it and closes the popover
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/EntryModePanel.tsx` | Add "Add New Product" option, integrate `AddProductModal`, add callback for new products |
-| `src/components/farm/CropPlanningView.tsx` | Pass `onAddProduct` callback and `productMasters` to EntryModePanel |
+| `src/components/farm/EntryModePanel.tsx` | Replace `Select` with `Popover` + `Command` combobox |
 
 ---
 
 ## Technical Details
 
-### EntryModePanel Changes
+### Import Changes
 
-**New Props:**
+Add Command and Popover imports:
 ```typescript
-interface EntryModePanelProps {
-  // ...existing props...
-  productMasters?: ProductMaster[];
-  onAddProduct?: (product: ProductMaster) => void;
-}
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from '@/components/ui/button';
+import { Check, ChevronsUpDown } from 'lucide-react';
 ```
 
-**State & Logic:**
-- Add `showAddProductModal` state
-- Import and render `AddProductModal`
-- Add a "special" item at the top of the product select that triggers the modal
-- When `AddProductModal.onSave` fires:
-  1. Call `onAddProduct` to persist the new ProductMaster
-  2. Create a temporary Product object from the ProductMaster for immediate selection
-  3. Set `productId` to the new product's ID
+### New State
 
-**Dropdown Structure:**
+```typescript
+const [productSearchOpen, setProductSearchOpen] = useState(false);
+const [productSearch, setProductSearch] = useState('');
+```
+
+### Filtered Products Logic
+
+Filter products based on search term while preserving vendor grouping:
+```typescript
+const filteredProductsByVendor = useMemo(() => {
+  if (!productSearch.trim()) return productsByVendor;
+  
+  const searchLower = productSearch.toLowerCase();
+  return productsByVendor
+    .map(group => ({
+      ...group,
+      products: group.products.filter(p => 
+        p.name.toLowerCase().includes(searchLower)
+      )
+    }))
+    .filter(group => group.products.length > 0);
+}, [productsByVendor, productSearch]);
+```
+
+### Updated UI Component
+
+Replace the Select with a Combobox pattern:
 ```tsx
-<SelectContent>
-  {/* Add New Product option - always first */}
-  <SelectItem value="__add_new__" className="text-primary font-medium">
-    <div className="flex items-center gap-2">
-      <Plus className="h-3.5 w-3.5" />
-      Add New Product...
-    </div>
-  </SelectItem>
+<Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+  <PopoverTrigger asChild>
+    <Button
+      variant="outline"
+      role="combobox"
+      aria-expanded={productSearchOpen}
+      className="w-full justify-between font-normal bg-background border-input"
+    >
+      {product ? (
+        <div className="flex items-center gap-2">
+          {product.form === 'liquid' ? (
+            <Droplet className="h-3.5 w-3.5 text-blue-500" />
+          ) : (
+            <Weight className="h-3.5 w-3.5 text-amber-600" />
+          )}
+          <span className="truncate">{product.name}</span>
+        </div>
+      ) : (
+        "Select product..."
+      )}
+      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+    </Button>
+  </PopoverTrigger>
   
-  <Separator className="my-1" />
-  
-  {/* Existing products grouped by vendor */}
-  {productsByVendor.map(...)}
-</SelectContent>
+  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+    <Command shouldFilter={false}>
+      <CommandInput 
+        placeholder="Search products..." 
+        value={productSearch}
+        onValueChange={setProductSearch}
+      />
+      <CommandList className="max-h-[300px]">
+        {/* Add New Product - always visible */}
+        {onAddProduct && (
+          <>
+            <CommandItem
+              onSelect={() => {
+                setShowAddProductModal(true);
+                setProductSearchOpen(false);
+              }}
+              className="text-primary font-medium"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Product...
+            </CommandItem>
+            <CommandSeparator />
+          </>
+        )}
+        
+        {/* Empty state */}
+        <CommandEmpty>No products found</CommandEmpty>
+        
+        {/* Vendor-grouped products */}
+        {filteredProductsByVendor.map(({ vendor, products: vendorProducts }) => (
+          <CommandGroup 
+            key={vendor?.id || 'unknown'} 
+            heading={vendor?.name || 'Unknown Vendor'}
+          >
+            {vendorProducts.map(p => (
+              <CommandItem
+                key={p.id}
+                value={p.id}
+                onSelect={() => {
+                  setProductId(p.id);
+                  setProductSearchOpen(false);
+                  setProductSearch('');
+                }}
+              >
+                <Check className={cn(
+                  "mr-2 h-4 w-4",
+                  productId === p.id ? "opacity-100" : "opacity-0"
+                )} />
+                {p.form === 'liquid' ? (
+                  <Droplet className="mr-2 h-3.5 w-3.5 text-blue-500" />
+                ) : (
+                  <Weight className="mr-2 h-3.5 w-3.5 text-amber-600" />
+                )}
+                {p.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </Command>
+  </PopoverContent>
+</Popover>
 ```
 
-**Handler:**
-```typescript
-const handleProductChange = (value: string) => {
-  if (value === '__add_new__') {
-    setShowAddProductModal(true);
-    return;
-  }
-  setProductId(value);
-};
+### Key Implementation Notes
 
-const handleNewProductSave = (newProductMaster: ProductMaster) => {
-  // Notify parent to persist the new product
-  onAddProduct?.(newProductMaster);
-  
-  // Create a Product from ProductMaster for immediate use
-  const newProduct: Product = {
-    id: newProductMaster.id,
-    name: newProductMaster.name,
-    form: newProductMaster.form,
-    category: newProductMaster.category,
-    price: newProductMaster.estimatedPrice || 0,
-    priceUnit: newProductMaster.estimatedPriceUnit || 
-               (newProductMaster.form === 'liquid' ? 'gal' : 'lbs'),
-    vendorId: '', // No vendor yet
-  };
-  
-  // Add to local products list and select it
-  setProductId(newProductMaster.id);
-  setShowAddProductModal(false);
-};
-```
+1. **`shouldFilter={false}`** - Disable cmdk's built-in filtering since we're handling it ourselves to preserve vendor groupings
 
-### CropPlanningView Changes
+2. **Clear search on select** - Reset `productSearch` to empty when a product is selected
 
-Pass the required props to `EntryModePanel`:
+3. **Checkmark indicator** - Show a checkmark next to the currently selected product
 
-```tsx
-<EntryModePanel
-  application={editingApplication}
-  crop={crop}
-  products={products}
-  vendors={vendors}
-  productMasters={productMasters}
-  onAddProduct={handleAddNewProduct}
-  onSave={handleSaveApplication}
-  onDelete={handleDeleteApplication}
-  onClose={() => setEditingApplication(null)}
-/>
-```
-
-Add handler (or receive from parent):
-```typescript
-const handleAddNewProduct = (product: ProductMaster) => {
-  // This will bubble up to FarmCalcApp through existing patterns
-  // or use a prop passed down from parent
-};
-```
+4. **Preserve "Add New Product"** - Keep this option always visible at the top, outside the filtered list
 
 ---
 
 ## UI Preview
 
-The product dropdown will look like:
-
 ```text
 ┌─────────────────────────────────────────┐
-│ Product                                  │
+│ 💧 Humic Acid 12%                   ▼  │  ← Trigger button
+└─────────────────────────────────────────┘
+                    ↓ Click
+┌─────────────────────────────────────────┐
+│ 🔍 Search products...                   │  ← CommandInput
 ├─────────────────────────────────────────┤
-│ [+] Add New Product...                   │ ← Primary color, clickable
+│ [+] Add New Product...                   │  ← Always visible
 ├─────────────────────────────────────────┤
-│ AGRISOLUTIONS                            │ ← Vendor group header
-│   💧 Humic Acid 12%                      │
-│   💧 Fulvic Acid 6%                      │
+│ AGRISOLUTIONS                            │  ← Group heading
+│   ✓ 💧 Humic Acid 12%                    │  ← Selected
+│     💧 Fulvic Acid 6%                    │
 ├─────────────────────────────────────────┤
 │ NACHURS                                  │
-│   💧 Bio-K                               │
-│   ⚖️ AMS                                │
+│     💧 Bio-K                             │
+│     ⚖️ AMS                               │
+└─────────────────────────────────────────┘
+```
+
+When typing "hum":
+```text
+┌─────────────────────────────────────────┐
+│ 🔍 hum                                  │
+├─────────────────────────────────────────┤
+│ [+] Add New Product...                   │
+├─────────────────────────────────────────┤
+│ AGRISOLUTIONS                            │
+│   ✓ 💧 Humic Acid 12%                    │  ← Only matching products
 └─────────────────────────────────────────┘
 ```
 
 ---
 
-## Edge Cases
-
-1. **New product has no price** - The new product may only have an `estimatedPrice`. The EntryModePanel cost preview will still work since it already handles `product.price || 0`.
-
-2. **Vendor not assigned** - New products won't have a `vendorId` initially. The product will appear under "Unknown Vendor" group until a vendor offering is added.
-
-3. **Products list sync** - The parent component needs to refresh the `products` list after the new ProductMaster is saved. The existing data flow via `onAddProduct` → FarmCalcApp should handle this.
-
----
-
 ## Testing Checklist
 
-1. Click "+ Add Product" on a pass
-2. Open the product dropdown
-3. Click "Add New Product..." at top
-4. Fill in product details and save
-5. Verify the new product is auto-selected
-6. Set rate and save application
-7. Verify the product appears in the pass
-8. Verify the product appears in the Products list (sidebar)
+1. Click the product field - popover opens with search input focused
+2. Type a few characters - products filter in real-time
+3. Vendor groups with no matches are hidden
+4. "Add New Product..." always visible regardless of search
+5. Click a product - it's selected, popover closes, search clears
+6. Checkmark shows next to currently selected product
+7. ESC key closes popover without changing selection
+8. Arrow keys navigate between items
+
