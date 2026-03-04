@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, TrendingUp, TrendingDown, ChevronRight } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -8,16 +8,26 @@ import {
   Tooltip, 
   ResponsiveContainer,
   Legend,
-  Scatter,
   ComposedChart,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatCurrency } from '@/lib/calculations';
 import type { ProductMaster, Vendor, VendorOffering } from '@/types';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import { LogQuoteModal } from './LogQuoteModal';
+import { toast } from 'sonner';
 
 interface ProductPriceHistoryProps {
   product: ProductMaster;
@@ -25,6 +35,8 @@ interface ProductPriceHistoryProps {
   vendors: Vendor[];
   currentSeasonYear: number;
   onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
+  onUpdatePriceRecord?: (id: string, updates: Partial<PriceRecord>) => Promise<boolean>;
+  onDeletePriceRecord?: (id: string) => Promise<boolean>;
   vendorOfferings?: VendorOffering[];
   onUpdateOfferings?: (offerings: VendorOffering[]) => void;
 }
@@ -39,10 +51,14 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
   vendors,
   currentSeasonYear,
   onAddPriceRecord,
+  onUpdatePriceRecord,
+  onDeletePriceRecord,
   vendorOfferings,
   onUpdateOfferings,
 }) => {
   const [showLogQuote, setShowLogQuote] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<PriceRecord | null>(null);
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
   const [tableOpen, setTableOpen] = useState(true);
 
   const productRecords = useMemo(() => {
@@ -67,9 +83,7 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
       const ts = d.getTime();
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       const point: Record<string, any> = { ts, dateLabel: label };
-      // Put price in vendor-specific key
       point[r.vendorId] = r.normalizedPrice;
-      // Mark type for dot styling
       point[`${r.vendorId}_type`] = r.type;
       return point;
     });
@@ -98,6 +112,53 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
+  // Auto-sync vendor offering to latest price record for a given vendor+product
+  const syncOfferingToLatest = (excludeRecordId?: string) => {
+    if (!vendorOfferings || !onUpdateOfferings) return;
+    
+    const remainingRecords = excludeRecordId
+      ? productRecords.filter(r => r.id !== excludeRecordId)
+      : productRecords;
+
+    // Group by vendor and find latest for each
+    const vendorLatest: Record<string, PriceRecord> = {};
+    for (const r of remainingRecords) {
+      if (!vendorLatest[r.vendorId] || new Date(r.date) > new Date(vendorLatest[r.vendorId].date)) {
+        vendorLatest[r.vendorId] = r;
+      }
+    }
+
+    const updated = vendorOfferings.map(o => {
+      if (o.productId !== product.id) return o;
+      const latest = vendorLatest[o.vendorId];
+      if (latest) {
+        return { ...o, price: latest.normalizedPrice, priceUnit: latest.unit as any, lastQuotedDate: latest.date, updatedAt: new Date().toISOString() };
+      }
+      return { ...o, price: 0, updatedAt: new Date().toISOString() };
+    }) as VendorOffering[];
+    onUpdateOfferings(updated);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingRecordId || !onDeletePriceRecord) return;
+    const success = await onDeletePriceRecord(deletingRecordId);
+    if (success) {
+      syncOfferingToLatest(deletingRecordId);
+      toast.success('Price record deleted');
+    }
+    setDeletingRecordId(null);
+  };
+
+  const handleUpdateRecord = async (id: string, updates: Partial<PriceRecord>): Promise<boolean> => {
+    if (!onUpdatePriceRecord) return false;
+    const success = await onUpdatePriceRecord(id, updates);
+    if (success) {
+      // After update, sync offering
+      setTimeout(() => syncOfferingToLatest(), 100);
+    }
+    return success;
+  };
+
   // Custom dot renderer: filled for purchased, hollow for quote
   const renderDot = (vendorId: string, color: string) => (props: any) => {
     const { cx, cy, payload } = props;
@@ -117,13 +178,15 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
 
   const logQuoteModal = (
     <LogQuoteModal
-      isOpen={showLogQuote}
-      onClose={() => setShowLogQuote(false)}
+      isOpen={showLogQuote || !!editingRecord}
+      onClose={() => { setShowLogQuote(false); setEditingRecord(null); }}
       onSave={onAddPriceRecord}
+      onUpdate={handleUpdateRecord}
       products={[product]}
       vendors={vendors}
       currentSeasonYear={currentSeasonYear}
       preselectedProductId={product.id}
+      editingRecord={editingRecord}
       vendorOfferings={vendorOfferings}
       onUpdateOfferings={onUpdateOfferings}
     />
@@ -221,13 +284,13 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
       {priceChange && (
         <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
           {priceChange.percent > 0 ? (
-            <TrendingUp className="w-4 h-4 text-red-500" />
+            <TrendingUp className="w-4 h-4 text-destructive" />
           ) : (
             <TrendingDown className="w-4 h-4 text-emerald-500" />
           )}
           <span className="text-sm">
             {priceChange.years}-Year Change:{' '}
-            <span className={priceChange.percent > 0 ? 'text-red-600 font-medium' : 'text-emerald-600 font-medium'}>
+            <span className={priceChange.percent > 0 ? 'text-destructive font-medium' : 'text-emerald-600 font-medium'}>
               {priceChange.percent > 0 ? '+' : ''}{formatCurrency(priceChange.amount)}/{product.form === 'liquid' ? 'gal' : 'lb'}{' '}
               ({priceChange.percent > 0 ? '+' : ''}{priceChange.percent.toFixed(1)}%)
             </span>
@@ -253,6 +316,9 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
                   <th className="text-right px-3 py-2 font-medium">Price</th>
                   <th className="text-left px-3 py-2 font-medium">Package</th>
                   <th className="text-center px-3 py-2 font-medium">Type</th>
+                  {(onUpdatePriceRecord || onDeletePriceRecord) && (
+                    <th className="text-right px-3 py-2 font-medium w-20"></th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -271,6 +337,32 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
                         <Badge variant="outline" className="text-xs">Quote</Badge>
                       )}
                     </td>
+                    {(onUpdatePriceRecord || onDeletePriceRecord) && (
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {onUpdatePriceRecord && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setEditingRecord(record)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {onDeletePriceRecord && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingRecordId(record.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -280,6 +372,24 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
       </Collapsible>
 
       {logQuoteModal}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deletingRecordId} onOpenChange={(open) => !open && setDeletingRecordId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete price record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this price entry and update the vendor offering to reflect the latest remaining price.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

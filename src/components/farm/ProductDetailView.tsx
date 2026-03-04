@@ -71,6 +71,8 @@ interface ProductDetailViewProps {
   onBack: () => void;
   onNavigateToVendor?: (vendorId: string) => void;
   onAddPriceRecord?: (record: NewPriceRecord) => Promise<any>;
+  onUpdatePriceRecord?: (id: string, updates: Partial<PriceRecord>) => Promise<boolean>;
+  onDeletePriceRecord?: (id: string) => Promise<boolean>;
 }
 
 export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
@@ -89,6 +91,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onBack,
   onNavigateToVendor,
   onAddPriceRecord,
+  onUpdatePriceRecord,
+  onDeletePriceRecord,
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'purpose' | 'notes'>('details');
   const [editingDensity, setEditingDensity] = useState(false);
@@ -1402,6 +1406,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               vendors={vendors}
               currentSeasonYear={currentSeasonYear}
               onAddPriceRecord={onAddPriceRecord}
+              onUpdatePriceRecord={onUpdatePriceRecord}
+              onDeletePriceRecord={onDeletePriceRecord}
               vendorOfferings={vendorOfferings}
               onUpdateOfferings={onUpdateOfferings}
             />

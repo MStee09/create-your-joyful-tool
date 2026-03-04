@@ -14,11 +14,13 @@ interface LogQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (record: NewPriceRecord) => Promise<PriceRecord | null>;
+  onUpdate?: (id: string, updates: Partial<PriceRecord>) => Promise<boolean>;
   products: ProductMaster[];
   vendors: Vendor[];
   currentSeasonYear: number;
   preselectedProductId?: string;
   preselectedVendorId?: string;
+  editingRecord?: PriceRecord | null;
   /** When true, also update the matching vendor offering price */
   vendorOfferings?: VendorOffering[];
   onUpdateOfferings?: (offerings: VendorOffering[]) => void;
@@ -31,11 +33,13 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onUpdate,
   products,
   vendors,
   currentSeasonYear,
   preselectedProductId,
   preselectedVendorId,
+  editingRecord,
   vendorOfferings,
   onUpdateOfferings,
 }) => {
@@ -50,6 +54,9 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   const [seasonYear, setSeasonYear] = useState(currentSeasonYear);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recordType, setRecordType] = useState<'quote' | 'purchased'>('quote');
+
+  const isEditMode = !!editingRecord;
 
   // Vendors filtered to those with offerings for the selected product
   const availableVendors = useMemo(() => {
@@ -63,18 +70,33 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   // Initialize form
   useEffect(() => {
     if (isOpen) {
-      setProductId(preselectedProductId || '');
-      setVendorId(preselectedVendorId || '');
-      setPrice(0);
-      setUnit('gal');
-      setPackageType('');
-      setPackageSize(undefined);
-      setPackageUnit('gal');
-      setQuoteDate(new Date().toISOString().split('T')[0]);
-      setSeasonYear(currentSeasonYear);
-      setNotes('');
+      if (editingRecord) {
+        setProductId(editingRecord.productId);
+        setVendorId(editingRecord.vendorId);
+        setPrice(editingRecord.price);
+        setUnit(editingRecord.unit as 'gal' | 'lbs' | 'ton');
+        setPackageType(editingRecord.packageType || '');
+        setPackageSize(editingRecord.packageSize);
+        setPackageUnit((editingRecord.packageUnit || 'gal') as 'gal' | 'lbs');
+        setQuoteDate(editingRecord.date);
+        setSeasonYear(editingRecord.seasonYear);
+        setNotes(editingRecord.notes || '');
+        setRecordType(editingRecord.type);
+      } else {
+        setProductId(preselectedProductId || '');
+        setVendorId(preselectedVendorId || '');
+        setPrice(0);
+        setUnit('gal');
+        setPackageType('');
+        setPackageSize(undefined);
+        setPackageUnit('gal');
+        setQuoteDate(new Date().toISOString().split('T')[0]);
+        setSeasonYear(currentSeasonYear);
+        setNotes('');
+        setRecordType('quote');
+      }
     }
-  }, [isOpen, preselectedProductId, preselectedVendorId, currentSeasonYear]);
+  }, [isOpen, preselectedProductId, preselectedVendorId, currentSeasonYear, editingRecord]);
 
   // Auto-select vendor if only one, and pre-fill price from offering
   useEffect(() => {
@@ -120,39 +142,61 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
     try {
       const normalizedPrice = calculateNormalizedPrice();
 
-      const record: NewPriceRecord = {
-        productId,
-        vendorId,
-        price,
-        unit,
-        normalizedPrice,
-        packageType: packageType && packageType !== 'none' ? packageType : undefined,
-        packageSize: packageSize || undefined,
-        packageUnit: packageSize ? packageUnit : undefined,
-        date: quoteDate,
-        seasonYear,
-        type: 'quote',
-        notes: notes || undefined,
-      };
-
-      const result = await onSave(record);
-      if (result) {
-        // Always update vendor offering price
-        if (vendorOfferings && onUpdateOfferings) {
-          const existingOffering = vendorOfferings.find(
-            o => o.productId === productId && o.vendorId === vendorId
-          );
-          if (existingOffering) {
-            const updated = vendorOfferings.map(o =>
-              o.id === existingOffering.id
-                ? { ...o, price: normalizedPrice, priceUnit: unit, lastQuotedDate: quoteDate, updatedAt: new Date().toISOString() }
-                : o
-            );
-            onUpdateOfferings(updated);
-          }
+      if (isEditMode && onUpdate && editingRecord) {
+        const updates: Partial<PriceRecord> = {
+          productId,
+          vendorId,
+          price,
+          unit,
+          normalizedPrice,
+          packageType: packageType && packageType !== 'none' ? packageType : undefined,
+          packageSize: packageSize || undefined,
+          packageUnit: packageSize ? packageUnit : undefined,
+          date: quoteDate,
+          seasonYear,
+          type: recordType,
+          notes: notes || undefined,
+        };
+        const success = await onUpdate(editingRecord.id, updates);
+        if (success) {
+          toast.success('Price record updated');
+          onClose();
         }
-        toast.success('Price updated successfully');
-        onClose();
+      } else {
+        const record: NewPriceRecord = {
+          productId,
+          vendorId,
+          price,
+          unit,
+          normalizedPrice,
+          packageType: packageType && packageType !== 'none' ? packageType : undefined,
+          packageSize: packageSize || undefined,
+          packageUnit: packageSize ? packageUnit : undefined,
+          date: quoteDate,
+          seasonYear,
+          type: recordType,
+          notes: notes || undefined,
+        };
+
+        const result = await onSave(record);
+        if (result) {
+          // Always update vendor offering price
+          if (vendorOfferings && onUpdateOfferings) {
+            const existingOffering = vendorOfferings.find(
+              o => o.productId === productId && o.vendorId === vendorId
+            );
+            if (existingOffering) {
+              const updated = vendorOfferings.map(o =>
+                o.id === existingOffering.id
+                  ? { ...o, price: normalizedPrice, priceUnit: unit, lastQuotedDate: quoteDate, updatedAt: new Date().toISOString() }
+                  : o
+              );
+              onUpdateOfferings(updated);
+            }
+          }
+          toast.success('Price recorded');
+          onClose();
+        }
       }
     } catch (error) {
       console.error('Error saving quote:', error);
@@ -168,7 +212,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Update Price</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{isEditMode ? 'Edit Price Record' : 'Update Price'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -312,6 +356,20 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
             </div>
           </div>
 
+          {/* Type */}
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={recordType} onValueChange={val => setRecordType(val as 'quote' | 'purchased')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quote">Quote</SelectItem>
+                <SelectItem value="purchased">Purchased</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Notes */}
           <div className="space-y-2">
             <Label>Notes</Label>
@@ -335,7 +393,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
             disabled={!isValid || saving}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {saving ? 'Saving...' : 'Save Price'}
+            {saving ? 'Saving...' : isEditMode ? 'Update' : 'Save Price'}
           </Button>
         </div>
       </DialogContent>
