@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/calculations';
-import type { ProductMaster, Vendor } from '@/types';
+import type { ProductMaster, Vendor, VendorOffering } from '@/types';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import { LogQuoteModal } from './LogQuoteModal';
 
@@ -22,6 +22,8 @@ interface ProductPriceHistoryProps {
   vendors: Vendor[];
   currentSeasonYear: number;
   onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
+  vendorOfferings?: VendorOffering[];
+  onUpdateOfferings?: (offerings: VendorOffering[]) => void;
 }
 
 // Colors for different vendors
@@ -39,6 +41,8 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
   vendors,
   currentSeasonYear,
   onAddPriceRecord,
+  vendorOfferings,
+  onUpdateOfferings,
 }) => {
   const [showLogQuote, setShowLogQuote] = useState(false);
 
@@ -138,6 +142,8 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
           vendors={vendors}
           currentSeasonYear={currentSeasonYear}
           preselectedProductId={product.id}
+          vendorOfferings={vendorOfferings}
+          onUpdateOfferings={onUpdateOfferings}
         />
       </div>
     );
@@ -270,6 +276,8 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
         vendors={vendors}
         currentSeasonYear={currentSeasonYear}
         preselectedProductId={product.id}
+        vendorOfferings={vendorOfferings}
+        onUpdateOfferings={onUpdateOfferings}
       />
     </div>
   );
