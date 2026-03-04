@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/calculations';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
-import type { Vendor, ProductMaster } from '@/types';
+import type { Vendor, ProductMaster, VendorOffering } from '@/types';
 
 interface LogQuoteModalProps {
   isOpen: boolean;
@@ -18,6 +19,9 @@ interface LogQuoteModalProps {
   currentSeasonYear: number;
   preselectedProductId?: string;
   preselectedVendorId?: string;
+  /** When true, also update the matching vendor offering price */
+  vendorOfferings?: VendorOffering[];
+  onUpdateOfferings?: (offerings: VendorOffering[]) => void;
 }
 
 const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Bulk'];
@@ -32,6 +36,8 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   currentSeasonYear,
   preselectedProductId,
   preselectedVendorId,
+  vendorOfferings,
+  onUpdateOfferings,
 }) => {
   const [productId, setProductId] = useState('');
   const [vendorId, setVendorId] = useState('');
@@ -44,6 +50,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   const [seasonYear, setSeasonYear] = useState(currentSeasonYear);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [alsoUpdateOffering, setAlsoUpdateOffering] = useState(true);
 
   // Initialize form
   useEffect(() => {
@@ -58,6 +65,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
       setQuoteDate(new Date().toISOString().split('T')[0]);
       setSeasonYear(currentSeasonYear);
       setNotes('');
+      setAlsoUpdateOffering(true);
     }
   }, [isOpen, preselectedProductId, preselectedVendorId, currentSeasonYear]);
 
@@ -104,7 +112,21 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
 
       const result = await onSave(record);
       if (result) {
-        toast.success('Quote logged successfully');
+        // Also update vendor offering if checkbox is checked
+        if (alsoUpdateOffering && vendorOfferings && onUpdateOfferings) {
+          const existingOffering = vendorOfferings.find(
+            o => o.productId === productId && o.vendorId === vendorId
+          );
+          if (existingOffering) {
+            const updated = vendorOfferings.map(o =>
+              o.id === existingOffering.id
+                ? { ...o, price: normalizedPrice, priceUnit: unit, lastQuotedDate: quoteDate, updatedAt: new Date().toISOString() }
+                : o
+            );
+            onUpdateOfferings(updated);
+          }
+        }
+        toast.success('Price updated successfully');
         onClose();
       }
     } catch (error) {
@@ -121,7 +143,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Log Price Quote</DialogTitle>
+          <DialogTitle className="text-xl font-bold">Update Price</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -275,6 +297,20 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
               onChange={e => setNotes(e.target.value)}
             />
           </div>
+
+          {/* Also update vendor offering */}
+          {vendorOfferings && onUpdateOfferings && (
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Checkbox
+                id="update-offering"
+                checked={alsoUpdateOffering}
+                onCheckedChange={(checked) => setAlsoUpdateOffering(checked === true)}
+              />
+              <label htmlFor="update-offering" className="text-sm text-muted-foreground cursor-pointer">
+                Also update this vendor's current offering price
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -287,7 +323,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
             disabled={!isValid || saving}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {saving ? 'Saving...' : 'Save Quote'}
+            {saving ? 'Saving...' : 'Save Price'}
           </Button>
         </div>
       </DialogContent>

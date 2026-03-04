@@ -123,7 +123,7 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
             onClick={() => setShowLogQuote(true)}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Log Quote
+            Update Price
           </Button>
         </div>
         <p className="text-muted-foreground text-center py-8">
@@ -152,8 +152,8 @@ export const ProductPriceHistory: React.FC<ProductPriceHistoryProps> = ({
           size="sm"
           onClick={() => setShowLogQuote(true)}
         >
-          <Plus className="w-4 h-4 mr-1" />
-          Log Quote
+            <Plus className="w-4 h-4 mr-1" />
+            Update Price
         </Button>
       </div>
 
