@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Plus, TrendingUp, TrendingDown, Search, Pencil, Check, X } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Search, Pencil, Check, X, Award } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,18 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
   const [editPrice, setEditPrice] = useState<number>(0);
   const [trendView, setTrendView] = useState<'monthly' | 'yearly'>('monthly');
   const [trendRange, setTrendRange] = useState<string>('12'); // months or years
+  const [selectedChartProduct, setSelectedChartProduct] = useState<string>('all');
+
+  const VENDOR_COLORS = [
+    'hsl(var(--primary))',
+    'hsl(var(--destructive))',
+    'hsl(142, 76%, 36%)',
+    'hsl(280, 67%, 50%)',
+    'hsl(32, 95%, 50%)',
+    'hsl(190, 90%, 40%)',
+    'hsl(340, 75%, 55%)',
+    'hsl(60, 80%, 40%)',
+  ];
 
   // Get unique categories
   const categories = useMemo(() => {
@@ -169,6 +182,62 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
       decreases: sorted.filter(r => (r.change?.percent || 0) < 0).slice(0, 3),
     };
   }, [trendData]);
+
+  // Chart data: plot every price record as a data point, one line per vendor
+  const chartData = useMemo(() => {
+    const filtered = selectedChartProduct === 'all'
+      ? priceRecords
+      : priceRecords.filter(r => r.productId === selectedChartProduct);
+
+    if (filtered.length === 0) return { points: [], vendorLines: [] };
+
+    // Get unique vendors in filtered records
+    const vendorIds = [...new Set(filtered.map(r => r.vendorId))];
+    const vendorLines = vendorIds.map((vid, i) => ({
+      vendorId: vid,
+      vendorName: vendors.find(v => v.id === vid)?.name || 'Unknown',
+      color: VENDOR_COLORS[i % VENDOR_COLORS.length],
+    }));
+
+    // Sort all records by date
+    const sorted = [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Build data points grouped by date
+    const dateMap = new Map<string, Record<string, any>>();
+    sorted.forEach(r => {
+      const dateKey = r.date;
+      if (!dateMap.has(dateKey)) {
+        dateMap.set(dateKey, { date: dateKey, dateLabel: new Date(dateKey).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) });
+      }
+      const entry = dateMap.get(dateKey)!;
+      // If multiple records same vendor same date, take latest (highest normalizedPrice key wins)
+      entry[r.vendorId] = r.normalizedPrice;
+      entry[`${r.vendorId}_type`] = r.type;
+    });
+
+    return { points: Array.from(dateMap.values()), vendorLines };
+  }, [priceRecords, selectedChartProduct, vendors, VENDOR_COLORS]);
+
+  // Vendor comparison: latest price per vendor for selected product
+  const vendorComparison = useMemo(() => {
+    if (selectedChartProduct === 'all') return null;
+    const filtered = priceRecords.filter(r => r.productId === selectedChartProduct);
+    const vendorIds = [...new Set(filtered.map(r => r.vendorId))];
+    const latest = vendorIds.map(vid => {
+      const records = filtered.filter(r => r.vendorId === vid).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const vendor = vendors.find(v => v.id === vid);
+      const product = products.find(p => p.id === selectedChartProduct);
+      return records.length > 0 ? {
+        vendorId: vid,
+        vendorName: vendor?.name || 'Unknown',
+        price: records[0].normalizedPrice,
+        unit: records[0].unit,
+        date: records[0].date,
+        productUnit: product?.form === 'liquid' ? 'gal' : 'lbs',
+      } : null;
+    }).filter(Boolean).sort((a, b) => a!.price - b!.price) as { vendorId: string; vendorName: string; price: number; unit: string; date: string; productUnit: string }[];
+    return latest;
+  }, [priceRecords, selectedChartProduct, vendors, products]);
 
   // Inline edit handlers
   const startEdit = (offering: VendorOffering) => {
@@ -325,6 +394,112 @@ export const PriceHistoryView: React.FC<PriceHistoryViewProps> = ({
           </Card>
         </div>
       )}
+
+      {/* Price Trend Chart */}
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Price Trends</CardTitle>
+            <Select value={selectedChartProduct} onValueChange={setSelectedChartProduct}>
+              <SelectTrigger className="w-56 h-8">
+                <SelectValue placeholder="All Products" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Products (avg)</SelectItem>
+                {products
+                  .filter(p => priceRecords.some(r => r.productId === p.id))
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {chartData.points.length > 0 ? (
+            <>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData.points} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fontSize: 11 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => `$${v}`}
+                      className="text-muted-foreground"
+                    />
+                    <RechartsTooltip
+                      formatter={(value: number, name: string) => {
+                        const vendor = chartData.vendorLines.find(v => v.vendorId === name);
+                        return [`$${value.toFixed(2)}`, vendor?.vendorName || name];
+                      }}
+                      labelFormatter={(label) => `Date: ${label}`}
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
+                    />
+                    <Legend
+                      formatter={(value) => {
+                        const vendor = chartData.vendorLines.find(v => v.vendorId === value);
+                        return vendor?.vendorName || value;
+                      }}
+                    />
+                    {chartData.vendorLines.map(vl => (
+                      <Line
+                        key={vl.vendorId}
+                        type="monotone"
+                        dataKey={vl.vendorId}
+                        stroke={vl.color}
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: vl.color }}
+                        activeDot={{ r: 6 }}
+                        connectNulls
+                        name={vl.vendorId}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Vendor Comparison Callout */}
+              {vendorComparison && vendorComparison.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {vendorComparison.map((vc, i) => (
+                    <div
+                      key={vc.vendorId}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
+                        i === 0
+                          ? 'bg-primary/10 border border-primary/20'
+                          : 'bg-muted/50 border border-border'
+                      }`}
+                    >
+                      {i === 0 && <Award className="w-4 h-4 text-primary" />}
+                      <span className={i === 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}>
+                        {vc.vendorName}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(vc.price)}/{vc.unit}
+                      </span>
+                      {i > 0 && vendorComparison[0] && (
+                        <span className="text-xs text-destructive">
+                          +{formatCurrency(vc.price - vendorComparison[0].price)} more
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No price records found. Update prices to start tracking trends.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Price Update Table */}
       <Card className="mb-8">
