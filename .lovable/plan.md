@@ -1,57 +1,43 @@
 
 
-# Edit/Delete Price Records + Vendor Offering Role Clarification
+# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
 
-## The Two Problems
+## The Problem
 
-**1. Can't edit or delete price records.** The backend functions `updatePriceRecord` and `deletePriceRecord` already exist in `useSupabaseData.ts` and are exported -- but no UI exposes them. The table rows have no edit or delete buttons.
+The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
 
-**2. Vendor offerings feel pointless.** Right now vendor offerings store a price that goes stale immediately. The "Update Price" modal already syncs to the offering when you save, but there's no reverse flow: if someone edits a price record, the offering doesn't update. The offering price should always reflect the most recent price record for that vendor+product pair.
+## The Fix
 
-## My Recommendation on Vendor Offerings
-
-Vendor offerings should serve two purposes:
-- **Relationship**: which vendors carry which products (this drives the vendor dropdown filter)
-- **Current price**: always auto-synced from the latest price record for that vendor+product
-
-The offering price should NOT be independently editable. When you edit/delete a price record, the offering price auto-updates to match the latest remaining record. This eliminates the "stale offering" problem entirely.
+Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
 
 ## Changes
 
-### 1. Add edit/delete to the Recent Prices table in `ProductPriceHistory.tsx`
+### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
 
-Each row gets:
-- **Edit** (pencil icon) -- opens an inline edit or the LogQuoteModal pre-filled with that record's data, saves via `onUpdatePriceRecord`
-- **Delete** (trash icon) -- confirm dialog, calls `onDeletePriceRecord`
+- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
+- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
+- Add a small label or tooltip: "Price synced from latest price record"
+- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
+- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
+- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
 
-New props: `onUpdatePriceRecord` and `onDeletePriceRecord`.
+### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
 
-### 2. Wire `updatePriceRecord` and `deletePriceRecord` through the component chain
+- Add a small button next to the read-only price that says "Update" or has a pencil icon
+- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
+- New optional prop: `onLogQuote?: (vendorId: string) => void`
 
-- `FarmCalcApp.tsx` -- pass `updatePriceRecord` and `deletePriceRecord` to `ProductDetailView`
-- `ProductDetailView.tsx` -- accept and forward to `ProductPriceHistory`
-- `ProductPriceHistory.tsx` -- accept and use in table rows
+### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
 
-### 3. Auto-sync vendor offering price after edit/delete
-
-When a price record is edited or deleted, find the latest remaining price record for that vendor+product and update the vendor offering price to match. If no records remain, set offering price to 0.
-
-This happens in `ProductPriceHistory` after a successful update/delete call, using the existing `onUpdateOfferings` prop.
-
-### 4. LogQuoteModal: support edit mode
-
-Add an optional `editingRecord` prop. When set:
-- Modal title becomes "Edit Price Record"
-- All fields pre-fill from the record
-- Save calls `onUpdatePriceRecord(id, updates)` instead of `onAddPriceRecord`
-- The type (quote/purchased) is preserved and editable
+- Add state for `logQuoteVendorId`
+- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
+- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
+- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/ProductPriceHistory.tsx` | Add edit/delete buttons to table rows, edit modal state, auto-sync offering after changes |
-| `src/components/farm/LogQuoteModal.tsx` | Add `editingRecord` prop for edit mode |
-| `src/components/farm/ProductDetailView.tsx` | Accept and forward `onUpdatePriceRecord`, `onDeletePriceRecord` |
-| `src/FarmCalcApp.tsx` | Pass `updatePriceRecord`, `deletePriceRecord` to ProductDetailView |
+| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
+| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
 
