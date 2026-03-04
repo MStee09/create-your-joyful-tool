@@ -248,7 +248,7 @@ const Sidebar: React.FC<{
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Products</div>
           <NavButton id="products" label="Product Catalog" icon={FlaskConical} />
           <NavButton id="vendors" label="Vendors" icon={Building2} />
-          <NavButton id="price-history" label="Price History" icon={DollarSign} />
+          <NavButton id="price-history" label="Pricing" icon={DollarSign} />
         </div>
 
         {/* INVENTORY section */}
@@ -1398,6 +1398,27 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateVendorOfferings = async (newOfferings: VendorOffering[]) => {
+    // Detect price changes and auto-log price records
+    const oldOfferings = state.vendorOfferings || [];
+    for (const newOff of newOfferings) {
+      const oldOff = oldOfferings.find(o => o.id === newOff.id);
+      if (oldOff && oldOff.price !== newOff.price && newOff.price > 0) {
+        const product = (state.productMasters || []).find(p => p.id === newOff.productId);
+        const unit = newOff.priceUnit || (product?.form === 'liquid' ? 'gal' : 'lbs');
+        // Fire and forget — don't block the offering update
+        addPriceRecord({
+          productId: newOff.productId,
+          vendorId: newOff.vendorId,
+          price: newOff.price,
+          unit: unit as any,
+          normalizedPrice: newOff.price,
+          date: new Date().toISOString().split('T')[0],
+          seasonYear: currentSeason?.year || new Date().getFullYear(),
+          type: 'quote',
+          notes: 'Auto-logged from vendor offering update',
+        }).catch(console.error);
+      }
+    }
     await updateVendorOfferings(newOfferings);
   };
 
@@ -1653,14 +1674,16 @@ const AppContent: React.FC = () => {
         );
       case 'price-book':
       case 'market-prices':
-        // Redirect price views to Price History
+        // Redirect price views to Pricing
         return (
           <PriceHistoryView
             priceRecords={priceRecords || []}
             products={productMasters || []}
             vendors={vendors}
+            vendorOfferings={vendorOfferings || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPriceRecord={addPriceRecord}
+            onUpdateOfferings={handleUpdateVendorOfferings}
           />
         );
       case 'exports':
@@ -1741,8 +1764,10 @@ const AppContent: React.FC = () => {
             priceRecords={priceRecords || []}
             products={productMasters || []}
             vendors={vendors}
+            vendorOfferings={vendorOfferings || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPriceRecord={addPriceRecord}
+            onUpdateOfferings={handleUpdateVendorOfferings}
           />
         );
       case 'assistant':
