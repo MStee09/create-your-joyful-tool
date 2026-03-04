@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import type { PriceRecord, NewPriceRecord } from '@/types/priceRecord';
 import { ProductPriceHistory } from './ProductPriceHistory';
 import { ChemicalDataTab } from './ChemicalDataTab';
+import { LogQuoteModal } from './LogQuoteModal';
 import { isPesticideCategory, type ChemicalData } from '@/types/chemicalData';
 interface ProductDetailViewProps {
   product: ProductMaster;
@@ -156,6 +157,9 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   // Document data loaded from IndexedDB
   const [labelDoc, setLabelDoc] = useState<{ data: string; fileName?: string } | null>(null);
   const [sdsDoc, setSdsDoc] = useState<{ data: string; fileName?: string } | null>(null);
+  
+  // Log quote from vendor offerings shortcut
+  const [logQuoteVendorId, setLogQuoteVendorId] = useState<string | null>(null);
   
   // Load documents from IndexedDB on mount
   useEffect(() => {
@@ -1395,8 +1399,25 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               vendors={vendors}
               onUpdateOfferings={onUpdateOfferings}
               onNavigateToVendor={onNavigateToVendor}
+              onLogQuote={onAddPriceRecord ? (vendorId) => setLogQuoteVendorId(vendorId) : undefined}
             />
           </div>
+
+          {/* Log Quote Modal triggered from Vendor Offerings */}
+          {logQuoteVendorId && onAddPriceRecord && (
+            <LogQuoteModal
+              isOpen={!!logQuoteVendorId}
+              onClose={() => setLogQuoteVendorId(null)}
+              onSave={onAddPriceRecord}
+              products={[product]}
+              vendors={vendors}
+              currentSeasonYear={currentSeasonYear}
+              preselectedProductId={product.id}
+              preselectedVendorId={logQuoteVendorId}
+              vendorOfferings={vendorOfferings}
+              onUpdateOfferings={onUpdateOfferings}
+            />
+          )}
 
           {/* Price History */}
           {onAddPriceRecord && (
