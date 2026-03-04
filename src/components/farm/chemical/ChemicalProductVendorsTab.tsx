@@ -25,6 +25,7 @@ interface ChemicalProductVendorsTabProps {
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
   onAddVendor?: (vendor: Vendor) => void;
+  onLogQuote?: (vendorId: string) => void;
 }
 
 export function ChemicalProductVendorsTab({
@@ -35,6 +36,7 @@ export function ChemicalProductVendorsTab({
   onUpdateOfferings,
   onNavigateToVendor,
   onAddVendor,
+  onLogQuote,
 }: ChemicalProductVendorsTabProps) {
   const [editingEstPrice, setEditingEstPrice] = useState(false);
   const [estPriceValue, setEstPriceValue] = useState<number>(product.estimatedPrice || 0);
@@ -195,6 +197,7 @@ export function ChemicalProductVendorsTab({
             vendors={vendors}
             onUpdateOfferings={onUpdateOfferings}
             onNavigateToVendor={onNavigateToVendor}
+            onLogQuote={onLogQuote}
             onCreateVendor={onAddVendor ? async (vendorData) => {
               const newVendor: Vendor = {
                 id: crypto.randomUUID(),

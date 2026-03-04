@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle, TrendingDown, UserPlus } from 'lucide-react';
+import { Plus, Star, Trash2, Edit2, Check, X, Calendar, AlertTriangle, TrendingDown, UserPlus, DollarSign } from 'lucide-react';
 import type { VendorOffering, Vendor, ProductMaster } from '@/types';
 import { formatCurrency, generateId, calculateCostPerPound } from '@/lib/calculations';
 import { isLowestPrice } from '@/lib/pricingUtils';
@@ -23,6 +23,7 @@ interface VendorOfferingsTableProps {
   onUpdateOfferings: (offerings: VendorOffering[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
   onCreateVendor?: (vendor: Partial<Vendor>) => Vendor | Promise<Vendor>;
+  onLogQuote?: (vendorId: string) => void;
 }
 
 export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
@@ -32,6 +33,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   onUpdateOfferings,
   onNavigateToVendor,
   onCreateVendor,
+  onLogQuote,
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,34 +57,22 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   const handleAdd = () => {
     if (!formData.vendorId) return;
 
-    const price = formData.price ?? 0;
-    const priceUnit = formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal');
-    const isContainerPriced = ['jug', 'bag', 'case', 'tote'].includes(priceUnit);
-
-    const containerSize = isContainerPriced
-      ? (formData.containerSize !== undefined && formData.containerSize !== null
-          ? Number(formData.containerSize)
-          : undefined)
-      : undefined;
-
-    const containerUnit = isContainerPriced
-      ? (formData.containerUnit || (product.form === 'dry' ? 'g' : 'gal'))
-      : undefined;
+    const priceUnit = product.form === 'dry' ? 'lbs' : 'gal';
 
     const newOffering: VendorOffering = {
       id: generateId(),
       productId: product.id,
       vendorId: formData.vendorId,
-      price,
+      price: 0,
       priceUnit,
-      containerSize,
-      containerUnit,
+      containerSize: formData.containerSize !== undefined ? Number(formData.containerSize) : undefined,
+      containerUnit: formData.containerUnit,
       packaging: formData.packaging,
       sku: formData.sku,
       minOrder: formData.minOrder,
       freightTerms: formData.freightTerms,
-      lastQuotedDate: formData.lastQuotedDate || new Date().toISOString().split('T')[0],
-      isPreferred: productOfferings.length === 0, // First one is preferred
+      lastQuotedDate: undefined,
+      isPreferred: productOfferings.length === 0,
     };
 
     onUpdateOfferings([...offerings, newOffering]);
@@ -269,47 +259,32 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1 justify-end">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.price ?? offering.price}
-                            onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                            className="w-20 px-2 py-1 border border-input rounded text-sm text-right bg-background"
-                          />
-                          <select
-                            value={formData.priceUnit || offering.priceUnit}
-                            onChange={(e) => setFormData({ ...formData, priceUnit: e.target.value as VendorOffering['priceUnit'] })}
-                            className="px-1 py-1 border border-input rounded text-sm bg-background"
-                          >
-                            {product.form === 'liquid' ? (
-                              <>
-                                <option value="gal">/gal</option>
-                                <option value="tote">/tote</option>
-                              </>
-                            ) : (
-                              <>
-                                <option value="lbs">/lb</option>
-                                <option value="g">/g</option>
-                                <option value="ton">/ton</option>
-                                <option value="bag">/bag</option>
-                              </>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        {offering.price > 0 ? (
+                          <>
+                            <span>{formatCurrency(offering.price)}/{offering.priceUnit}</span>
+                            {isLowest && productOfferings.length > 1 && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 text-emerald-600 border-emerald-300 bg-emerald-50">
+                                <TrendingDown className="w-2.5 h-2.5 mr-0.5" />
+                                Lowest
+                              </Badge>
                             )}
-                            <option value="jug">/jug</option>
-                            <option value="case">/case</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <span>{formatCurrency(offering.price)}/{offering.priceUnit}</span>
-                          {isLowest && productOfferings.length > 1 && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 text-emerald-600 border-emerald-300 bg-emerald-50">
-                              <TrendingDown className="w-2.5 h-2.5 mr-0.5" />
-                              Lowest
-                            </Badge>
-                          )}
-                        </div>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground italic text-xs">No price</span>
+                        )}
+                        {onLogQuote && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onLogQuote(offering.vendorId); }}
+                            className="p-0.5 text-muted-foreground hover:text-primary rounded"
+                            title="Log a quote to update price"
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {offering.price > 0 && (
+                        <span className="text-[10px] text-muted-foreground">Synced from price history</span>
                       )}
                     </td>
                     {/* Contents - for container-based pricing */}
@@ -404,18 +379,9 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {isEditing ? (
-                        <input
-                          type="date"
-                          value={formData.lastQuotedDate ?? offering.lastQuotedDate ?? ''}
-                          onChange={(e) => setFormData({ ...formData, lastQuotedDate: e.target.value })}
-                          className="px-2 py-1 border border-input rounded text-sm bg-background"
-                        />
-                      ) : (
                         <span className="text-muted-foreground text-xs">
                           {offering.lastQuotedDate ? new Date(offering.lastQuotedDate).toLocaleDateString() : '-'}
                         </span>
-                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button
@@ -501,77 +467,11 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 text-muted-foreground">Price</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.price ?? ''}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value === '' ? undefined : Number(e.target.value) })}
-                  placeholder="0.00"
-                  className="flex-1 px-3 py-2 border border-input rounded-lg text-sm bg-background"
-                />
-                <select
-                  value={formData.priceUnit || (product.form === 'dry' ? 'lbs' : 'gal')}
-                  onChange={(e) => setFormData({ ...formData, priceUnit: e.target.value as VendorOffering['priceUnit'] })}
-                  className="px-2 py-2 border border-input rounded-lg text-sm bg-background"
-                >
-                  {product.form === 'liquid' ? (
-                    <>
-                      <option value="gal">/gal</option>
-                      <option value="tote">/tote</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="lbs">/lb</option>
-                      <option value="g">/g</option>
-                      <option value="ton">/ton</option>
-                      <option value="bag">/bag</option>
-                    </>
-                  )}
-                  <option value="jug">/jug</option>
-                  <option value="case">/case</option>
-                </select>
-              </div>
+              <p className="text-sm text-muted-foreground italic py-2">
+                Price will be set when you log a quote via Price History
+              </p>
             </div>
             {/* Container size - show when price is per container */}
-            {['jug', 'bag', 'case', 'tote'].includes(formData.priceUnit || '') && (
-              <div>
-                <label className="block text-xs font-medium mb-1 text-muted-foreground">Contents per {formData.priceUnit}</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formData.containerSize ?? ''}
-                    onChange={(e) => setFormData({ ...formData, containerSize: e.target.value === '' ? undefined : Number(e.target.value) })}
-                    placeholder="e.g., 500"
-                    className="flex-1 px-3 py-2 border border-input rounded-lg text-sm bg-background"
-                  />
-                  <select
-                    value={formData.containerUnit || (product.form === 'dry' ? 'g' : 'gal')}
-                    onChange={(e) => setFormData({ ...formData, containerUnit: e.target.value as VendorOffering['containerUnit'] })}
-                    className="px-2 py-2 border border-input rounded-lg text-sm bg-background"
-                  >
-                    {product.form === 'dry' ? (
-                      <>
-                        <option value="g">grams</option>
-                        <option value="lbs">lbs</option>
-                        <option value="oz">oz</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="gal">gal</option>
-                        <option value="oz">oz</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-                {formData.containerSize && formData.price && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    = ${(formData.price / formData.containerSize).toFixed(4)}/{formData.containerUnit || 'g'}
-                  </p>
-                )}
-              </div>
-            )}
             <div>
               <label className="block text-xs font-medium mb-1 text-muted-foreground">Packaging</label>
               <input
@@ -599,15 +499,6 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
                 value={formData.minOrder || ''}
                 onChange={(e) => setFormData({ ...formData, minOrder: e.target.value })}
                 placeholder="e.g., 1 pallet, 10 cases"
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Last Quoted</label>
-              <input
-                type="date"
-                value={formData.lastQuotedDate || new Date().toISOString().split('T')[0]}
-                onChange={(e) => setFormData({ ...formData, lastQuotedDate: e.target.value })}
                 className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
               />
             </div>
