@@ -1,51 +1,57 @@
 
 
-# Redesign Product Price History: Chart-First Layout
+# Edit/Delete Price Records + Vendor Offering Role Clarification
 
-## What Changes
+## The Two Problems
 
-The current layout buries the chart -- it's a small 192px tall chart conditionally rendered, with the table taking equal visual weight. The redesign flips the hierarchy: the trend chart becomes the hero element, and the line items become a compact collapsible detail below.
+**1. Can't edit or delete price records.** The backend functions `updatePriceRecord` and `deletePriceRecord` already exist in `useSupabaseData.ts` and are exported -- but no UI exposes them. The table rows have no edit or delete buttons.
 
-## Layout
+**2. Vendor offerings feel pointless.** Right now vendor offerings store a price that goes stale immediately. The "Update Price" modal already syncs to the offering when you save, but there's no reverse flow: if someone edits a price record, the offering doesn't update. The offering price should always reflect the most recent price record for that vendor+product pair.
 
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Price History                          [Update Price]    │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │                                                    │  │
-│  │            TREND CHART (280px tall)                 │  │
-│  │     Every data point plotted by date (not year)     │  │
-│  │     One line per vendor, dots = individual prices   │  │
-│  │                                                    │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  3-Year Change: +$12/ton (+2.5%)           ▲ trending up │
-│                                                          │
-│  ▸ Recent Prices (8)                    [collapsible]    │
-│    Date       Vendor      Price    Package   Type        │
-│    Mar 2026   Nutrien     $485/ton  Bulk     ✓ Purchased │
-│    ...                                                   │
-└─────────────────────────────────────────────────────────┘
-```
+## My Recommendation on Vendor Offerings
 
-## Changes in `ProductPriceHistory.tsx`
+Vendor offerings should serve two purposes:
+- **Relationship**: which vendors carry which products (this drives the vendor dropdown filter)
+- **Current price**: always auto-synced from the latest price record for that vendor+product
 
-1. **Chart uses actual dates, not just year buckets** -- currently it groups by year (4 data points). Change to plot every record by its actual date, sorted chronologically. This gives a real timeline users can watch.
+The offering price should NOT be independently editable. When you edit/delete a price record, the offering price auto-updates to match the latest remaining record. This eliminates the "stale offering" problem entirely.
 
-2. **Chart height increased** from `h-48` (192px) to `h-72` (288px) -- make it the dominant visual element.
+## Changes
 
-3. **Chart always renders** when there are records (remove the conditional `chartData.some(d => Object.keys(d).length > 1)` guard that hides it). If there's data, show the chart.
+### 1. Add edit/delete to the Recent Prices table in `ProductPriceHistory.tsx`
 
-4. **Include both purchases AND quotes** in the chart (currently filters to `type === 'purchased'` only). Use filled dots for purchases, hollow dots for quotes so you can see both.
+Each row gets:
+- **Edit** (pencil icon) -- opens an inline edit or the LogQuoteModal pre-filled with that record's data, saves via `onUpdatePriceRecord`
+- **Delete** (trash icon) -- confirm dialog, calls `onDeletePriceRecord`
 
-5. **X-axis shows month/year** instead of just year -- `"Mar '25"` format for readable date axis.
+New props: `onUpdatePriceRecord` and `onDeletePriceRecord`.
 
-6. **Recent prices table wrapped in a Collapsible** -- starts open but can be collapsed so the chart dominates. Uses Radix Collapsible already in the project.
+### 2. Wire `updatePriceRecord` and `deletePriceRecord` through the component chain
 
-7. **Price change summary stays** between chart and table as a compact insight bar.
+- `FarmCalcApp.tsx` -- pass `updatePriceRecord` and `deletePriceRecord` to `ProductDetailView`
+- `ProductDetailView.tsx` -- accept and forward to `ProductPriceHistory`
+- `ProductPriceHistory.tsx` -- accept and use in table rows
+
+### 3. Auto-sync vendor offering price after edit/delete
+
+When a price record is edited or deleted, find the latest remaining price record for that vendor+product and update the vendor offering price to match. If no records remain, set offering price to 0.
+
+This happens in `ProductPriceHistory` after a successful update/delete call, using the existing `onUpdateOfferings` prop.
+
+### 4. LogQuoteModal: support edit mode
+
+Add an optional `editingRecord` prop. When set:
+- Modal title becomes "Edit Price Record"
+- All fields pre-fill from the record
+- Save calls `onUpdatePriceRecord(id, updates)` instead of `onAddPriceRecord`
+- The type (quote/purchased) is preserved and editable
+
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/ProductPriceHistory.tsx` | Rebuild chart data to use actual dates; increase chart height; always show chart; add quote dots; collapsible table |
+| `src/components/farm/ProductPriceHistory.tsx` | Add edit/delete buttons to table rows, edit modal state, auto-sync offering after changes |
+| `src/components/farm/LogQuoteModal.tsx` | Add `editingRecord` prop for edit mode |
+| `src/components/farm/ProductDetailView.tsx` | Accept and forward `onUpdatePriceRecord`, `onDeletePriceRecord` |
+| `src/FarmCalcApp.tsx` | Pass `updatePriceRecord`, `deletePriceRecord` to ProductDetailView |
 
