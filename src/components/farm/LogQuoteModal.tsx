@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +50,15 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
   const [seasonYear, setSeasonYear] = useState(currentSeasonYear);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [alsoUpdateOffering, setAlsoUpdateOffering] = useState(true);
+
+  // Vendors filtered to those with offerings for the selected product
+  const availableVendors = useMemo(() => {
+    if (!productId || !vendorOfferings) return vendors;
+    const offeringsForProduct = vendorOfferings.filter(o => o.productId === productId);
+    if (offeringsForProduct.length === 0) return vendors; // fallback if no offerings
+    const vendorIds = new Set(offeringsForProduct.map(o => o.vendorId));
+    return vendors.filter(v => vendorIds.has(v.id));
+  }, [productId, vendorOfferings, vendors]);
 
   // Initialize form
   useEffect(() => {
@@ -65,19 +73,36 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
       setQuoteDate(new Date().toISOString().split('T')[0]);
       setSeasonYear(currentSeasonYear);
       setNotes('');
-      setAlsoUpdateOffering(true);
     }
   }, [isOpen, preselectedProductId, preselectedVendorId, currentSeasonYear]);
 
-  // Auto-set unit based on selected product
+  // Auto-select vendor if only one, and pre-fill price from offering
   useEffect(() => {
+    if (!productId) return;
+    // Auto-select if only one vendor
+    if (availableVendors.length === 1 && !vendorId) {
+      setVendorId(availableVendors[0].id);
+    }
+    // Set default unit from product
     const product = products.find(p => p.id === productId);
     if (product) {
       const defaultUnit: 'gal' | 'lbs' = product.form === 'liquid' ? 'gal' : 'lbs';
-      setUnit(defaultUnit);
       setPackageUnit(defaultUnit);
     }
-  }, [productId, products]);
+  }, [productId, availableVendors, products]);
+
+  // Pre-fill price from vendor offering when vendor is selected
+  useEffect(() => {
+    if (!productId || !vendorId || !vendorOfferings) return;
+    const offering = vendorOfferings.find(
+      o => o.productId === productId && o.vendorId === vendorId
+    );
+    if (offering) {
+      setPrice(offering.price);
+      const offeringUnit = (offering.priceUnit || 'gal') as 'gal' | 'lbs' | 'ton';
+      setUnit(offeringUnit);
+    }
+  }, [productId, vendorId, vendorOfferings]);
 
   const calculateNormalizedPrice = (): number => {
     if (packageSize && packageSize > 0) {
@@ -112,8 +137,8 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
 
       const result = await onSave(record);
       if (result) {
-        // Also update vendor offering if checkbox is checked
-        if (alsoUpdateOffering && vendorOfferings && onUpdateOfferings) {
+        // Always update vendor offering price
+        if (vendorOfferings && onUpdateOfferings) {
           const existingOffering = vendorOfferings.find(
             o => o.productId === productId && o.vendorId === vendorId
           );
@@ -170,7 +195,7 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
                 <SelectValue placeholder="Select vendor" />
               </SelectTrigger>
               <SelectContent>
-                {vendors.map(v => (
+                {availableVendors.map(v => (
                   <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -298,19 +323,6 @@ export const LogQuoteModal: React.FC<LogQuoteModalProps> = ({
             />
           </div>
 
-          {/* Also update vendor offering */}
-          {vendorOfferings && onUpdateOfferings && (
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <Checkbox
-                id="update-offering"
-                checked={alsoUpdateOffering}
-                onCheckedChange={(checked) => setAlsoUpdateOffering(checked === true)}
-              />
-              <label htmlFor="update-offering" className="text-sm text-muted-foreground cursor-pointer">
-                Also update this vendor's current offering price
-              </label>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
