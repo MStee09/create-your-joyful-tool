@@ -1,232 +1,120 @@
 
 
-# Add Fuzzy Search to Product Selector in EntryModePanel
+# Unified Pricing Experience Redesign
 
-## Overview
+## The Problem
 
-Replace the current `Select` dropdown with a searchable `Popover` + `Command` combobox that provides fuzzy filtering as you type. This pattern is already used in `AddProductModal.tsx` for the manufacturer field.
+Pricing is scattered across 4+ places with confusing overlapping concepts:
 
-## Current State
+1. **Vendor Offerings** (Product Detail → Vendors tab) — current price per vendor, "Last Quoted" date
+2. **Price History** (sidebar nav) — historical price records table with "Log Quote" button
+3. **Price Book** (procurement) — commodity bid prices by season
+4. **Product Price History** (product detail page) — chart + table of price records
+5. **Log Quote Modal** — creates a `price_record` entry
 
-- Product selection uses a `Select` dropdown with vendor-grouped items
-- No way to filter/search - users must scroll through all products
-- With many products, finding the right one is slow
+The user's core confusion: "How is 'Log a Quote' different from updating a vendor offering price?" They feel like the same action but live in different places and write to different tables (`price_records` vs `vendor_offerings`).
 
-## Proposed UX
+## Design Principles
 
-1. User clicks the product input field
-2. A popover opens with a search box at top
-3. Typing filters products in real-time (fuzzy matching on product name)
-4. Vendor groupings are preserved for matching products
-5. "Add New Product..." option always visible at top
-6. Clicking a product selects it and closes the popover
+- **One place to update prices** — updating a vendor offering price should automatically log a price record
+- **Rename "Log Quote"** to "Update Price" — clearer intent
+- **Unified Pricing view** — replace the current Price History with a richer view showing trends by product, vendor, and time
+- **Inline quick-edit** — allow price updates directly from the unified view without navigating to individual product pages
+
+## Plan
+
+### 1. Auto-log price records when vendor offerings change
+
+**File:** `src/FarmCalcApp.tsx` (or wherever `onUpdateOfferings` handler lives)
+
+When a user updates a vendor offering price (or adds a new offering), automatically create a `price_record` entry with type `'quote'`. This eliminates the need to separately "log a quote" — updating a vendor price IS logging a quote.
+
+- In the offering save handler, after persisting the offering update, call `addPriceRecord()` with the new price, vendor, product, and today's date
+- This means vendor offerings and price history stay in sync automatically
+
+### 2. Redesign Price History View → "Pricing" view
+
+**File:** `src/components/farm/PriceHistoryView.tsx` (rewrite)
+
+Replace the current sparse table with a unified pricing dashboard:
+
+**Header section:**
+- Rename to **"Pricing"** (simpler, clearer)
+- Replace "Log Quote" button with **"Update Price"** button that opens a streamlined modal
+
+**Quick Price Update table (new, top section):**
+- Flat table of all products with their current vendor offering prices
+- Each row: Product name | Vendor | Current Price | Last Updated | inline edit button
+- Click the price cell to edit inline — saves to both `vendor_offerings` AND creates a `price_record`
+- Filter by vendor, category
+- This is the "less clicking" fast-update experience
+
+**Trend History section (below):**
+- Pivot table: rows = products, columns = months or seasons
+- Each cell shows the price at that point in time (from `price_records`)
+- Color coding: green = price dropped, red = price increased vs previous period
+- Filter by vendor to see one vendor's pricing over time
+- Toggle between monthly and yearly view
+
+**Insights cards (keep existing):**
+- Biggest increases / decreases (already exists, keep it)
+
+### 3. Streamline the "Update Price" modal
+
+**File:** `src/components/farm/LogQuoteModal.tsx` (modify)
+
+- Rename title from "Log Price Quote" to "Update Price"
+- Add a checkbox: "Also update vendor offering" (checked by default)
+- When checked, saving updates both the `price_record` AND the matching `vendor_offering` price + `lastQuotedDate`
+- This eliminates the confusion of two separate workflows
+
+### 4. Update navigation label
+
+**File:** `src/FarmCalcApp.tsx`
+
+- Change sidebar label from "Price History" to "Pricing"
+
+### 5. Update Product Detail price history section
+
+**File:** `src/components/farm/ProductPriceHistory.tsx`
+
+- Rename "Log Quote" button to "Update Price"  
+- Keep the existing chart and table — they work well for single-product context
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/EntryModePanel.tsx` | Replace `Select` with `Popover` + `Command` combobox |
+| `src/components/farm/PriceHistoryView.tsx` | Major rewrite: add quick-edit table, trend grid, rename |
+| `src/components/farm/LogQuoteModal.tsx` | Rename to "Update Price", add "also update offering" checkbox |
+| `src/components/farm/ProductPriceHistory.tsx` | Rename button labels |
+| `src/FarmCalcApp.tsx` | Rename nav label, pass `vendorOfferings` + `onUpdateOfferings` to PriceHistoryView, auto-log price records on offering changes |
 
----
-
-## Technical Details
-
-### Import Changes
-
-Add Command and Popover imports:
-```typescript
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown } from 'lucide-react';
-```
-
-### New State
-
-```typescript
-const [productSearchOpen, setProductSearchOpen] = useState(false);
-const [productSearch, setProductSearch] = useState('');
-```
-
-### Filtered Products Logic
-
-Filter products based on search term while preserving vendor grouping:
-```typescript
-const filteredProductsByVendor = useMemo(() => {
-  if (!productSearch.trim()) return productsByVendor;
-  
-  const searchLower = productSearch.toLowerCase();
-  return productsByVendor
-    .map(group => ({
-      ...group,
-      products: group.products.filter(p => 
-        p.name.toLowerCase().includes(searchLower)
-      )
-    }))
-    .filter(group => group.products.length > 0);
-}, [productsByVendor, productSearch]);
-```
-
-### Updated UI Component
-
-Replace the Select with a Combobox pattern:
-```tsx
-<Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-  <PopoverTrigger asChild>
-    <Button
-      variant="outline"
-      role="combobox"
-      aria-expanded={productSearchOpen}
-      className="w-full justify-between font-normal bg-background border-input"
-    >
-      {product ? (
-        <div className="flex items-center gap-2">
-          {product.form === 'liquid' ? (
-            <Droplet className="h-3.5 w-3.5 text-blue-500" />
-          ) : (
-            <Weight className="h-3.5 w-3.5 text-amber-600" />
-          )}
-          <span className="truncate">{product.name}</span>
-        </div>
-      ) : (
-        "Select product..."
-      )}
-      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-    </Button>
-  </PopoverTrigger>
-  
-  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-    <Command shouldFilter={false}>
-      <CommandInput 
-        placeholder="Search products..." 
-        value={productSearch}
-        onValueChange={setProductSearch}
-      />
-      <CommandList className="max-h-[300px]">
-        {/* Add New Product - always visible */}
-        {onAddProduct && (
-          <>
-            <CommandItem
-              onSelect={() => {
-                setShowAddProductModal(true);
-                setProductSearchOpen(false);
-              }}
-              className="text-primary font-medium"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Product...
-            </CommandItem>
-            <CommandSeparator />
-          </>
-        )}
-        
-        {/* Empty state */}
-        <CommandEmpty>No products found</CommandEmpty>
-        
-        {/* Vendor-grouped products */}
-        {filteredProductsByVendor.map(({ vendor, products: vendorProducts }) => (
-          <CommandGroup 
-            key={vendor?.id || 'unknown'} 
-            heading={vendor?.name || 'Unknown Vendor'}
-          >
-            {vendorProducts.map(p => (
-              <CommandItem
-                key={p.id}
-                value={p.id}
-                onSelect={() => {
-                  setProductId(p.id);
-                  setProductSearchOpen(false);
-                  setProductSearch('');
-                }}
-              >
-                <Check className={cn(
-                  "mr-2 h-4 w-4",
-                  productId === p.id ? "opacity-100" : "opacity-0"
-                )} />
-                {p.form === 'liquid' ? (
-                  <Droplet className="mr-2 h-3.5 w-3.5 text-blue-500" />
-                ) : (
-                  <Weight className="mr-2 h-3.5 w-3.5 text-amber-600" />
-                )}
-                {p.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
-      </CommandList>
-    </Command>
-  </PopoverContent>
-</Popover>
-```
-
-### Key Implementation Notes
-
-1. **`shouldFilter={false}`** - Disable cmdk's built-in filtering since we're handling it ourselves to preserve vendor groupings
-
-2. **Clear search on select** - Reset `productSearch` to empty when a product is selected
-
-3. **Checkmark indicator** - Show a checkmark next to the currently selected product
-
-4. **Preserve "Add New Product"** - Keep this option always visible at the top, outside the filtered list
-
----
-
-## UI Preview
+## Quick-Edit Table Preview
 
 ```text
-┌─────────────────────────────────────────┐
-│ 💧 Humic Acid 12%                   ▼  │  ← Trigger button
-└─────────────────────────────────────────┘
-                    ↓ Click
-┌─────────────────────────────────────────┐
-│ 🔍 Search products...                   │  ← CommandInput
-├─────────────────────────────────────────┤
-│ [+] Add New Product...                   │  ← Always visible
-├─────────────────────────────────────────┤
-│ AGRISOLUTIONS                            │  ← Group heading
-│   ✓ 💧 Humic Acid 12%                    │  ← Selected
-│     💧 Fulvic Acid 6%                    │
-├─────────────────────────────────────────┤
-│ NACHURS                                  │
-│     💧 Bio-K                             │
-│     ⚖️ AMS                               │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ Pricing                                              [Update Price] │
+│ Update prices and track trends across all products                  │
+├──────────────────────────────────────────────────────────────────────┤
+│ Filter: [All Vendors ▼]  [All Categories ▼]  🔍 Search...          │
+├──────────────────────────────────────────────────────────────────────┤
+│ Product          │ Vendor        │ Price     │ Updated   │          │
+│──────────────────│───────────────│───────────│───────────│──────────│
+│ Urea 46-0-0      │ Nutrien       │ $485/ton  │ Jan 2026  │ [Edit]   │
+│ Urea 46-0-0      │ CHS           │ $492/ton  │ Dec 2025  │ [Edit]   │
+│ AMS 21-0-0-24S   │ Nutrien       │ $310/ton  │ Feb 2026  │ [Edit]   │
+│ Humic Acid 12%   │ AgriSolutions │ $148/gal  │ Mar 2026  │ [Edit]   │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ Price Trends                    [Monthly ▼]  [1 Year ▼]             │
+├──────────────────────────────────────────────────────────────────────┤
+│ Product          │ Mar 26 │ Feb 26 │ Jan 26 │ Dec 25 │ Change      │
+│──────────────────│────────│────────│────────│────────│─────────────│
+│ Urea 46-0-0      │  $485  │  $460  │  $440  │  $425  │ ▲ +14.1%   │
+│ AMS 21-0-0-24S   │  $310  │  $315  │  $320  │  $318  │ ▼ -2.5%    │
+│ Humic Acid 12%   │  $148  │  $148  │  $145  │  $145  │ ▲ +2.1%    │
+└──────────────────────────────────────────────────────────────────────┘
 ```
-
-When typing "hum":
-```text
-┌─────────────────────────────────────────┐
-│ 🔍 hum                                  │
-├─────────────────────────────────────────┤
-│ [+] Add New Product...                   │
-├─────────────────────────────────────────┤
-│ AGRISOLUTIONS                            │
-│   ✓ 💧 Humic Acid 12%                    │  ← Only matching products
-└─────────────────────────────────────────┘
-```
-
----
-
-## Testing Checklist
-
-1. Click the product field - popover opens with search input focused
-2. Type a few characters - products filter in real-time
-3. Vendor groups with no matches are hidden
-4. "Add New Product..." always visible regardless of search
-5. Click a product - it's selected, popover closes, search clears
-6. Checkmark shows next to currently selected product
-7. ESC key closes popover without changing selection
-8. Arrow keys navigate between items
 
