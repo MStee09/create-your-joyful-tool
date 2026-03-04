@@ -1,62 +1,38 @@
 
 
-# Add Price Trend Chart to Pricing Dashboard
+# Fix "Update Price" Modal: Use Vendor Offerings as Source of Truth
 
-## What You Get
+## The Core Issue
 
-A multi-line chart at the top of the Pricing page that visualizes every price update ever recorded. Each line represents a vendor's price for a selected product over time, so you can instantly see:
+You already told the system which vendors sell which products (via vendor offerings). The "Update Price" modal ignores that and shows every vendor and every product, forcing you to re-enter context you already provided. It also starts the price at $0 instead of showing the current price.
 
-- **Cost impact** -- where prices are now vs. where they were when you last bought
-- **Which vendor is cheapest** -- lines stacked visually, lowest line = best deal
-- **When to buy** -- seasonal dips become visible patterns over months/years
+**Vendor offerings define the relationship**: "Nutrien sells me Urea 46-0-0 at $485/ton." The Update Price modal should read from that, not make you rebuild it from scratch.
 
-## How It Works
+## Changes
 
-**Product selector** above the chart lets you pick one product (or "All Products" for an overview). When a product is selected, one line per vendor appears showing every recorded price point (quotes and purchases) plotted by date. When "All Products" is selected, it shows the average price trend across your catalog.
+### 1. LogQuoteModal: Filter vendors by product's offerings, pre-fill current price
 
-**Every data point matters** -- unlike the current pivot table that shows one price per month, the chart plots every individual price record as a dot on the line, so you never lose granularity.
+**File:** `src/components/farm/LogQuoteModal.tsx`
 
-**Vendor comparison callout** below the chart shows: lowest current price, highest current price, and the spread (e.g., "Nutrien is $7/ton cheaper than CHS right now").
+When a product is selected:
+- **Vendor dropdown only shows vendors that have an offering for that product** (filter `vendorOfferings` by `productId`, then map to vendor names)
+- If only one vendor exists, auto-select it
+- **Pre-fill the price** from the matching vendor offering's current price so you can adjust it (not start from $0)
+- **Pre-fill the unit** from the offering's `priceUnit`
+
+When a vendor is selected (or auto-selected):
+- Look up `vendorOfferings.find(o => o.productId === productId && o.vendorId === vendorId)`
+- Set `price` to `offering.price`, `unit` to `offering.priceUnit`
+
+This means the flow becomes: pick product -> vendor auto-narrows -> current price pre-filled -> adjust price -> save. Two clicks instead of six fields.
+
+### 2. Remove "Also update vendor offering" checkbox confusion
+
+Since vendor offerings ARE the source of pricing, the checkbox "Also update vendor offering" should be removed -- it should always update the offering. The modal saves to both price history (for the trend chart) and the vendor offering (for the current price) every time.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/PriceHistoryView.tsx` | Add Recharts `LineChart` section above the existing quick-edit table, with product selector and vendor comparison summary |
-
-## Technical Approach
-
-1. **Import Recharts** (`LineChart`, `Line`, `XAxis`, `YAxis`, `Tooltip`, `ResponsiveContainer`, `Legend`, `ReferenceLine`) -- already a project dependency used in `ProductPriceHistory.tsx`
-
-2. **New state**: `selectedChartProduct` (product ID or `'all'`)
-
-3. **Chart data builder** (`useMemo`):
-   - Filter `priceRecords` by selected product
-   - Sort by date ascending
-   - Build data points: `{ date: "2025-03-15", [vendorId]: normalizedPrice, ... }`
-   - One line per vendor, color-coded (reuse `VENDOR_COLORS` pattern from `ProductPriceHistory`)
-   - Include both quotes and purchases (differentiate with dot style: filled = purchase, hollow = quote)
-
-4. **Vendor comparison card**: For the selected product, show each vendor's latest price sorted low-to-high, with a "Best price" badge on the cheapest and a savings callout
-
-5. **Layout**: Chart card sits between the Insights cards and the Quick Price Update table
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Price Trends                    [Product: Urea 46-0-0 ▼]│
-│                                                          │
-│  $500 ┤                                          ● Nutrien│
-│  $480 ┤                                    ●──────        │
-│  $460 ┤                          ●────●───╱               │
-│  $440 ┤              ●──────●──╱                  ○ CHS   │
-│  $420 ┤    ●────●──╱                                      │
-│       └──┬──────┬──────┬──────┬──────┬──────┬─────        │
-│        Oct   Nov   Dec   Jan   Feb   Mar                  │
-│                                                          │
-│  Best price: Nutrien at $485/ton                         │
-│  CHS is $7/ton higher ($492/ton)                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-The existing quick-edit table and pivot trend table remain below unchanged.
+| `src/components/farm/LogQuoteModal.tsx` | Filter vendor dropdown by product's offerings, pre-fill price from offering, remove checkbox, always sync offering |
 
