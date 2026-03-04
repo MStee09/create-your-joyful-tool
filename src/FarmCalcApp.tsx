@@ -333,6 +333,8 @@ const ProductsViewNew: React.FC<{
   onUpdateSpecs: (specs: CommoditySpec[]) => void;
   onNavigateToVendor?: (vendorId: string) => void;
   onAddPriceRecord?: (record: any) => Promise<any>;
+  onUpdatePriceRecord?: (id: string, updates: any) => Promise<boolean>;
+  onDeletePriceRecord?: (id: string) => Promise<boolean>;
   onAddVendor?: (vendor: Vendor) => void;
 }> = ({
   productMasters, 
@@ -352,6 +354,8 @@ const ProductsViewNew: React.FC<{
   onUpdateSpecs,
   onNavigateToVendor,
   onAddPriceRecord,
+  onUpdatePriceRecord,
+  onDeletePriceRecord,
   onAddVendor,
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(() => {
@@ -442,6 +446,8 @@ const ProductsViewNew: React.FC<{
         onBack={() => selectProduct(null)}
         onNavigateToVendor={onNavigateToVendor}
         onAddPriceRecord={onAddPriceRecord}
+        onUpdatePriceRecord={onUpdatePriceRecord}
+        onDeletePriceRecord={onDeletePriceRecord}
       />
     );
   }
@@ -1150,6 +1156,8 @@ const AppContent: React.FC = () => {
     updateInvoices,
     addInvoice,
     addPriceRecord,
+    updatePriceRecord,
+    deletePriceRecord,
     // New SimplePurchase operations
     simplePurchases,
     addSimplePurchase,
@@ -1555,6 +1563,8 @@ const AppContent: React.FC = () => {
             onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
             onAddPriceRecord={addPriceRecord}
+            onUpdatePriceRecord={updatePriceRecord}
+            onDeletePriceRecord={deletePriceRecord}
             onAddVendor={(vendor) => handleUpdateVendors([...state.vendors, vendor])}
           />
         );
