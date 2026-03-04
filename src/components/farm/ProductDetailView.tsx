@@ -1402,6 +1402,8 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               vendors={vendors}
               currentSeasonYear={currentSeasonYear}
               onAddPriceRecord={onAddPriceRecord}
+              vendorOfferings={vendorOfferings}
+              onUpdateOfferings={onUpdateOfferings}
             />
           )}
 
