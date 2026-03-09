@@ -19,6 +19,7 @@ interface DashboardViewProps {
   seasonYear?: number;
   inventory?: InventoryItem[];
   purchases?: SimplePurchase[];
+  costSnapshots?: CostSnapshot[];
   onViewChange?: (view: string) => void;
   onOpenRecordApplication?: () => void;
 }
