@@ -130,7 +130,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     priceBook,
     seasonYear: season.year,
     purchases,
-  }), [productMasters, priceBook, season.year]);
+  }), [productMasters, priceBook, season.year, purchases]);
 
   const summary = useMemo(() => 
     calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext),
