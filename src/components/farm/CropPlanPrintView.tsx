@@ -27,6 +27,7 @@ interface CropPlanPrintViewProps {
   products: Product[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   seasonYear: number;
   purposes: Record<string, ProductPurpose>;
   // Optional field data for By Field section
