@@ -25,6 +25,7 @@ interface PassCardProps {
   applicationOverrides?: Record<string, ApplicationOverride>;
   productMasters?: ProductMaster[];
   priceBook?: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   seasonYear?: number;
   onEditApplication: (app: Application) => void;
   onAddApplication: (timingId: string) => void;
