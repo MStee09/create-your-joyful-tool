@@ -686,7 +686,7 @@ const InventoryView: React.FC<{
 
   // Calculate ordered items from pending purchases
   const orderedItems = useMemo(() => {
-    const pendingPurchases = purchases.filter(p => p.status === 'ordered');
+    const pendingPurchases = purchases.filter(p => p.status === 'ordered' || p.status === 'booked');
     const items: Array<{
       purchaseId: string;
       lineId: string;

@@ -47,6 +47,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   );
 
   // Split by status
+  const booked = seasonPurchases.filter(p => p.status === 'booked');
   const awaitingDelivery = seasonPurchases.filter(p => p.status === 'ordered');
   const received = seasonPurchases.filter(p => p.status === 'received');
 
@@ -54,6 +55,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const totalSpent = seasonPurchases.reduce((sum, p) => sum + p.total, 0);
   const receivedTotal = received.reduce((sum, p) => sum + p.total, 0);
   const awaitingTotal = awaitingDelivery.reduce((sum, p) => sum + p.total, 0);
+  const bookedTotal = booked.reduce((sum, p) => sum + p.total, 0);
   const freightTotal = seasonPurchases.reduce((sum, p) => sum + (p.freightCost || 0), 0);
 
   const getVendorName = (vendorId: string) => 
@@ -116,6 +118,16 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Booked</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(bookedTotal)}</div>
+            <p className="text-xs text-muted-foreground">{booked.length} bookings</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Awaiting Delivery</CardTitle>
           </CardHeader>
           <CardContent>
@@ -135,7 +147,83 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         </Card>
       </div>
 
-      {/* Awaiting Delivery */}
+      {/* Booked */}
+      {booked.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-blue-500" />
+            Booked (Price Locked)
+          </h3>
+          <div className="space-y-3">
+            {booked.map(purchase => (
+              <Card key={purchase.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(purchase.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span className="font-semibold text-foreground">{getVendorName(purchase.vendorId)}</span>
+                        <span className="font-bold text-foreground">{formatCurrency(purchase.total)}</span>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          Booked
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">{getProductNames(purchase.lines)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onUpdatePurchase(purchase.id, { status: 'ordered' })}
+                      >
+                        Mark Ordered
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingPurchase(purchase);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        Details
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Booking?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this {formatCurrency(purchase.total)} booking from {getVendorName(purchase.vendorId)}.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => onDeletePurchase(purchase.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       {awaitingDelivery.length > 0 && (
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">

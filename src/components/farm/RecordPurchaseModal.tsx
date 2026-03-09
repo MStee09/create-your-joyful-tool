@@ -45,7 +45,7 @@ const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: PackageUnitTyp
   'Drum': { size: 30, unit: 'gal' },
   'Pail': { size: 5, unit: 'gal' },
   'Bag': { size: 50, unit: 'lbs' },
-  'Bulk': { size: 1, unit: 'gal' },
+  'Bulk': { size: 1, unit: 'ton' },
   'Bottle': { size: 1, unit: 'qt' },
   'Case': { size: 12, unit: 'qt' },
 };
@@ -66,7 +66,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   // Form state
   const [vendorId, setVendorId] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState<'ordered' | 'received'>('received');
+  const [status, setStatus] = useState<'booked' | 'ordered' | 'received'>('received');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<PurchaseLineInput[]>([]);
@@ -121,7 +121,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     if (editingPurchase) {
       setVendorId(editingPurchase.vendorId);
       setOrderDate(editingPurchase.orderDate);
-      setStatus(editingPurchase.status);
+      setStatus(editingPurchase.status as 'booked' | 'ordered' | 'received');
       setExpectedDeliveryDate(editingPurchase.expectedDeliveryDate || '');
       setReceivedDate(editingPurchase.receivedDate || new Date().toISOString().split('T')[0]);
       setFreightCost(editingPurchase.freightCost || 0);
@@ -229,7 +229,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         vendorId,
         status,
         orderDate,
-        expectedDeliveryDate: status === 'ordered' ? expectedDeliveryDate || undefined : undefined,
+        expectedDeliveryDate: (status === 'ordered' || status === 'booked') ? expectedDeliveryDate || undefined : undefined,
         receivedDate: status === 'received' ? receivedDate : undefined,
         lines: purchaseLines,
         freightCost,
@@ -387,6 +387,14 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
             <div className="flex gap-2">
               <Button
                 type="button"
+                variant={status === 'booked' ? 'default' : 'outline'}
+                onClick={() => setStatus('booked')}
+                className={status === 'booked' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              >
+                Booked
+              </Button>
+              <Button
+                type="button"
                 variant={status === 'ordered' ? 'default' : 'outline'}
                 onClick={() => setStatus('ordered')}
                 className={status === 'ordered' ? 'bg-amber-600 hover:bg-amber-700' : ''}
@@ -402,10 +410,13 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                 Received
               </Button>
             </div>
+            {status === 'booked' && (
+              <p className="text-xs text-muted-foreground">Price locked — volume reserved but not yet ordered or paid</p>
+            )}
           </div>
 
           {/* Conditional date fields */}
-          {status === 'ordered' && (
+          {(status === 'ordered' || status === 'booked') && (
             <div className="space-y-2">
               <Label>Expected Delivery Date</Label>
               <Input 
@@ -518,6 +529,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                     <SelectContent>
                       <SelectItem value="gal">gal</SelectItem>
                       <SelectItem value="lbs">lbs</SelectItem>
+                      <SelectItem value="ton">ton</SelectItem>
                       <SelectItem value="g">g</SelectItem>
                       <SelectItem value="oz">oz</SelectItem>
                       <SelectItem value="qt">qt</SelectItem>

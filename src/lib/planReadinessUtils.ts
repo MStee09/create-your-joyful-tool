@@ -89,7 +89,7 @@ export function calculateReadinessSummary(
 ): ReadinessSummary {
   const scopedPurchases = (purchases || []).filter(p => {
     if (season?.id && p.seasonId !== season.id) return false;
-    return p.status === 'ordered';
+    return p.status === 'ordered' || p.status === 'booked';
   });
 
   const plannedUsage = calculatePlannedUsage(season, products);

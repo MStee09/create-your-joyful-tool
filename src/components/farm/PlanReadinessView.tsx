@@ -81,7 +81,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const scopedPurchases = useMemo(() => {
     return (purchases || []).filter(p => {
       if (season?.id && p.seasonId !== season.id) return false;
-      return p.status === 'ordered';
+      return p.status === 'ordered' || p.status === 'booked';
     });
   }, [purchases, season]);
 

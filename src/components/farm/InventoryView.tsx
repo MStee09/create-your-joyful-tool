@@ -213,7 +213,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   // Build ordered items from SimplePurchases with status='ordered'
   const orderedItems = useMemo(() => {
     const orderedPurchases = purchases.filter(p => 
-      p.status === 'ordered' && 
+      (p.status === 'ordered' || p.status === 'booked') && 
       (activeSeason ? p.seasonId === activeSeason.id : true)
     );
     

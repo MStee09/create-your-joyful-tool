@@ -36,7 +36,7 @@ export interface SimplePurchase {
   vendorId: string;
   
   // Status
-  status: 'ordered' | 'received';
+  status: 'booked' | 'ordered' | 'received';
   
   // Dates
   orderDate: string;             // ISO date string
