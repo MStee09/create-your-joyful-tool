@@ -17,6 +17,7 @@ interface CropPlannerViewProps {
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
   purchases?: SimplePurchase[];
+  costSnapshots?: CostSnapshot[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];
