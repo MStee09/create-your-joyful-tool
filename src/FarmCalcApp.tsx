@@ -270,6 +270,7 @@ const Sidebar: React.FC<{
         {/* TOOLS section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Tools</div>
+          <NavButton id="record-application" label="Record Application" icon={ClipboardList} />
           <NavButton id="mix-calculator" label="Mix Calculator" icon={Beaker} />
           <NavButton id="equipment" label="Equipment" icon={Truck} />
         </div>
@@ -1729,13 +1730,14 @@ const AppContent: React.FC = () => {
           <DashboardView
             season={currentSeason}
             products={legacyProducts}
-            productMasters={productMasters}
+            productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
             seasonYear={currentSeason?.year}
             inventory={state.inventory}
             purchases={simplePurchases || []}
             costSnapshots={costSnapshots}
             onViewChange={setActiveView}
+            onOpenRecordApplication={() => setShowRecordApplicationModal(true)}
           />
         );
       case 'commodity-specs':
@@ -1954,7 +1956,13 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen bg-stone-100 font-sans">
       <Sidebar
         activeView={activeView}
-        onViewChange={setActiveView}
+        onViewChange={(view) => {
+          if (view === 'record-application') {
+            setShowRecordApplicationModal(true);
+            return;
+          }
+          setActiveView(view);
+        }}
         seasons={state.seasons}
         currentSeasonId={state.currentSeasonId}
         onSeasonChange={handleSeasonChange}
