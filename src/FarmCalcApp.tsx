@@ -1486,6 +1486,7 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
+            purchases={simplePurchases || []}
             fields={fields || []}
             fieldAssignments={fieldAssignments || []}
             fieldCropOverrides={fieldCropOverrides || []}
