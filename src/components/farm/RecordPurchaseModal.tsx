@@ -387,6 +387,14 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
             <div className="flex gap-2">
               <Button
                 type="button"
+                variant={status === 'booked' ? 'default' : 'outline'}
+                onClick={() => setStatus('booked')}
+                className={status === 'booked' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              >
+                Booked
+              </Button>
+              <Button
+                type="button"
                 variant={status === 'ordered' ? 'default' : 'outline'}
                 onClick={() => setStatus('ordered')}
                 className={status === 'ordered' ? 'bg-amber-600 hover:bg-amber-700' : ''}
@@ -402,6 +410,9 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                 Received
               </Button>
             </div>
+            {status === 'booked' && (
+              <p className="text-xs text-muted-foreground">Price locked — volume reserved but not yet ordered or paid</p>
+            )}
           </div>
 
           {/* Conditional date fields */}
