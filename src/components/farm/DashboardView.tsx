@@ -228,7 +228,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ))}
               {cropSummaries.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     No crops configured. Add crops in the Crop Plans section.
                   </td>
                 </tr>

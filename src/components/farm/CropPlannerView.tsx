@@ -184,6 +184,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
             productMasters={productMasters}
             priceBook={priceBook}
             purchases={purchases}
+            costSnapshots={costSnapshots}
             fields={fields}
             fieldAssignments={fieldAssignments}
             fieldCropOverrides={fieldCropOverrides}
