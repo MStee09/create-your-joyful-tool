@@ -4,11 +4,13 @@ import type { Crop, Season, Product, Vendor, InventoryItem, Application, Applica
 import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
 import { ExportPdfButton } from './ExportPdfButton';
+import { CostTrendCard } from './CostTrendCard';
 import { FieldAssignmentModal } from './FieldAssignmentModal';
 import { CropByFieldView } from './CropByFieldView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -71,6 +73,7 @@ interface CropPlanningViewProps {
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
   purchases?: SimplePurchase[];
+  costSnapshots?: CostSnapshot[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];
@@ -91,6 +94,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   productMasters,
   priceBook,
   purchases,
+  costSnapshots = [],
   fields,
   fieldAssignments,
   fieldCropOverrides,
@@ -329,6 +333,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         onUpdateCropName={(name) => onUpdate({ ...crop, name })}
         onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
       />
+
+      {/* Cost Trend Chart */}
+      <div className="px-6 pt-4">
+        <CostTrendCard
+          snapshots={costSnapshots.filter(s => s.cropId === crop.id)}
+          currentCostPerAcre={summary.costPerAcre}
+        />
+      </div>
 
       {/* Timeline Navigation Bar */}
       <div className="bg-card border-b border-border px-6 py-4">

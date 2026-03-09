@@ -4,6 +4,7 @@ import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm'
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import type { SimplePurchase } from '@/types/simplePurchase';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
 import { CropPlanningView } from './CropPlanningView';
@@ -16,6 +17,7 @@ interface CropPlannerViewProps {
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
   purchases?: SimplePurchase[];
+  costSnapshots?: CostSnapshot[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];
@@ -34,6 +36,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
   productMasters,
   priceBook,
   purchases,
+  costSnapshots,
   fields,
   fieldAssignments,
   fieldCropOverrides,
@@ -181,6 +184,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
             productMasters={productMasters}
             priceBook={priceBook}
             purchases={purchases}
+            costSnapshots={costSnapshots}
             fields={fields}
             fieldAssignments={fieldAssignments}
             fieldCropOverrides={fieldCropOverrides}

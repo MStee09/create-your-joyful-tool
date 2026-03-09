@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
-import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
 import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 import { QuickActionsCard } from './applications/QuickActionsCard';
+import { CostTrendSparkline } from './CostTrendSparkline';
 
 interface DashboardViewProps {
   season: Season | null;
@@ -17,6 +19,7 @@ interface DashboardViewProps {
   seasonYear?: number;
   inventory?: InventoryItem[];
   purchases?: SimplePurchase[];
+  costSnapshots?: CostSnapshot[];
   onViewChange?: (view: string) => void;
   onOpenRecordApplication?: () => void;
 }
@@ -29,6 +32,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   seasonYear = new Date().getFullYear(),
   inventory = [],
   purchases = [],
+  costSnapshots = [],
   onViewChange,
   onOpenRecordApplication,
 }) => {
@@ -80,17 +84,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [season, products, priceBookContext]);
 
-  // Get comparative indicator for crop cost/acre vs farm average
-  const getComparativeIndicator = (cropCostPerAcre: number) => {
-    if (stats.costPerAcre === 0) return null;
-    const deviation = (cropCostPerAcre - stats.costPerAcre) / stats.costPerAcre;
-    
-    if (deviation > 0.10) {
-      return <ArrowUp className="w-4 h-4 text-amber-500" />;
-    } else if (deviation < -0.10) {
-      return <ArrowDown className="w-4 h-4 text-emerald-500" />;
-    }
-    return null;
+  // Get sparkline + trend indicator for crop
+  const getCropTrend = (cropId: string, cropCostPerAcre: number) => {
+    const cropSnaps = costSnapshots.filter(s => s.cropId === cropId);
+    return (
+      <CostTrendSparkline
+        snapshots={cropSnaps}
+        currentCostPerAcre={cropCostPerAcre}
+      />
+    );
   };
 
   // Calculate plan readiness using SimplePurchases
@@ -206,6 +208,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <tr className="bg-muted/50">
                 <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crop</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost/Acre</th>
+                <th className="text-center px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trend</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acres</th>
                 <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Passes</th>
@@ -216,10 +219,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tr key={idx} className="hover:bg-muted/30">
                   <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
-                      {getComparativeIndicator(crop.costPerAcre)}
-                    </div>
+                    <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {getCropTrend(season!.crops[idx]?.id || '', crop.costPerAcre)}
                   </td>
                   <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
                   <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
@@ -228,7 +231,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ))}
               {cropSummaries.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     No crops configured. Add crops in the Crop Plans section.
                   </td>
                 </tr>

@@ -120,6 +120,8 @@ import { EnhancedExportView } from './components/EnhancedExportView';
 
 // Import Supabase data hook
 import { useSupabaseData } from './hooks/useSupabaseData';
+import { useCostSnapshots } from './hooks/useCostSnapshots';
+import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from './lib/cropCalculations';
 
 // Import migration utilities
 import { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } from './lib/migrateToSupabase';
@@ -1187,6 +1189,10 @@ const AppContent: React.FC = () => {
     refetch,
   } = supabaseData;
 
+  // Cost snapshots for tracking crop plan cost changes over time
+  const seasonYear = seasons.find(s => s.id === currentSeasonId)?.year || new Date().getFullYear();
+  const { snapshots: costSnapshots, saveCostSnapshot, getSnapshotsForCrop } = useCostSnapshots(user, seasonYear);
+
   // Check for localStorage data to migrate
   const localDataSummary = getLocalStorageDataSummary();
   const hasDataToMigrate = hasLocalStorageData() && !migrationComplete;
@@ -1378,6 +1384,18 @@ const AppContent: React.FC = () => {
   const handleUpdateSeason = async (updatedSeason: Season) => {
     const newSeasons = seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s);
     await updateSeasons(newSeasons);
+    
+    // Snapshot cost for each crop after plan edit
+    const pbCtx: PriceBookContext = {
+      productMasters: productMasters || [],
+      priceBook: priceBook || [],
+      seasonYear: updatedSeason.year,
+      purchases: simplePurchases || [],
+    };
+    for (const crop of updatedSeason.crops) {
+      const summary = calculateSeasonSummaryWithPriceBook(crop, legacyProducts, pbCtx);
+      saveCostSnapshot(crop.id, summary.costPerAcre, summary.totalCost, 'plan_edit');
+    }
   };
 
   const handleAddSeason = async (season: Season) => {
@@ -1473,6 +1491,7 @@ const AppContent: React.FC = () => {
             seasonYear={currentSeason?.year || new Date().getFullYear()}
             inventory={state.inventory}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             onViewChange={setActiveView}
             onOpenRecordApplication={() => setShowRecordApplicationModal(true)}
           />
@@ -1487,6 +1506,7 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             fields={fields || []}
             fieldAssignments={fieldAssignments || []}
             fieldCropOverrides={fieldCropOverrides || []}
@@ -1494,7 +1514,6 @@ const AppContent: React.FC = () => {
             onUpdateFieldAssignments={updateFieldAssignments}
             onUpdateFieldCropOverrides={updateFieldCropOverrides}
             onNavigateToMixCalculator={(fieldId, acres) => {
-              // Navigate to mix calculator - could store context for pre-population
               setActiveView('mix-calculator');
             }}
             onAddProduct={handleAddProduct}
@@ -1657,6 +1676,7 @@ const AppContent: React.FC = () => {
             seasonYear={currentSeason?.year}
             inventory={state.inventory}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             onViewChange={setActiveView}
           />
         );
