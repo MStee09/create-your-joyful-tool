@@ -665,11 +665,11 @@ export const calculateCoverageGroupsWithPriceBook = (
       applications: apps.slice().sort((a, b) => {
         const costA = calculateApplicationCostPerAcreWithPriceBook(
           a, products.find(p => p.id === a.productId),
-          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear, priceBookContext.purchases
         );
         const costB = calculateApplicationCostPerAcreWithPriceBook(
           b, products.find(p => p.id === b.productId),
-          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear, priceBookContext.purchases
         );
         return costB - costA; // Descending: highest cost first
       }),
