@@ -1408,7 +1408,7 @@ const AppContent: React.FC = () => {
   };
 
   // Helper: snapshot costs for all crops in current season
-  const snapshotAllCropCosts = useCallback((reason: string) => {
+  const snapshotAllCropCosts = (reason: string) => {
     const season = seasons.find(s => s.id === currentSeasonId);
     if (!season) return;
     const pbCtx: PriceBookContext = {
@@ -1421,7 +1421,7 @@ const AppContent: React.FC = () => {
       const summary = calculateSeasonSummaryWithPriceBook(crop, legacyProducts, pbCtx);
       saveCostSnapshot(crop.id, summary.costPerAcre, summary.totalCost, reason);
     }
-  }, [seasons, currentSeasonId, productMasters, priceBook, simplePurchases, legacyProducts, saveCostSnapshot]);
+  };
 
   const handleUpdateSeason = async (updatedSeason: Season) => {
     const newSeasons = seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s);
