@@ -66,7 +66,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   // Form state
   const [vendorId, setVendorId] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState<'ordered' | 'received'>('received');
+  const [status, setStatus] = useState<'booked' | 'ordered' | 'received'>('received');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<PurchaseLineInput[]>([]);
