@@ -16,7 +16,7 @@ export const QuickActionsCard: React.FC<QuickActionsCardProps> = ({
   return (
     <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-8">
       <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Button
           variant="outline"
           className="h-auto py-4 flex flex-col items-center gap-2"

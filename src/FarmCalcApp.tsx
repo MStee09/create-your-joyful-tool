@@ -37,6 +37,7 @@ import {
   MapPin,
   GitCompare,
   Beaker,
+  Menu,
 } from 'lucide-react';
 
 // Import types
@@ -146,6 +147,8 @@ const Sidebar: React.FC<{
   onSync?: () => void;
   userEmail?: string;
   onSignOut?: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }> = ({
   activeView,
   onViewChange,
@@ -157,12 +160,17 @@ const Sidebar: React.FC<{
   onSync,
   userEmail,
   onSignOut,
+  isMobileOpen,
+  onMobileClose,
 }) => {
   const NavButton = ({ id, label, icon: Icon }: { id: string; label: string; icon: React.ElementType }) => {
     const active = activeView === id;
     return (
       <button
-        onClick={() => onViewChange(id)}
+        onClick={() => {
+          onViewChange(id);
+          onMobileClose?.();
+        }}
         className={
           'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ' +
           (active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white')
@@ -175,7 +183,20 @@ const Sidebar: React.FC<{
   };
 
   return (
-    <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
+    <>
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+      <div className={`
+        w-64 bg-stone-900 text-stone-100 flex flex-col h-screen
+        fixed md:relative z-50 md:z-auto
+        transition-transform duration-300 ease-in-out
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
       {/* Logo */}
       <div className="p-6 border-b border-stone-700">
         <div className="flex items-center gap-3">
@@ -308,6 +329,7 @@ const Sidebar: React.FC<{
         </div>
       </div>
     </div>
+    </>
   );
 };
 
@@ -1119,6 +1141,7 @@ const AppContent: React.FC = () => {
   const [migrationError, setMigrationError] = useState<string | null>(null);
   // Phase 5: Record Application modal state
   const [showRecordApplicationModal, setShowRecordApplicationModal] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
@@ -1640,7 +1663,13 @@ const AppContent: React.FC = () => {
             onAddVendorOffering={(offering) => handleUpdateVendorOfferings([...(state.vendorOfferings || []), offering])}
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
-            onNavigateToVendor={() => setActiveView('vendors')}
+            onNavigateToVendor={(vendorId?: string) => {
+              if (vendorId) {
+                setActiveView(`vendor-${vendorId}`);
+              } else {
+                setActiveView('vendors');
+              }
+            }}
             onAddPriceRecord={handleAddPriceRecord}
             onUpdatePriceRecord={updatePriceRecord}
             onDeletePriceRecord={deletePriceRecord}
@@ -1656,7 +1685,13 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             currentSeason={currentSeason}
             onUpdateVendors={handleUpdateVendors}
-            onNavigateToProduct={() => setActiveView('products')}
+            onNavigateToProduct={(productId?: string) => {
+              if (productId) {
+                setActiveView(`product-${productId}`);
+              } else {
+                setActiveView('products');
+              }
+            }}
           />
         );
       case 'inventory':
@@ -1948,6 +1983,8 @@ const AppContent: React.FC = () => {
             );
           }
         }
+        // Fallback: redirect to dashboard for unrecognized views
+        setActiveView('dashboard');
         return null;
     }
   };
@@ -1971,9 +2008,26 @@ const AppContent: React.FC = () => {
         onSync={user ? handleSync : undefined}
         userEmail={user?.email}
         onSignOut={user ? signOut : undefined}
+        isMobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {/* Mobile header with hamburger */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-muted"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-emerald-600 rounded-md flex items-center justify-center">
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-foreground">FarmCalc</span>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
           {renderView()}
         </div>
       </main>
