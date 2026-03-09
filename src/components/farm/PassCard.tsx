@@ -139,6 +139,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   applicationOverrides = {},
   productMasters = [],
   priceBook = [],
+  purchases,
   seasonYear = new Date().getFullYear(),
   onEditApplication,
   onAddApplication,
