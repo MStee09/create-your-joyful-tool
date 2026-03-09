@@ -4,6 +4,7 @@ import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm'
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import type { SimplePurchase } from '@/types/simplePurchase';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
 import { CropPlanningView } from './CropPlanningView';
