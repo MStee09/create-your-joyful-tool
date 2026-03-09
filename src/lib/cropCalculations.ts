@@ -548,7 +548,8 @@ export const calculatePassSummaryWithPriceBook = (
       product,
       priceBookContext.productMasters,
       priceBookContext.priceBook,
-      priceBookContext.seasonYear
+      priceBookContext.seasonYear,
+      priceBookContext.purchases
     );
     
     totalCost += costPerAcre * acresTreated;
