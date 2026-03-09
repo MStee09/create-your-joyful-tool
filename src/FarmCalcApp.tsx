@@ -147,6 +147,8 @@ const Sidebar: React.FC<{
   onSync?: () => void;
   userEmail?: string;
   onSignOut?: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }> = ({
   activeView,
   onViewChange,
@@ -158,12 +160,17 @@ const Sidebar: React.FC<{
   onSync,
   userEmail,
   onSignOut,
+  isMobileOpen,
+  onMobileClose,
 }) => {
   const NavButton = ({ id, label, icon: Icon }: { id: string; label: string; icon: React.ElementType }) => {
     const active = activeView === id;
     return (
       <button
-        onClick={() => onViewChange(id)}
+        onClick={() => {
+          onViewChange(id);
+          onMobileClose?.();
+        }}
         className={
           'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ' +
           (active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white')
@@ -176,7 +183,20 @@ const Sidebar: React.FC<{
   };
 
   return (
-    <div className="w-64 bg-stone-900 text-stone-100 flex flex-col h-screen">
+    <>
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+      <div className={`
+        w-64 bg-stone-900 text-stone-100 flex flex-col h-screen
+        fixed md:relative z-50 md:z-auto
+        transition-transform duration-300 ease-in-out
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
       {/* Logo */}
       <div className="p-6 border-b border-stone-700">
         <div className="flex items-center gap-3">
