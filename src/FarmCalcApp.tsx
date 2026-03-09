@@ -1384,6 +1384,18 @@ const AppContent: React.FC = () => {
   const handleUpdateSeason = async (updatedSeason: Season) => {
     const newSeasons = seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s);
     await updateSeasons(newSeasons);
+    
+    // Snapshot cost for each crop after plan edit
+    const pbCtx: PriceBookContext = {
+      productMasters: productMasters || [],
+      priceBook: priceBook || [],
+      seasonYear: updatedSeason.year,
+      purchases: simplePurchases || [],
+    };
+    for (const crop of updatedSeason.crops) {
+      const summary = calculateSeasonSummaryWithPriceBook(crop, legacyProducts, pbCtx);
+      saveCostSnapshot(crop.id, summary.costPerAcre, summary.totalCost, 'plan_edit');
+    }
   };
 
   const handleAddSeason = async (season: Season) => {
