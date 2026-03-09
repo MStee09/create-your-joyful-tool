@@ -120,6 +120,8 @@ import { EnhancedExportView } from './components/EnhancedExportView';
 
 // Import Supabase data hook
 import { useSupabaseData } from './hooks/useSupabaseData';
+import { useCostSnapshots } from './hooks/useCostSnapshots';
+import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from './lib/cropCalculations';
 
 // Import migration utilities
 import { hasLocalStorageData, getLocalStorageDataSummary, migrateToSupabase } from './lib/migrateToSupabase';
