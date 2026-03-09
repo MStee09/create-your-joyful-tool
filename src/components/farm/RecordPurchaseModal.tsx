@@ -229,7 +229,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         vendorId,
         status,
         orderDate,
-        expectedDeliveryDate: status === 'ordered' ? expectedDeliveryDate || undefined : undefined,
+        expectedDeliveryDate: (status === 'ordered' || status === 'booked') ? expectedDeliveryDate || undefined : undefined,
         receivedDate: status === 'received' ? receivedDate : undefined,
         lines: purchaseLines,
         freightCost,
