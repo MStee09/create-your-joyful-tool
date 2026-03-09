@@ -1843,10 +1843,10 @@ const AppContent: React.FC = () => {
             priceRecords={priceRecords || []}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPurchase={addSimplePurchase}
+            onAddPurchase={handleAddPurchase}
             onUpdatePurchase={updateSimplePurchase}
             onDeletePurchase={deleteSimplePurchase}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
           />
         );
       case 'price-history':
