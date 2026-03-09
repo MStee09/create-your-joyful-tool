@@ -1,5 +1,6 @@
 import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType, TierLabel } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
 
 // Auto-tier calculation based on 80/40 thresholds
