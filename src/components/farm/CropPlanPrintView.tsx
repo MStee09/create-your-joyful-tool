@@ -68,6 +68,7 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
   products,
   productMasters,
   priceBook,
+  purchases,
   seasonYear,
   purposes,
   fields,
@@ -78,7 +79,8 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
     productMasters,
     priceBook,
     seasonYear,
-  }), [productMasters, priceBook, seasonYear]);
+    purchases,
+  }), [productMasters, priceBook, seasonYear, purchases]);
   
   // Build extended field assignments with calculations for By Field section
   const extendedAssignments: FieldAssignmentExtended[] = useMemo(() => {
