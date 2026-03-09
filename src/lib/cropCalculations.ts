@@ -144,18 +144,39 @@ export const calculateApplicationCostPerAcre = (
 };
 
 // Calculate cost per acre using price book for bid-eligible products
+// When purchases are provided, computes a blended price for partially-purchased inputs.
 export const calculateApplicationCostPerAcreWithPriceBook = (
   app: Application,
   product: Product | undefined,
   productMasters: ProductMaster[],
   priceBook: PriceBookEntry[],
-  seasonYear: number
+  seasonYear: number,
+  purchases?: SimplePurchase[]
 ): number => {
   if (!product) return 0;
   
   const productMaster = productMasters.find(pm => pm.id === product.id);
   
-  // Check if this product has a price book entry (from awarded bids or manual entries)
+  // Helper: compute $/acre from a unit price and unit
+  const computeCostPerAcre = (unitPrice: number, priceUom: string): number => {
+    if (product.form === 'liquid') {
+      const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      if (priceUom === 'gal') return gallonsPerAcre * unitPrice;
+      const density = product.densityLbsPerGal || productMaster?.densityLbsPerGal || 10;
+      const lbsPerAcre = gallonsPerAcre * density;
+      const pricePerLb = priceUom === 'ton' ? unitPrice / 2000 : unitPrice;
+      return lbsPerAcre * pricePerLb;
+    } else {
+      const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+      const pricePerPound = priceUom === 'ton' ? unitPrice / 2000 : unitPrice;
+      return poundsPerAcre * pricePerPound;
+    }
+  };
+  
+  // Determine the "current market" unit price and its UOM
+  let currentUnitPrice: number | null = null;
+  let currentPriceUom: string = 'ton';
+  
   if (productMaster) {
     // Look for price book entry - check by specId OR productId
     const priceEntry = priceBook.find(pb => 
@@ -167,41 +188,32 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     );
     
     if (priceEntry) {
-      // Use price from price book (could be awarded, manual, estimated, or invoice)
-      const priceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
-      if (product.form === 'liquid') {
-        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-        if (priceUom === 'gal') {
-          return gallonsPerAcre * priceEntry.price;
-        }
-        const density = product.densityLbsPerGal || 10;
-        const lbsPerAcre = gallonsPerAcre * density;
-        const pricePerLb = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
-        return lbsPerAcre * pricePerLb;
-      } else {
-        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-        const pricePerPound = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
-        return poundsPerAcre * pricePerPound;
-      }
+      currentPriceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
+      currentUnitPrice = priceEntry.price;
+    } else if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
+      currentPriceUom = productMaster.estimatedPriceUnit;
+      currentUnitPrice = productMaster.estimatedPrice;
     }
+  }
+  
+  // If we have purchases AND a current market price, attempt blended pricing
+  if (purchases && purchases.length > 0 && currentUnitPrice !== null) {
+    const blendedPrice = calculateBlendedUnitPrice(
+      product.id,
+      purchases,
+      currentUnitPrice,
+      currentPriceUom,
+    );
     
-    // No price book entry - use ProductMaster's estimated price if available
-    if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
-      if (product.form === 'liquid') {
-        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-        if (productMaster.estimatedPriceUnit === 'gal') {
-          return gallonsPerAcre * productMaster.estimatedPrice;
-        }
-        const density = product.densityLbsPerGal || productMaster.densityLbsPerGal || 10;
-        const lbsPerAcre = gallonsPerAcre * density;
-        const pricePerLb = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
-        return lbsPerAcre * pricePerLb;
-      } else {
-        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-        const pricePerPound = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
-        return poundsPerAcre * pricePerPound;
-      }
+    if (blendedPrice !== null) {
+      // We have actual purchases — use blended price
+      return computeCostPerAcre(blendedPrice, currentPriceUom);
     }
+  }
+  
+  // No blended price available — use current market price directly
+  if (currentUnitPrice !== null) {
+    return computeCostPerAcre(currentUnitPrice, currentPriceUom);
   }
   
   // Fall back to legacy product price (for old data with price on Product)
