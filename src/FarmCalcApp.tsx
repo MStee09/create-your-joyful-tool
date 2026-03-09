@@ -1948,6 +1948,8 @@ const AppContent: React.FC = () => {
             );
           }
         }
+        // Fallback: redirect to dashboard for unrecognized views
+        setActiveView('dashboard');
         return null;
     }
   };
