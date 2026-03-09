@@ -74,6 +74,7 @@ interface ProductDetailViewProps {
   onAddPriceRecord?: (record: NewPriceRecord) => Promise<any>;
   onUpdatePriceRecord?: (id: string, updates: Partial<PriceRecord>) => Promise<boolean>;
   onDeletePriceRecord?: (id: string) => Promise<boolean>;
+  onAddVendor?: (vendor: Vendor) => void;
 }
 
 export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
@@ -94,6 +95,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onAddPriceRecord,
   onUpdatePriceRecord,
   onDeletePriceRecord,
+  onAddVendor,
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'purpose' | 'notes'>('details');
   const [editingDensity, setEditingDensity] = useState(false);
@@ -1400,6 +1402,19 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               onUpdateOfferings={onUpdateOfferings}
               onNavigateToVendor={onNavigateToVendor}
               onLogQuote={onAddPriceRecord ? (vendorId) => setLogQuoteVendorId(vendorId) : undefined}
+              onCreateVendor={onAddVendor ? async (vendorData) => {
+                const newVendor: Vendor = {
+                  id: crypto.randomUUID(),
+                  name: vendorData.name || '',
+                  contactEmail: vendorData.contactEmail,
+                  contactPhone: vendorData.contactPhone,
+                  contacts: [],
+                  documents: [],
+                  tags: [],
+                };
+                onAddVendor(newVendor);
+                return newVendor;
+              } : undefined}
             />
           </div>
 

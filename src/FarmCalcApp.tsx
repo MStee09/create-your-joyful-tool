@@ -450,6 +450,7 @@ const ProductsViewNew: React.FC<{
         onAddPriceRecord={onAddPriceRecord}
         onUpdatePriceRecord={onUpdatePriceRecord}
         onDeletePriceRecord={onDeletePriceRecord}
+        onAddVendor={onAddVendor}
       />
     );
   }
