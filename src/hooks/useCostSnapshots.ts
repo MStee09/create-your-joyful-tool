@@ -58,39 +58,82 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
   ) => {
     if (!user) return;
 
-    // Only skip if cost is exactly the same (allow even tiny changes to be recorded)
+    // Skip if cost is exactly the same
     const last = lastSnapshotRef.current.get(cropId);
     if (last && last.costPerAcre === costPerAcre && last.totalCost === totalCost) {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('crop_plan_cost_snapshots')
-      .insert({
-        user_id: user.id,
-        season_year: seasonYear,
-        crop_id: cropId,
-        cost_per_acre: costPerAcre,
-        total_cost: totalCost,
-        snapshot_reason: reason,
-      })
-      .select()
-      .single();
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-    if (!error && data) {
-      const snapshot: CostSnapshot = {
-        id: data.id,
-        seasonYear: data.season_year,
-        cropId: data.crop_id,
-        costPerAcre: Number(data.cost_per_acre),
-        totalCost: Number(data.total_cost),
-        snapshotReason: data.snapshot_reason,
-        createdAt: data.created_at,
-      };
-      setSnapshots(prev => [...prev, snapshot]);
-      lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
+    // Check if there's already a snapshot for this crop today — if so, update it
+    const existingToday = snapshots.find(
+      s => s.cropId === cropId && s.createdAt.startsWith(today)
+    );
+
+    if (existingToday) {
+      // Upsert: delete today's row and insert fresh (snapshots table lacks UPDATE RLS)
+      await supabase
+        .from('crop_plan_cost_snapshots')
+        .delete()
+        .eq('id', existingToday.id);
+
+      const { data, error } = await supabase
+        .from('crop_plan_cost_snapshots')
+        .insert({
+          user_id: user.id,
+          season_year: seasonYear,
+          crop_id: cropId,
+          cost_per_acre: costPerAcre,
+          total_cost: totalCost,
+          snapshot_reason: reason,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const snapshot: CostSnapshot = {
+          id: data.id,
+          seasonYear: data.season_year,
+          cropId: data.crop_id,
+          costPerAcre: Number(data.cost_per_acre),
+          totalCost: Number(data.total_cost),
+          snapshotReason: data.snapshot_reason,
+          createdAt: data.created_at,
+        };
+        setSnapshots(prev => prev.map(s => s.id === existingToday.id ? snapshot : s));
+        lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
+      }
+    } else {
+      // First snapshot of the day — insert new
+      const { data, error } = await supabase
+        .from('crop_plan_cost_snapshots')
+        .insert({
+          user_id: user.id,
+          season_year: seasonYear,
+          crop_id: cropId,
+          cost_per_acre: costPerAcre,
+          total_cost: totalCost,
+          snapshot_reason: reason,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const snapshot: CostSnapshot = {
+          id: data.id,
+          seasonYear: data.season_year,
+          cropId: data.crop_id,
+          costPerAcre: Number(data.cost_per_acre),
+          totalCost: Number(data.total_cost),
+          snapshotReason: data.snapshot_reason,
+          createdAt: data.created_at,
+        };
+        setSnapshots(prev => [...prev, snapshot]);
+        lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
+      }
     }
-  }, [user, seasonYear]);
+  }, [user, seasonYear, snapshots]);
 
   const getSnapshotsForCrop = useCallback((cropId: string) => {
     return snapshots.filter(s => s.cropId === cropId);
