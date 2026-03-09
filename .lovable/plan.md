@@ -1,43 +1,69 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Blended Cost for Partially-Purchased Inputs
 
 ## The Problem
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+Right now, `calculateApplicationCostPerAcreWithPriceBook` uses a single price per product (from price book or estimated). If you bought 20 tons of AMS at $540/ton but still need 15 more tons and the market moved to $700/ton, the crop plan should reflect a blended cost of ~$608/ton -- not just $540 or $700.
 
-## The Fix
+## The Formula
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+```text
+blendedPrice = (purchasedQty × avgPurchasedPrice + remainingQty × currentMarketPrice) / totalNeeded
+```
 
-## Changes
+Where:
+- **purchasedQty** = sum of received purchase quantities for this product/season
+- **avgPurchasedPrice** = weighted average of actual purchase prices
+- **remainingQty** = totalNeeded - purchasedQty (floored at 0)
+- **currentMarketPrice** = latest vendor offering price or price book entry
+- **totalNeeded** = demand from crop plans (already calculated by `calculatePlannedUsage`)
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+If fully purchased, blended price = avg purchased price. If nothing purchased, blended price = current market price. This is exactly what you described.
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+## What Changes
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+### 1. New utility: `calculateBlendedPrice` in `src/lib/cropCalculations.ts`
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
+A function that takes a product ID, season year, purchases, price records, price book, and planned demand, then returns the blended $/unit. It:
+- Sums purchased quantities and costs from `purchases` line items for that product+season
+- Gets the "unpurchased" price from the price book or latest vendor offering
+- Returns the weighted average
 
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
+### 2. Expand `PriceBookContext` interface
 
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
+Add optional fields so the blended calculation has the data it needs:
+- `purchases` (the season's purchase records)
+- `plannedUsage` (total demand per product, already computed elsewhere)
+
+These are optional so existing call sites don't break -- they just won't get blended pricing until wired up.
+
+### 3. Update `calculateApplicationCostPerAcreWithPriceBook`
+
+Before falling back to the single price book price, check if purchase data is available in the context. If so, compute the blended price for that product and use it instead. The priority becomes:
+
+1. **Blended price** (if purchases exist in context and product has partial purchases)
+2. Price book entry (awarded/manual -- used as the "unpurchased" component of the blend, or standalone if no purchase data)
+3. Estimated price fallback
+
+### 4. Wire purchase data into `PriceBookContext` at the top level
+
+In the components that build the `PriceBookContext` (`CropPlanningView`, `DashboardView`, `PassCard`, `CropPlanPrintView`), pass the `purchases` array that's already available in those views from `FarmCalcApp` props.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+| `src/lib/cropCalculations.ts` | Add `calculateBlendedPrice` function; expand `PriceBookContext` with optional `purchases` and `plannedUsage`; update `calculateApplicationCostPerAcreWithPriceBook` to use blended price |
+| `src/components/farm/CropPlanningView.tsx` | Pass `purchases` into `priceBookContext` |
+| `src/components/farm/DashboardView.tsx` | Pass `purchases` into `priceBookContext` |
+| `src/components/farm/PassCard.tsx` | Pass `purchases` into `priceBookContext` |
+| `src/components/farm/CropPlanPrintView.tsx` | Pass `purchases` into `priceBookContext` |
+
+## Edge Cases
+
+- Product fully purchased: blended = avg purchase price only
+- Product not purchased at all: blended = current market/price book price (no change from today)
+- Purchased more than planned: blended = avg purchase price (remaining = 0)
+- No price book entry AND no purchases: falls back to estimated price as today
 
