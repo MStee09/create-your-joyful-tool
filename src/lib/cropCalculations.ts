@@ -1,5 +1,6 @@
 import type { Crop, Product, Application, ApplicationTiming, LiquidUnit, DryUnit, CropType, TierLabel } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { convertToGallons, convertToPounds } from '@/utils/farmUtils';
 
 // Auto-tier calculation based on 80/40 thresholds
@@ -143,18 +144,39 @@ export const calculateApplicationCostPerAcre = (
 };
 
 // Calculate cost per acre using price book for bid-eligible products
+// When purchases are provided, computes a blended price for partially-purchased inputs.
 export const calculateApplicationCostPerAcreWithPriceBook = (
   app: Application,
   product: Product | undefined,
   productMasters: ProductMaster[],
   priceBook: PriceBookEntry[],
-  seasonYear: number
+  seasonYear: number,
+  purchases?: SimplePurchase[]
 ): number => {
   if (!product) return 0;
   
   const productMaster = productMasters.find(pm => pm.id === product.id);
   
-  // Check if this product has a price book entry (from awarded bids or manual entries)
+  // Helper: compute $/acre from a unit price and unit
+  const computeCostPerAcre = (unitPrice: number, priceUom: string): number => {
+    if (product.form === 'liquid') {
+      const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
+      if (priceUom === 'gal') return gallonsPerAcre * unitPrice;
+      const density = product.densityLbsPerGal || productMaster?.densityLbsPerGal || 10;
+      const lbsPerAcre = gallonsPerAcre * density;
+      const pricePerLb = priceUom === 'ton' ? unitPrice / 2000 : unitPrice;
+      return lbsPerAcre * pricePerLb;
+    } else {
+      const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
+      const pricePerPound = priceUom === 'ton' ? unitPrice / 2000 : unitPrice;
+      return poundsPerAcre * pricePerPound;
+    }
+  };
+  
+  // Determine the "current market" unit price and its UOM
+  let currentUnitPrice: number | null = null;
+  let currentPriceUom: string = 'ton';
+  
   if (productMaster) {
     // Look for price book entry - check by specId OR productId
     const priceEntry = priceBook.find(pb => 
@@ -166,41 +188,32 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     );
     
     if (priceEntry) {
-      // Use price from price book (could be awarded, manual, estimated, or invoice)
-      const priceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
-      if (product.form === 'liquid') {
-        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-        if (priceUom === 'gal') {
-          return gallonsPerAcre * priceEntry.price;
-        }
-        const density = product.densityLbsPerGal || 10;
-        const lbsPerAcre = gallonsPerAcre * density;
-        const pricePerLb = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
-        return lbsPerAcre * pricePerLb;
-      } else {
-        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-        const pricePerPound = priceUom === 'ton' ? priceEntry.price / 2000 : priceEntry.price;
-        return poundsPerAcre * pricePerPound;
-      }
+      currentPriceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
+      currentUnitPrice = priceEntry.price;
+    } else if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
+      currentPriceUom = productMaster.estimatedPriceUnit;
+      currentUnitPrice = productMaster.estimatedPrice;
     }
+  }
+  
+  // If we have purchases AND a current market price, attempt blended pricing
+  if (purchases && purchases.length > 0 && currentUnitPrice !== null) {
+    const blendedPrice = calculateBlendedUnitPrice(
+      product.id,
+      purchases,
+      currentUnitPrice,
+      currentPriceUom,
+    );
     
-    // No price book entry - use ProductMaster's estimated price if available
-    if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
-      if (product.form === 'liquid') {
-        const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-        if (productMaster.estimatedPriceUnit === 'gal') {
-          return gallonsPerAcre * productMaster.estimatedPrice;
-        }
-        const density = product.densityLbsPerGal || productMaster.densityLbsPerGal || 10;
-        const lbsPerAcre = gallonsPerAcre * density;
-        const pricePerLb = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
-        return lbsPerAcre * pricePerLb;
-      } else {
-        const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-        const pricePerPound = productMaster.estimatedPriceUnit === 'ton' ? productMaster.estimatedPrice / 2000 : productMaster.estimatedPrice;
-        return poundsPerAcre * pricePerPound;
-      }
+    if (blendedPrice !== null) {
+      // We have actual purchases — use blended price
+      return computeCostPerAcre(blendedPrice, currentPriceUom);
     }
+  }
+  
+  // No blended price available — use current market price directly
+  if (currentUnitPrice !== null) {
+    return computeCostPerAcre(currentUnitPrice, currentPriceUom);
   }
   
   // Fall back to legacy product price (for old data with price on Product)
@@ -416,7 +429,100 @@ export interface PriceBookContext {
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
   seasonYear: number;
+  purchases?: SimplePurchase[];
 }
+
+// ============================================================================
+// Blended Price Calculation
+// ============================================================================
+
+/**
+ * Calculate a blended unit price for a product based on actual purchases
+ * and current market price for the unpurchased portion.
+ * 
+ * Formula: (purchasedQty × avgPurchasedPrice + remainingQty × currentPrice) / totalNeeded
+ * 
+ * Returns null if no purchase data exists (caller falls back to normal pricing).
+ */
+export const calculateBlendedUnitPrice = (
+  productId: string,
+  purchases: SimplePurchase[],
+  currentUnitPrice: number, // $/base-unit (e.g. $/ton, $/gal)
+  currentPriceUnit: string, // 'ton', 'gal', 'lbs', etc.
+  totalDemand?: number, // total needed in base units (optional - if not provided, uses purchased qty only)
+): number | null => {
+  // Gather all purchase lines for this product
+  let purchasedQty = 0; // in normalized units
+  let purchasedCost = 0; // total $ spent
+
+  for (const purchase of purchases) {
+    for (const line of purchase.lines) {
+      if (line.productId !== productId) continue;
+      // Use totalQuantity (normalized) and normalizedUnitPrice
+      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      const lineUnit = line.normalizedUnit || line.packageUnit || 'lbs';
+      
+      // Convert to match currentPriceUnit for apples-to-apples
+      const convertedQty = convertQuantityToUnit(lineQty, lineUnit, currentPriceUnit);
+      purchasedQty += convertedQty;
+      purchasedCost += line.totalPrice;
+    }
+  }
+
+  if (purchasedQty <= 0) return null; // No purchases, caller uses standard pricing
+
+  const avgPurchasedPrice = purchasedCost / purchasedQty;
+
+  // If no demand figure, just return avg purchased price (fully-purchased scenario)
+  if (!totalDemand || totalDemand <= 0) return avgPurchasedPrice;
+
+  // If purchased >= needed, blended = avg purchase price
+  if (purchasedQty >= totalDemand) return avgPurchasedPrice;
+
+  // Blend: (purchased * avgPurchased + remaining * current) / total
+  const remainingQty = totalDemand - purchasedQty;
+  return (purchasedQty * avgPurchasedPrice + remainingQty * currentUnitPrice) / totalDemand;
+};
+
+/**
+ * Convert a quantity from one unit to another for comparison.
+ * Simplified conversion for common farm units.
+ */
+const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
+  if (fromUnit === toUnit) return qty;
+  
+  // Convert everything to lbs as intermediate
+  const toLbs: Record<string, number> = {
+    'lbs': 1,
+    'ton': 2000,
+    'oz': 1/16,
+    'g': 1/453.592,
+    'gal': 1, // liquids stay as-is (separate dimension)
+    'qt': 0.25, // relative to gal
+    'pt': 0.125,
+  };
+  
+  // Liquid-to-liquid conversions
+  const toGal: Record<string, number> = {
+    'gal': 1,
+    'qt': 0.25,
+    'pt': 0.125,
+    'oz': 1/128,
+  };
+  
+  const liquidUnits = new Set(['gal', 'qt', 'pt']);
+  const isFromLiquid = liquidUnits.has(fromUnit) || (fromUnit === 'oz' && liquidUnits.has(toUnit));
+  const isToLiquid = liquidUnits.has(toUnit);
+  
+  if (isFromLiquid && isToLiquid) {
+    const galQty = qty * (toGal[fromUnit] || 1);
+    return galQty / (toGal[toUnit] || 1);
+  }
+  
+  // Dry conversions
+  const lbsQty = qty * (toLbs[fromUnit] || 1);
+  return lbsQty / (toLbs[toUnit] || 1);
+};
 
 // Calculate pass summary with price book integration
 export const calculatePassSummaryWithPriceBook = (
@@ -442,7 +548,8 @@ export const calculatePassSummaryWithPriceBook = (
       product,
       priceBookContext.productMasters,
       priceBookContext.priceBook,
-      priceBookContext.seasonYear
+      priceBookContext.seasonYear,
+      priceBookContext.purchases
     );
     
     totalCost += costPerAcre * acresTreated;
@@ -521,7 +628,8 @@ export const calculateCoverageGroupsWithPriceBook = (
       product,
       priceBookContext.productMasters,
       priceBookContext.priceBook,
-      priceBookContext.seasonYear
+      priceBookContext.seasonYear,
+      priceBookContext.purchases
     );
 
     if (!groupMap.has(bucket)) {
@@ -557,11 +665,11 @@ export const calculateCoverageGroupsWithPriceBook = (
       applications: apps.slice().sort((a, b) => {
         const costA = calculateApplicationCostPerAcreWithPriceBook(
           a, products.find(p => p.id === a.productId),
-          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear, priceBookContext.purchases
         );
         const costB = calculateApplicationCostPerAcreWithPriceBook(
           b, products.find(p => p.id === b.productId),
-          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear
+          priceBookContext.productMasters, priceBookContext.priceBook, priceBookContext.seasonYear, priceBookContext.purchases
         );
         return costB - costA; // Descending: highest cost first
       }),

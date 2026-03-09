@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, Crop } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { createDefaultCrop } from '@/data/initialData';
 import { formatNumber } from '@/utils/farmUtils';
 import { CropPlanningView } from './CropPlanningView';
@@ -14,6 +15,7 @@ interface CropPlannerViewProps {
   inventory: InventoryItem[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];
@@ -31,6 +33,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
   inventory,
   productMasters,
   priceBook,
+  purchases,
   fields,
   fieldAssignments,
   fieldCropOverrides,
@@ -177,6 +180,7 @@ export const CropPlannerView: React.FC<CropPlannerViewProps> = ({
             inventory={inventory}
             productMasters={productMasters}
             priceBook={priceBook}
+            purchases={purchases}
             fields={fields}
             fieldAssignments={fieldAssignments}
             fieldCropOverrides={fieldCropOverrides}

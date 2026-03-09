@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit2, Check, X, Trash2, Layers, Focus, ArrowRight, Snowflake, Sprout, Sun, CloudSnow, ChevronDown, ChevronRight, List, Droplets, Weight, ChevronsUpDown, MapPin } from 'lucide-react';
 import type { Crop, Season, Product, Vendor, InventoryItem, Application, ApplicationTiming, TimingBucket } from '@/types/farm';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
 import { formatNumber, generateId } from '@/utils/farmUtils';
@@ -69,6 +70,7 @@ interface CropPlanningViewProps {
   inventory: InventoryItem[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];
@@ -88,6 +90,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   inventory,
   productMasters,
   priceBook,
+  purchases,
   fields,
   fieldAssignments,
   fieldCropOverrides,
@@ -126,7 +129,8 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     productMasters,
     priceBook,
     seasonYear: season.year,
-  }), [productMasters, priceBook, season.year]);
+    purchases,
+  }), [productMasters, priceBook, season.year, purchases]);
 
   const summary = useMemo(() => 
     calculateSeasonSummaryWithPriceBook(crop, products, priceBookContext),
@@ -545,6 +549,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                           purposes={purposes}
                           productMasters={productMasters}
                           priceBook={priceBook}
+                          purchases={purchases}
                           seasonYear={season.year}
                           onEditApplication={setEditingApplication}
                           onAddApplication={handleAddApplication}
@@ -786,6 +791,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                         purposes={purposes}
                         productMasters={productMasters}
                         priceBook={priceBook}
+                        purchases={purchases}
                         seasonYear={season.year}
                         onEditApplication={setEditingApplication}
                         onAddApplication={handleAddApplication}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap, AlertTriangle } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor, InventoryItem } from '@/types/farm';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import type { FieldCropOverride } from '@/types/field';
@@ -24,6 +25,7 @@ interface PassCardProps {
   applicationOverrides?: Record<string, ApplicationOverride>;
   productMasters?: ProductMaster[];
   priceBook?: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   seasonYear?: number;
   onEditApplication: (app: Application) => void;
   onAddApplication: (timingId: string) => void;
@@ -137,6 +139,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   applicationOverrides = {},
   productMasters = [],
   priceBook = [],
+  purchases,
   seasonYear = new Date().getFullYear(),
   onEditApplication,
   onAddApplication,
@@ -160,7 +163,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   
   // Build price book context if available
   const priceBookContext: PriceBookContext | undefined = productMasters.length > 0 && priceBook.length > 0 
-    ? { productMasters, priceBook, seasonYear }
+    ? { productMasters, priceBook, seasonYear, purchases }
     : undefined;
   
   const summary = priceBookContext 
