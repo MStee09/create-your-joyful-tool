@@ -10,6 +10,7 @@ import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
 import { EntryModePanel } from './EntryModePanel';
 import { ExportPdfButton } from './ExportPdfButton';
+import { CostTrendCard } from './CostTrendCard';
 import { FieldAssignmentModal } from './FieldAssignmentModal';
 import { CropByFieldView } from './CropByFieldView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
