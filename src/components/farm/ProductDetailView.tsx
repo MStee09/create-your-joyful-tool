@@ -1402,6 +1402,19 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               onUpdateOfferings={onUpdateOfferings}
               onNavigateToVendor={onNavigateToVendor}
               onLogQuote={onAddPriceRecord ? (vendorId) => setLogQuoteVendorId(vendorId) : undefined}
+              onCreateVendor={onAddVendor ? async (vendorData) => {
+                const newVendor: Vendor = {
+                  id: crypto.randomUUID(),
+                  name: vendorData.name || '',
+                  contactEmail: vendorData.contactEmail,
+                  contactPhone: vendorData.contactPhone,
+                  contacts: [],
+                  documents: [],
+                  tags: [],
+                };
+                onAddVendor(newVendor);
+                return newVendor;
+              } : undefined}
             />
           </div>
 
