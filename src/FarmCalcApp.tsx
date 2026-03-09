@@ -1642,7 +1642,7 @@ const AppContent: React.FC = () => {
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
             onUpdatePriceRecord={updatePriceRecord}
             onDeletePriceRecord={deletePriceRecord}
             onAddVendor={(vendor) => handleUpdateVendors([...state.vendors, vendor])}
