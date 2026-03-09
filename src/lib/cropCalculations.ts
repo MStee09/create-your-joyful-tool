@@ -628,7 +628,8 @@ export const calculateCoverageGroupsWithPriceBook = (
       product,
       priceBookContext.productMasters,
       priceBookContext.priceBook,
-      priceBookContext.seasonYear
+      priceBookContext.seasonYear,
+      priceBookContext.purchases
     );
 
     if (!groupMap.has(bucket)) {
