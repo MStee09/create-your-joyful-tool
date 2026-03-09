@@ -346,7 +346,7 @@ export function useSupabaseData(user: User | null) {
           userId: row.user_id,
           seasonId: row.season_id,
           vendorId: row.vendor_id,
-          status: (row.status || 'ordered') as 'ordered' | 'received',
+          status: (row.status || 'ordered') as 'booked' | 'ordered' | 'received',
           orderDate: row.order_date || row.date,
           expectedDeliveryDate: row.expected_delivery_date || undefined,
           receivedDate: row.received_date || undefined,
