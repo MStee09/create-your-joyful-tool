@@ -238,6 +238,39 @@ export type Database = {
           },
         ]
       }
+      crop_plan_cost_snapshots: {
+        Row: {
+          cost_per_acre: number
+          created_at: string
+          crop_id: string
+          id: string
+          season_year: number
+          snapshot_reason: string
+          total_cost: number
+          user_id: string
+        }
+        Insert: {
+          cost_per_acre?: number
+          created_at?: string
+          crop_id: string
+          id?: string
+          season_year: number
+          snapshot_reason?: string
+          total_cost?: number
+          user_id: string
+        }
+        Update: {
+          cost_per_acre?: number
+          created_at?: string
+          crop_id?: string
+          id?: string
+          season_year?: number
+          snapshot_reason?: string
+          total_cost?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       equipment: {
         Row: {
           created_at: string
