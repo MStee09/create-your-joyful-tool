@@ -1506,6 +1506,7 @@ const AppContent: React.FC = () => {
             productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             fields={fields || []}
             fieldAssignments={fieldAssignments || []}
             fieldCropOverrides={fieldCropOverrides || []}
@@ -1513,7 +1514,6 @@ const AppContent: React.FC = () => {
             onUpdateFieldAssignments={updateFieldAssignments}
             onUpdateFieldCropOverrides={updateFieldCropOverrides}
             onNavigateToMixCalculator={(fieldId, acres) => {
-              // Navigate to mix calculator - could store context for pre-population
               setActiveView('mix-calculator');
             }}
             onAddProduct={handleAddProduct}
