@@ -1189,6 +1189,10 @@ const AppContent: React.FC = () => {
     refetch,
   } = supabaseData;
 
+  // Cost snapshots for tracking crop plan cost changes over time
+  const seasonYear = seasons.find(s => s.id === currentSeasonId)?.year || new Date().getFullYear();
+  const { snapshots: costSnapshots, saveCostSnapshot, getSnapshotsForCrop } = useCostSnapshots(user, seasonYear);
+
   // Check for localStorage data to migrate
   const localDataSummary = getLocalStorageDataSummary();
   const hasDataToMigrate = hasLocalStorageData() && !migrationComplete;
