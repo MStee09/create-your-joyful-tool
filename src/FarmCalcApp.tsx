@@ -1773,7 +1773,7 @@ const AppContent: React.FC = () => {
             vendors={vendors}
             vendorOfferings={vendorOfferings || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
             onUpdateOfferings={handleUpdateVendorOfferings}
           />
         );
