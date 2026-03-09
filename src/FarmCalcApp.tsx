@@ -1676,6 +1676,7 @@ const AppContent: React.FC = () => {
             seasonYear={currentSeason?.year}
             inventory={state.inventory}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             onViewChange={setActiveView}
           />
         );
