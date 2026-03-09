@@ -216,10 +216,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tr key={idx} className="hover:bg-muted/30">
                   <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
-                      {getComparativeIndicator(crop.costPerAcre)}
-                    </div>
+                    <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {getCropTrend(season!.crops[idx]?.id || '', crop.costPerAcre)}
                   </td>
                   <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(crop.totalCost)}</td>
                   <td className="px-6 py-4 text-right text-muted-foreground">{formatNumber(crop.acres, 0)}</td>
