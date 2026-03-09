@@ -416,7 +416,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
           </div>
 
           {/* Conditional date fields */}
-          {status === 'ordered' && (
+          {(status === 'ordered' || status === 'booked') && (
             <div className="space-y-2">
               <Label>Expected Delivery Date</Label>
               <Input 

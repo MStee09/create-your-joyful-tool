@@ -118,6 +118,16 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
 
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Booked</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(bookedTotal)}</div>
+            <p className="text-xs text-muted-foreground">{booked.length} bookings</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Awaiting Delivery</CardTitle>
           </CardHeader>
           <CardContent>
