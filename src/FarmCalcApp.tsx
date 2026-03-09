@@ -1141,6 +1141,7 @@ const AppContent: React.FC = () => {
   const [migrationError, setMigrationError] = useState<string | null>(null);
   // Phase 5: Record Application modal state
   const [showRecordApplicationModal, setShowRecordApplicationModal] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
