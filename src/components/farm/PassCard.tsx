@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus, Copy, Trash2, GripVertical, AlertCircle, Edit2, Check, X, Clock, Award, Zap, AlertTriangle } from 'lucide-react';
 import type { ApplicationTiming, Application, Crop, Product, Vendor, InventoryItem } from '@/types/farm';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose, ApplicationOverride } from '@/types/productIntelligence';
 import type { FieldCropOverride } from '@/types/field';
