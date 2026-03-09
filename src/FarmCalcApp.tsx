@@ -2008,9 +2008,26 @@ const AppContent: React.FC = () => {
         onSync={user ? handleSync : undefined}
         userEmail={user?.email}
         onSignOut={user ? signOut : undefined}
+        isMobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {/* Mobile header with hamburger */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-muted"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-emerald-600 rounded-md flex items-center justify-center">
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-foreground">FarmCalc</span>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
           {renderView()}
         </div>
       </main>
