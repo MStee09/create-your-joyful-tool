@@ -32,6 +32,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   seasonYear = new Date().getFullYear(),
   inventory = [],
   purchases = [],
+  costSnapshots = [],
   onViewChange,
   onOpenRecordApplication,
 }) => {
