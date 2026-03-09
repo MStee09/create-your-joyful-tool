@@ -1493,20 +1493,18 @@ const AppContent: React.FC = () => {
   };
 
   // Wrapped purchase handler that triggers cost snapshots
-  const handleAddPurchase = useCallback(async (purchase: any) => {
+  const handleAddPurchase = async (purchase: any) => {
     const result = await addSimplePurchase(purchase);
-    // Snapshot after purchase since it affects blended cost
     setTimeout(() => snapshotAllCropCosts('purchase_recorded'), 500);
     return result;
-  }, [addSimplePurchase, snapshotAllCropCosts]);
+  };
 
   // Wrapped price record handler that triggers cost snapshots
-  const handleAddPriceRecord = useCallback(async (record: any) => {
+  const handleAddPriceRecord = async (record: any) => {
     const result = await addPriceRecord(record);
-    // Snapshot after price change
     setTimeout(() => snapshotAllCropCosts('price_change'), 500);
     return result;
-  }, [addPriceRecord, snapshotAllCropCosts]);
+  };
 
   const handleUpdateVendors = async (newVendors: Vendor[]) => {
     await updateVendors(newVendors);
