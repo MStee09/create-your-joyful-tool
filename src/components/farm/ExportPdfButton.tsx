@@ -95,6 +95,7 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
           products={products}
           productMasters={productMasters}
           priceBook={priceBook}
+          purchases={purchases}
           seasonYear={seasonYear}
           purposes={purposes}
           fields={fields}
