@@ -417,7 +417,100 @@ export interface PriceBookContext {
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
   seasonYear: number;
+  purchases?: SimplePurchase[];
 }
+
+// ============================================================================
+// Blended Price Calculation
+// ============================================================================
+
+/**
+ * Calculate a blended unit price for a product based on actual purchases
+ * and current market price for the unpurchased portion.
+ * 
+ * Formula: (purchasedQty × avgPurchasedPrice + remainingQty × currentPrice) / totalNeeded
+ * 
+ * Returns null if no purchase data exists (caller falls back to normal pricing).
+ */
+export const calculateBlendedUnitPrice = (
+  productId: string,
+  purchases: SimplePurchase[],
+  currentUnitPrice: number, // $/base-unit (e.g. $/ton, $/gal)
+  currentPriceUnit: string, // 'ton', 'gal', 'lbs', etc.
+  totalDemand?: number, // total needed in base units (optional - if not provided, uses purchased qty only)
+): number | null => {
+  // Gather all purchase lines for this product
+  let purchasedQty = 0; // in normalized units
+  let purchasedCost = 0; // total $ spent
+
+  for (const purchase of purchases) {
+    for (const line of purchase.lines) {
+      if (line.productId !== productId) continue;
+      // Use totalQuantity (normalized) and normalizedUnitPrice
+      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      const lineUnit = line.normalizedUnit || line.packageUnit || 'lbs';
+      
+      // Convert to match currentPriceUnit for apples-to-apples
+      const convertedQty = convertQuantityToUnit(lineQty, lineUnit, currentPriceUnit);
+      purchasedQty += convertedQty;
+      purchasedCost += line.totalPrice;
+    }
+  }
+
+  if (purchasedQty <= 0) return null; // No purchases, caller uses standard pricing
+
+  const avgPurchasedPrice = purchasedCost / purchasedQty;
+
+  // If no demand figure, just return avg purchased price (fully-purchased scenario)
+  if (!totalDemand || totalDemand <= 0) return avgPurchasedPrice;
+
+  // If purchased >= needed, blended = avg purchase price
+  if (purchasedQty >= totalDemand) return avgPurchasedPrice;
+
+  // Blend: (purchased * avgPurchased + remaining * current) / total
+  const remainingQty = totalDemand - purchasedQty;
+  return (purchasedQty * avgPurchasedPrice + remainingQty * currentUnitPrice) / totalDemand;
+};
+
+/**
+ * Convert a quantity from one unit to another for comparison.
+ * Simplified conversion for common farm units.
+ */
+const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
+  if (fromUnit === toUnit) return qty;
+  
+  // Convert everything to lbs as intermediate
+  const toLbs: Record<string, number> = {
+    'lbs': 1,
+    'ton': 2000,
+    'oz': 1/16,
+    'g': 1/453.592,
+    'gal': 1, // liquids stay as-is (separate dimension)
+    'qt': 0.25, // relative to gal
+    'pt': 0.125,
+  };
+  
+  // Liquid-to-liquid conversions
+  const toGal: Record<string, number> = {
+    'gal': 1,
+    'qt': 0.25,
+    'pt': 0.125,
+    'oz': 1/128,
+  };
+  
+  const liquidUnits = new Set(['gal', 'qt', 'pt']);
+  const isFromLiquid = liquidUnits.has(fromUnit) || (fromUnit === 'oz' && liquidUnits.has(toUnit));
+  const isToLiquid = liquidUnits.has(toUnit);
+  
+  if (isFromLiquid && isToLiquid) {
+    const galQty = qty * (toGal[fromUnit] || 1);
+    return galQty / (toGal[toUnit] || 1);
+  }
+  
+  // Dry conversions
+  const lbsQty = qty * (toLbs[fromUnit] || 1);
+  return lbsQty / (toLbs[toUnit] || 1);
+};
 
 // Calculate pass summary with price book integration
 export const calculatePassSummaryWithPriceBook = (
