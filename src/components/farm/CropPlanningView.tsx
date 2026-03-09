@@ -70,6 +70,7 @@ interface CropPlanningViewProps {
   inventory: InventoryItem[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   fields: Field[];
   fieldAssignments: FieldAssignment[];
   fieldCropOverrides: FieldCropOverride[];

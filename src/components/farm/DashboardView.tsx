@@ -37,7 +37,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     productMasters,
     priceBook,
     seasonYear,
-  }), [productMasters, priceBook, seasonYear]);
+    purchases,
+  }), [productMasters, priceBook, seasonYear, purchases]);
 
   const stats = useMemo(() => {
     if (!season) return { totalAcres: 0, totalCost: 0, costPerAcre: 0, cropCount: 0 };
