@@ -1662,7 +1662,13 @@ const AppContent: React.FC = () => {
             inventory={state.inventory}
             currentSeason={currentSeason}
             onUpdateVendors={handleUpdateVendors}
-            onNavigateToProduct={() => setActiveView('products')}
+            onNavigateToProduct={(productId?: string) => {
+              if (productId) {
+                setActiveView(`product-${productId}`);
+              } else {
+                setActiveView('products');
+              }
+            }}
           />
         );
       case 'inventory':

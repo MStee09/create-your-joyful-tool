@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Calendar, Download, Package, Settings, BookOpen, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Calendar, Settings, BookOpen, RotateCcw } from 'lucide-react';
 import type { Season } from '@/types/farm';
 import { generateId } from '@/utils/farmUtils';
 import { HowToPage } from './HowToPage';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SettingsViewProps {
   seasons: Season[];
@@ -16,6 +26,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
   const [showAddSeason, setShowAddSeason] = useState(false);
   const [newSeasonYear, setNewSeasonYear] = useState(new Date().getFullYear() + 1);
   const [newSeasonName, setNewSeasonName] = useState('Growing Season');
+  const [seasonToDelete, setSeasonToDelete] = useState<string | null>(null);
 
   const handleAddSeason = () => {
     const season: Season = {
@@ -31,44 +42,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
     setNewSeasonName('Growing Season');
   };
 
-  const handleExportAllData = () => {
-    const data = localStorage.getItem('farmcalc-state');
-    if (data) {
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `farmcalc_backup_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        localStorage.setItem('farmcalc-state', JSON.stringify(data));
-        window.location.reload();
-      } catch (err) {
-        console.error('Failed to import data:', err);
-        alert('Failed to import data. Please check the file format.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <div className="h-full flex flex-col">
       {/* Tab Navigation */}
       <div className="border-b border-border bg-background">
-        <div className="px-8 pt-6">
+        <div className="px-4 sm:px-8 pt-6">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('settings')}
@@ -101,7 +79,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
         {activeTab === 'howto' ? (
           <HowToPage />
         ) : (
-          <div className="p-8">
+          <div className="p-4 sm:p-8">
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-foreground">Settings</h2>
               <p className="text-muted-foreground mt-1">Manage seasons and app configuration</p>
@@ -135,7 +113,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
                       </div>
                     </div>
                     <button
-                      onClick={() => onDeleteSeason(season.id)}
+                      onClick={() => setSeasonToDelete(season.id)}
                       className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
                       disabled={seasons.length <= 1}
                     >
@@ -145,6 +123,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
                 ))}
               </div>
             </div>
+
+            {/* Delete Season Confirmation */}
+            <AlertDialog open={!!seasonToDelete} onOpenChange={(open) => !open && setSeasonToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Season</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this season? All crop plans within this season will be permanently removed. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => {
+                      if (seasonToDelete) {
+                        onDeleteSeason(seasonToDelete);
+                        setSeasonToDelete(null);
+                      }
+                    }}
+                  >
+                    Delete Season
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Add Season Modal */}
             {showAddSeason && (
@@ -196,32 +200,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ seasons, onAddSeason
             <div className="bg-card rounded-xl shadow-sm border border-border">
               <div className="px-6 py-4 border-b border-border">
                 <h3 className="font-semibold text-foreground">Data Management</h3>
-                <p className="text-sm text-muted-foreground">Import and export your data</p>
+                <p className="text-sm text-muted-foreground">Your data is stored securely in the cloud</p>
               </div>
               <div className="p-6 space-y-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Your data is currently stored locally in your browser. Export your data regularly for backup.
+                    Your data is synced to the cloud and available on any device where you sign in. No manual backups needed.
                   </p>
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={handleExportAllData}
-                      className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export All Data
-                    </button>
-                    <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted cursor-pointer">
-                      <Package className="w-4 h-4" />
-                      Import Data
-                      <input
-                        type="file"
-                        accept=".json"
-                        onChange={handleImportData}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
                 </div>
                 
                 {onResetData && (
