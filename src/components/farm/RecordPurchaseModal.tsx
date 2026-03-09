@@ -518,6 +518,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                     <SelectContent>
                       <SelectItem value="gal">gal</SelectItem>
                       <SelectItem value="lbs">lbs</SelectItem>
+                      <SelectItem value="ton">ton</SelectItem>
                       <SelectItem value="g">g</SelectItem>
                       <SelectItem value="oz">oz</SelectItem>
                       <SelectItem value="qt">qt</SelectItem>
