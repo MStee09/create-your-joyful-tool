@@ -129,6 +129,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     productMasters,
     priceBook,
     seasonYear: season.year,
+    purchases,
   }), [productMasters, priceBook, season.year]);
 
   const summary = useMemo(() => 
