@@ -45,7 +45,7 @@ const PACKAGE_SIZE_DEFAULTS: Record<string, { size: number; unit: PackageUnitTyp
   'Drum': { size: 30, unit: 'gal' },
   'Pail': { size: 5, unit: 'gal' },
   'Bag': { size: 50, unit: 'lbs' },
-  'Bulk': { size: 1, unit: 'gal' },
+  'Bulk': { size: 1, unit: 'ton' },
   'Bottle': { size: 1, unit: 'qt' },
   'Case': { size: 12, unit: 'qt' },
 };
