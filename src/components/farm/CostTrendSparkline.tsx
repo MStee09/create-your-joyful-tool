@@ -29,8 +29,8 @@ export const CostTrendSparkline: React.FC<CostTrendSparklineProps> = ({
   }));
 
   // Compare current to previous snapshot
-  const prev = snapshots[snapshots.length - 2];
-  const delta = currentCostPerAcre - prev.costPerAcre;
+  const prev = snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+  const delta = prev ? currentCostPerAcre - prev.costPerAcre : 0;
 
   return (
     <div className="flex items-center gap-1.5">
