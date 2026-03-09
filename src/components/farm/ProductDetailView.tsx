@@ -74,6 +74,7 @@ interface ProductDetailViewProps {
   onAddPriceRecord?: (record: NewPriceRecord) => Promise<any>;
   onUpdatePriceRecord?: (id: string, updates: Partial<PriceRecord>) => Promise<boolean>;
   onDeletePriceRecord?: (id: string) => Promise<boolean>;
+  onAddVendor?: (vendor: Vendor) => void;
 }
 
 export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
