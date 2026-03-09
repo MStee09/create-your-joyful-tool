@@ -12,7 +12,7 @@ interface CostTrendCardProps {
 
 /** Cost trend card for CropPlanningView */
 export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, currentCostPerAcre }) => {
-  if (snapshots.length < 2) return null;
+  if (snapshots.length === 0) return null;
 
   const data = snapshots.map(s => ({
     date: s.createdAt,

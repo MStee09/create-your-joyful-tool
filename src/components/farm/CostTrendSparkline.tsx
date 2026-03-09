@@ -19,7 +19,7 @@ export const CostTrendSparkline: React.FC<CostTrendSparklineProps> = ({
   width = 80,
   height = 24,
 }) => {
-  if (snapshots.length < 2) {
+  if (snapshots.length === 0) {
     return null;
   }
 

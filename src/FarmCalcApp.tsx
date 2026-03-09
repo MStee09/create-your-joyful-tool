@@ -1194,6 +1194,31 @@ const AppContent: React.FC = () => {
   const seasonYear = seasons.find(s => s.id === currentSeasonId)?.year || new Date().getFullYear();
   const { snapshots: costSnapshots, saveCostSnapshot, getSnapshotsForCrop } = useCostSnapshots(user, seasonYear);
 
+  // Seed initial baseline snapshot for crops that have no snapshots yet
+  const seededCropsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentSeason = seasons.find(s => s.id === currentSeasonId);
+    if (!currentSeason || !user || supabaseLoading || costSnapshots.length === undefined) return;
+    const legacyProds = getProductsAsLegacy(productMasters || [], vendorOfferings || []);
+    const pbCtx: PriceBookContext = {
+      productMasters: productMasters || [],
+      priceBook: priceBook || [],
+      seasonYear: currentSeason.year,
+      purchases: simplePurchases || [],
+    };
+    for (const crop of currentSeason.crops) {
+      if (seededCropsRef.current.has(crop.id)) continue;
+      const existing = costSnapshots.filter(s => s.cropId === crop.id);
+      if (existing.length === 0 && crop.totalAcres > 0) {
+        const summary = calculateSeasonSummaryWithPriceBook(crop, legacyProds, pbCtx);
+        if (summary.totalCost > 0) {
+          saveCostSnapshot(crop.id, summary.costPerAcre, summary.totalCost, 'manual');
+          seededCropsRef.current.add(crop.id);
+        }
+      }
+    }
+  }, [costSnapshots, seasons, currentSeasonId, user, supabaseLoading, productMasters, vendorOfferings, priceBook, simplePurchases]);
+
   // Check for localStorage data to migrate
   const localDataSummary = getLocalStorageDataSummary();
   const hasDataToMigrate = hasLocalStorageData() && !migrationComplete;
