@@ -37,6 +37,7 @@ import {
   MapPin,
   GitCompare,
   Beaker,
+  Menu,
 } from 'lucide-react';
 
 // Import types
