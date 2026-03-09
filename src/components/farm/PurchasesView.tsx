@@ -47,6 +47,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   );
 
   // Split by status
+  const booked = seasonPurchases.filter(p => p.status === 'booked');
   const awaitingDelivery = seasonPurchases.filter(p => p.status === 'ordered');
   const received = seasonPurchases.filter(p => p.status === 'received');
 
@@ -54,6 +55,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const totalSpent = seasonPurchases.reduce((sum, p) => sum + p.total, 0);
   const receivedTotal = received.reduce((sum, p) => sum + p.total, 0);
   const awaitingTotal = awaitingDelivery.reduce((sum, p) => sum + p.total, 0);
+  const bookedTotal = booked.reduce((sum, p) => sum + p.total, 0);
   const freightTotal = seasonPurchases.reduce((sum, p) => sum + (p.freightCost || 0), 0);
 
   const getVendorName = (vendorId: string) => 
