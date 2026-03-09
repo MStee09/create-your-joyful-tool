@@ -1,43 +1,67 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Comprehensive Code and UX/UI Audit -- Findings and Fix Plan
 
-## The Problem
+## Audit Summary
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+I reviewed every sidebar nav item, every `renderView` case, all button handlers in Dashboard and QuickActions, prop mismatches between components, and dead code across the project.
 
-## The Fix
+---
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+## Issues Found
 
-## Changes
+### 1. Dead Sidebar File (Low -- cleanup)
+`src/components/farm/Sidebar.tsx` is never imported anywhere. It contains a different set of nav items (`tank-mixes`, `record-application`) that don't exist in `renderView()`. This is the source of the previous "blank screen" confusion -- the REAL sidebar is defined inline in `FarmCalcApp.tsx` (lines 138-311) and does NOT include those broken links.
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+**Fix:** Delete `src/components/farm/Sidebar.tsx` and remove its export from `src/components/farm/index.ts`.
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+### 2. Dashboard Redirect Missing `onOpenRecordApplication` Prop
+The `variance` / `variance-by-pass` / `alerts` cases (line 1724-1740) render `DashboardView` but don't pass `onOpenRecordApplication`. If a user somehow lands on those routes, the "Record Application" quick action button on Dashboard will silently do nothing.
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+**Fix:** Add `onOpenRecordApplication={() => setShowRecordApplicationModal(true)}` to that DashboardView instance.
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
+### 3. QuickActionsCard "Record Delivery" Button Never Shown
+`QuickActionsCard` accepts an optional `onRecordDelivery` prop but nobody passes it. The button exists in code but is invisible. This is a feature gap -- delivery recording has no implementation.
 
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
+**Fix:** Remove the `onRecordDelivery` prop and button from `QuickActionsCard` until a delivery recording feature is built, to avoid dead code.
 
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
+### 4. Sidebar User Section -- Works but Could Be Cleaner
+The inline sidebar correctly shows `userEmail` and a sign-out button. No fix needed here -- this was already addressed in the inline version.
 
-## Files to Modify
+### 5. No "Record Application" Sidebar Button in Active Sidebar
+The working inline sidebar has no "Record Application" nav link. Users can only access it via the Dashboard quick action button. This is a UX gap -- the feature exists (modal works) but is buried.
 
-| File | Change |
-|------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+**Fix:** Add a "Record Application" NavButton under the Tools section of the inline sidebar that opens the modal (via a new `onRecordApplication` callback prop or by setting `activeView` to a value that triggers the modal).
+
+### 6. `productMasters` Prop Name Inconsistency in Dashboard Redirect
+Line 1732 passes `productMasters={productMasters}` but line 1547 passes `productMasters={state.productMasters || []}`. These resolve to the same value (destructured earlier), but the inconsistency is worth normalizing.
+
+---
+
+## Implementation Plan
+
+### Task 1: Delete dead Sidebar file
+- Delete `src/components/farm/Sidebar.tsx`
+- Remove `export { Sidebar } from './Sidebar'` from `src/components/farm/index.ts`
+
+### Task 2: Fix Dashboard redirect missing prop
+- Add `onOpenRecordApplication={() => setShowRecordApplicationModal(true)}` to the DashboardView rendered in the `variance`/`variance-by-pass`/`alerts` case block (line 1729)
+
+### Task 3: Add "Record Application" to inline sidebar
+- Add a NavButton for record-application in the Tools section (around line 273)
+- In `renderView`, add a `case 'record-application'` that opens the modal and redirects to dashboard:
+  ```typescript
+  case 'record-application':
+    // Open the modal and show dashboard
+    setShowRecordApplicationModal(true);
+    setActiveView('dashboard');
+    return null;
+  ```
+  Or better: handle it in the `onViewChange` handler to trigger the modal without a blank flash.
+
+### Task 4: Clean up QuickActionsCard dead code
+- Remove `onRecordDelivery` prop and the conditional Truck button from `QuickActionsCard`
+
+### Task 5: Normalize prop usage in Dashboard redirect
+- Change `productMasters={productMasters}` to `productMasters={state.productMasters || []}` at line 1732 for consistency (or vice versa -- match the primary instance)
 
