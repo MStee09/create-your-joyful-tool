@@ -1956,7 +1956,13 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen bg-stone-100 font-sans">
       <Sidebar
         activeView={activeView}
-        onViewChange={setActiveView}
+        onViewChange={(view) => {
+          if (view === 'record-application') {
+            setShowRecordApplicationModal(true);
+            return;
+          }
+          setActiveView(view);
+        }}
         seasons={state.seasons}
         currentSeasonId={state.currentSeasonId}
         onSeasonChange={handleSeasonChange}
