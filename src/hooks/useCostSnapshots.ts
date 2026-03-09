@@ -58,9 +58,9 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
   ) => {
     if (!user) return;
 
-    // Only save if cost actually changed
+    // Only skip if cost is exactly the same (allow even tiny changes to be recorded)
     const last = lastSnapshotRef.current.get(cropId);
-    if (last && Math.abs(last.costPerAcre - costPerAcre) < 0.01 && Math.abs(last.totalCost - totalCost) < 0.01) {
+    if (last && last.costPerAcre === costPerAcre && last.totalCost === totalCost) {
       return;
     }
 

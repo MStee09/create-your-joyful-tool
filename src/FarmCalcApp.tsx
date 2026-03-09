@@ -1407,6 +1407,22 @@ const AppContent: React.FC = () => {
     setCurrentSeasonId(seasonId);
   };
 
+  // Helper: snapshot costs for all crops in current season
+  const snapshotAllCropCosts = useCallback((reason: string) => {
+    const season = seasons.find(s => s.id === currentSeasonId);
+    if (!season) return;
+    const pbCtx: PriceBookContext = {
+      productMasters: productMasters || [],
+      priceBook: priceBook || [],
+      seasonYear: season.year,
+      purchases: simplePurchases || [],
+    };
+    for (const crop of season.crops) {
+      const summary = calculateSeasonSummaryWithPriceBook(crop, legacyProducts, pbCtx);
+      saveCostSnapshot(crop.id, summary.costPerAcre, summary.totalCost, reason);
+    }
+  }, [seasons, currentSeasonId, productMasters, priceBook, simplePurchases, legacyProducts, saveCostSnapshot]);
+
   const handleUpdateSeason = async (updatedSeason: Season) => {
     const newSeasons = seasons.map(s => s.id === updatedSeason.id ? updatedSeason : s);
     await updateSeasons(newSeasons);
@@ -1472,7 +1488,25 @@ const AppContent: React.FC = () => {
       }
     }
     await updateVendorOfferings(newOfferings);
+    // Snapshot costs since pricing changed
+    snapshotAllCropCosts('price_change');
   };
+
+  // Wrapped purchase handler that triggers cost snapshots
+  const handleAddPurchase = useCallback(async (purchase: any) => {
+    const result = await addSimplePurchase(purchase);
+    // Snapshot after purchase since it affects blended cost
+    setTimeout(() => snapshotAllCropCosts('purchase_recorded'), 500);
+    return result;
+  }, [addSimplePurchase, snapshotAllCropCosts]);
+
+  // Wrapped price record handler that triggers cost snapshots
+  const handleAddPriceRecord = useCallback(async (record: any) => {
+    const result = await addPriceRecord(record);
+    // Snapshot after price change
+    setTimeout(() => snapshotAllCropCosts('price_change'), 500);
+    return result;
+  }, [addPriceRecord, snapshotAllCropCosts]);
 
   const handleUpdateVendors = async (newVendors: Vendor[]) => {
     await updateVendors(newVendors);
@@ -1608,7 +1642,7 @@ const AppContent: React.FC = () => {
             onUpdateInventory={handleUpdateInventory}
             onUpdateSpecs={updateCommoditySpecs}
             onNavigateToVendor={() => setActiveView('vendors')}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
             onUpdatePriceRecord={updatePriceRecord}
             onDeletePriceRecord={deletePriceRecord}
             onAddVendor={(vendor) => handleUpdateVendors([...state.vendors, vendor])}
@@ -1650,10 +1684,10 @@ const AppContent: React.FC = () => {
             priceRecords={priceRecords || []}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPurchase={addSimplePurchase}
+            onAddPurchase={handleAddPurchase}
             onUpdatePurchase={updateSimplePurchase}
             onDeletePurchase={deleteSimplePurchase}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
           />
         );
       case 'procurement':
@@ -1739,7 +1773,7 @@ const AppContent: React.FC = () => {
             vendors={vendors}
             vendorOfferings={vendorOfferings || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
             onUpdateOfferings={handleUpdateVendorOfferings}
           />
         );
@@ -1809,10 +1843,10 @@ const AppContent: React.FC = () => {
             priceRecords={priceRecords || []}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPurchase={addSimplePurchase}
+            onAddPurchase={handleAddPurchase}
             onUpdatePurchase={updateSimplePurchase}
             onDeletePurchase={deleteSimplePurchase}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
           />
         );
       case 'price-history':
@@ -1823,7 +1857,7 @@ const AppContent: React.FC = () => {
             vendors={vendors}
             vendorOfferings={vendorOfferings || []}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
-            onAddPriceRecord={addPriceRecord}
+            onAddPriceRecord={handleAddPriceRecord}
             onUpdateOfferings={handleUpdateVendorOfferings}
           />
         );
