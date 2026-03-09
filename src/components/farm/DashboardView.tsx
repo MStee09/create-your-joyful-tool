@@ -84,17 +84,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [season, products, priceBookContext]);
 
-  // Get comparative indicator for crop cost/acre vs farm average
-  const getComparativeIndicator = (cropCostPerAcre: number) => {
-    if (stats.costPerAcre === 0) return null;
-    const deviation = (cropCostPerAcre - stats.costPerAcre) / stats.costPerAcre;
-    
-    if (deviation > 0.10) {
-      return <ArrowUp className="w-4 h-4 text-amber-500" />;
-    } else if (deviation < -0.10) {
-      return <ArrowDown className="w-4 h-4 text-emerald-500" />;
-    }
-    return null;
+  // Get sparkline + trend indicator for crop
+  const getCropTrend = (cropId: string, cropCostPerAcre: number) => {
+    const cropSnaps = costSnapshots.filter(s => s.cropId === cropId);
+    return (
+      <CostTrendSparkline
+        snapshots={cropSnaps}
+        currentCostPerAcre={cropCostPerAcre}
+      />
+    );
   };
 
   // Calculate plan readiness using SimplePurchases
