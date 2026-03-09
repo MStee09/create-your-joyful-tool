@@ -90,6 +90,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   inventory,
   productMasters,
   priceBook,
+  purchases,
   fields,
   fieldAssignments,
   fieldCropOverrides,
