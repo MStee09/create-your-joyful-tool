@@ -121,7 +121,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     if (editingPurchase) {
       setVendorId(editingPurchase.vendorId);
       setOrderDate(editingPurchase.orderDate);
-      setStatus(editingPurchase.status);
+      setStatus(editingPurchase.status as 'booked' | 'ordered' | 'received');
       setExpectedDeliveryDate(editingPurchase.expectedDeliveryDate || '');
       setReceivedDate(editingPurchase.receivedDate || new Date().toISOString().split('T')[0]);
       setFreightCost(editingPurchase.freightCost || 0);
