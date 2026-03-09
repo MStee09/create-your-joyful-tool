@@ -1488,6 +1488,8 @@ const AppContent: React.FC = () => {
       }
     }
     await updateVendorOfferings(newOfferings);
+    // Snapshot costs since pricing changed
+    snapshotAllCropCosts('price_change');
   };
 
   const handleUpdateVendors = async (newVendors: Vendor[]) => {
