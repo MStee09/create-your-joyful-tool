@@ -1730,13 +1730,14 @@ const AppContent: React.FC = () => {
           <DashboardView
             season={currentSeason}
             products={legacyProducts}
-            productMasters={productMasters}
+            productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
             seasonYear={currentSeason?.year}
             inventory={state.inventory}
             purchases={simplePurchases || []}
             costSnapshots={costSnapshots}
             onViewChange={setActiveView}
+            onOpenRecordApplication={() => setShowRecordApplicationModal(true)}
           />
         );
       case 'commodity-specs':

@@ -1,4 +1,3 @@
-export { Sidebar } from './Sidebar';
 export { DashboardView } from './DashboardView';
 export { CropPlannerView } from './CropPlannerView';
 export { CropPlanningView } from './CropPlanningView';
