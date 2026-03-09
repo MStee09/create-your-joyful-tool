@@ -5,6 +5,7 @@ import type { Crop, Product } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose } from '@/types/productIntelligence';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { CropPlanPrintView } from './CropPlanPrintView';
 import { createRoot } from 'react-dom/client';
 
@@ -13,6 +14,7 @@ interface ExportPdfButtonProps {
   products: Product[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   seasonYear: number;
   purposes: Record<string, ProductPurpose>;
   // Optional field data for By Field section
