@@ -4,6 +4,7 @@ import type { Crop, Season, Product, Vendor, InventoryItem, Application, Applica
 import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { Field, FieldAssignment, FieldCropOverride } from '@/types/field';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { formatNumber, generateId } from '@/utils/farmUtils';
 import { SeasonOverviewBar } from './SeasonOverviewBar';
 import { PassCard } from './PassCard';
