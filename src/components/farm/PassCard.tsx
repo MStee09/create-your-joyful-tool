@@ -162,7 +162,7 @@ export const PassCard: React.FC<PassCardProps> = ({
   
   // Build price book context if available
   const priceBookContext: PriceBookContext | undefined = productMasters.length > 0 && priceBook.length > 0 
-    ? { productMasters, priceBook, seasonYear }
+    ? { productMasters, priceBook, seasonYear, purchases }
     : undefined;
   
   const summary = priceBookContext 
