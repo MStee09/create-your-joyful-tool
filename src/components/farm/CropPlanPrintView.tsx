@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { Crop, Product, ApplicationTiming, TimingBucket } from '@/types/farm';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
 import type { ProductPurpose } from '@/types/productIntelligence';
 import type { Field, FieldAssignment, FieldCropOverride, FieldAssignmentExtended } from '@/types/field';
