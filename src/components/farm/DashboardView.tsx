@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
-import { ArrowUp, ArrowDown, AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { CostSnapshot } from '@/hooks/useCostSnapshots';
 import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { NutrientSummaryCompact } from '@/components/NutrientSummary';
 import { calculateReadinessSummary } from '@/lib/planReadinessUtils';
 import { calculateSeasonSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
 import { QuickActionsCard } from './applications/QuickActionsCard';
+import { CostTrendSparkline } from './CostTrendSparkline';
 
 interface DashboardViewProps {
   season: Season | null;
