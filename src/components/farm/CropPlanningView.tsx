@@ -334,6 +334,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
       />
 
+      {/* Cost Trend Chart */}
+      <div className="px-6 pt-4">
+        <CostTrendCard
+          snapshots={costSnapshots.filter(s => s.cropId === crop.id)}
+          currentCostPerAcre={summary.costPerAcre}
+        />
+      </div>
+
       {/* Timeline Navigation Bar */}
       <div className="bg-card border-b border-border px-6 py-4">
         {/* View Toggle + Settings Row */}
