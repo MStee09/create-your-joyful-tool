@@ -1,0 +1,2 @@
+ALTER TABLE public.purchases DROP CONSTRAINT purchases_status_check;
+ALTER TABLE public.purchases ADD CONSTRAINT purchases_status_check CHECK (status = ANY (ARRAY['booked'::text, 'ordered'::text, 'received'::text, 'partial'::text]));
