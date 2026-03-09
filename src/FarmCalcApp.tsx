@@ -1491,6 +1491,7 @@ const AppContent: React.FC = () => {
             seasonYear={currentSeason?.year || new Date().getFullYear()}
             inventory={state.inventory}
             purchases={simplePurchases || []}
+            costSnapshots={costSnapshots}
             onViewChange={setActiveView}
             onOpenRecordApplication={() => setShowRecordApplicationModal(true)}
           />
