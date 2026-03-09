@@ -95,6 +95,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   onAddPriceRecord,
   onUpdatePriceRecord,
   onDeletePriceRecord,
+  onAddVendor,
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'purpose' | 'notes'>('details');
   const [editingDensity, setEditingDensity] = useState(false);
