@@ -126,6 +126,24 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [collapsedPhases, setCollapsedPhases] = useState<Set<TimingBucket>>(new Set());
   const [expandedPasses, setExpandedPasses] = useState<Set<string>>(new Set());
 
+  // Auto-hide header on scroll
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollTopRef = useRef(0);
+  const scrollThreshold = 30;
+
+  const handlePassesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    const delta = scrollTop - lastScrollTopRef.current;
+
+    if (delta > scrollThreshold && scrollTop > 50) {
+      setHeaderHidden(true);
+    } else if (delta < -scrollThreshold) {
+      setHeaderHidden(false);
+    }
+
+    lastScrollTopRef.current = scrollTop;
+  }, []);
+
   const { purposes } = useProductIntelligence();
 
   // Build price book context for cost calculations
