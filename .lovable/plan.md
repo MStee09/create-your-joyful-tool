@@ -1,43 +1,41 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Auto-Hide Header on Scroll in Crop Planning View
 
-## The Problem
+## What Changes
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+When you scroll down in the passes section, the Cost/Acre Trend chart and the Timeline Navigation Bar (view toggle + phase buttons) will slide up and hide, giving the passes section the full screen height. The moment you scroll back up even slightly, they slide back into view.
 
-## The Fix
+The `SeasonOverviewBar` at the very top stays pinned -- it's compact and always useful.
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+## Technical Approach
 
-## Changes
+**In `CropPlanningView.tsx`:**
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+1. Add a `useRef` on the scrollable passes container (`div.flex-1.overflow-y-auto`) and track scroll direction with `onScroll`.
+2. Add a `headerHidden` state boolean. Set `true` when `scrollTop` increases (scrolling down) and the user has scrolled past a threshold (~50px). Set `false` when `scrollTop` decreases (scrolling up).
+3. Wrap the CostTrendCard and Timeline Navigation Bar in a single `div` with a CSS transition:
+   - Default: `max-height: 500px; opacity: 1; overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease`
+   - Hidden: `max-height: 0; opacity: 0; padding: 0; margin: 0`
+4. Store `lastScrollTop` in a ref to compare direction on each scroll event.
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+```text
+┌─────────────────────────────────┐
+│ SeasonOverviewBar (always)      │  ← stays pinned
+├─────────────────────────────────┤
+│ CostTrendCard                   │  ← slides away
+│ Timeline Nav (toggles + phases) │  ← slides away
+├─────────────────────────────────┤
+│ Passes (scrollable)             │  ← gets more room
+│  ...                            │
+└─────────────────────────────────┘
+```
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+**Key details:**
+- Use `requestAnimationFrame` or a small debounce to avoid jittery toggling
+- Add a scroll threshold (minimum 30px scroll delta) before toggling, so tiny scrolls don't cause flicker
+- The transition uses `max-height` + `opacity` for a smooth collapse/expand feel
+- No layout shift -- the passes container is `flex-1` so it naturally fills the freed space
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
-
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
-
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+**Files modified:** `src/components/farm/CropPlanningView.tsx` only.
 
