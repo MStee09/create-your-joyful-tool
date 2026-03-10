@@ -352,170 +352,179 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
         onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
       />
 
-      {/* Cost Trend Chart */}
-      <div className="px-6 pt-4">
-        <CostTrendCard
-          snapshots={costSnapshots.filter(s => s.cropId === crop.id)}
-          currentCostPerAcre={summary.costPerAcre}
-        />
-      </div>
-
-      {/* Timeline Navigation Bar */}
-      <div className="bg-card border-b border-border px-6 py-4">
-        {/* View Toggle + Settings Row */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            {/* View Toggle */}
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('full')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'full' 
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                Full Season
-              </button>
-              <button
-                onClick={() => setViewMode('focus')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'focus' 
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Focus className="w-4 h-4" />
-                Focus Phase
-              </button>
-              <button
-                onClick={() => setViewMode('compact')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'compact' 
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                Compact
-              </button>
-            </div>
-
-            {/* Acres Editor */}
-            {editingAcres ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={acresValue}
-                  onChange={(e) => setAcresValue(Number(e.target.value))}
-                  className="w-24 px-3 py-1 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                />
-                <span className="text-muted-foreground">acres</span>
-                <button onClick={handleSaveAcres} className="p-1 text-primary hover:bg-primary/10 rounded">
-                  <Check className="w-4 h-4" />
-                </button>
-                <button onClick={() => { setEditingAcres(false); setAcresValue(crop.totalAcres); }} className="p-1 text-muted-foreground hover:bg-muted rounded">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setEditingAcres(true)}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                <span>{formatNumber(crop.totalAcres, 0)} acres</span>
-                <Edit2 className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            {/* Assign Fields Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFieldAssignment(true)}
-              className="flex items-center gap-2"
-            >
-              <MapPin className="w-4 h-4" />
-              Assign Fields
-              {fieldAssignments.filter(fa => fa.cropId === crop.id).length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 bg-muted rounded text-xs">
-                  {fieldAssignments.filter(fa => fa.cropId === crop.id).length}
-                </span>
-              )}
-            </Button>
-            
-            {/* Export PDF Button */}
-            <ExportPdfButton
-              crop={crop}
-              products={products}
-              productMasters={productMasters}
-              priceBook={priceBook}
-              seasonYear={season.year}
-              purposes={purposes}
-              fields={fields}
-              fieldAssignments={fieldAssignments.filter(fa => fa.seasonId === season.id)}
-              fieldOverrides={fieldCropOverrides}
-            />
-          </div>
+      {/* Collapsible header: Cost Trend + Timeline Nav */}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          maxHeight: headerHidden ? 0 : 600,
+          opacity: headerHidden ? 0 : 1,
+        }}
+      >
+        {/* Cost Trend Chart */}
+        <div className="px-6 pt-4">
+          <CostTrendCard
+            snapshots={costSnapshots.filter(s => s.cropId === crop.id)}
+            currentCostPerAcre={summary.costPerAcre}
+          />
         </div>
 
-        {/* Horizontal Timeline */}
-        <div className="flex items-center gap-2">
-          {PHASE_ORDER.map((phase, idx) => {
-            const config = PHASE_CONFIG[phase];
-            const Icon = config.icon;
-            const phaseCost = phaseCosts[phase];
-            const passCount = timingsByPhase[phase].length;
-            const isActive = activePhase === phase && viewMode === 'focus';
-            const hasTimings = passCount > 0;
-
-            return (
-              <React.Fragment key={phase}>
+        {/* Timeline Navigation Bar */}
+        <div className="bg-card border-b border-border px-6 py-4">
+          {/* View Toggle + Settings Row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              {/* View Toggle */}
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                 <button
-                  onClick={() => {
-                    setActivePhase(phase);
-                    if (viewMode === 'full') {
-                      togglePhaseCollapse(phase);
-                    }
-                  }}
-                  className={`flex-1 rounded-xl p-3 transition-all ${
-                    isActive 
-                      ? `${config.accent} text-white shadow-lg scale-[1.02]` 
-                      : hasTimings
-                        ? `${config.light} hover:scale-[1.01] border ${config.border}`
-                        : 'bg-muted/50 hover:bg-muted border border-transparent'
+                  onClick={() => setViewMode('full')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'full' 
+                      ? 'bg-background text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : hasTimings ? config.text : 'text-muted-foreground'}`} />
-                    <span className={`font-semibold text-sm ${isActive ? 'text-white' : hasTimings ? 'text-foreground' : 'text-muted-foreground'}`}>
-                      {config.label}
-                    </span>
-                  </div>
-                  <div className={`text-center ${isActive ? 'text-white/90' : hasTimings ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    <span className="font-bold">${phaseCost.toFixed(0)}</span>
-                    <span className="text-xs">/ac</span>
-                  </div>
-                  <div className={`text-center text-xs mt-1 ${isActive ? 'text-white/70' : 'text-muted-foreground'}`}>
-                    {passCount} pass{passCount !== 1 ? 'es' : ''}
-                  </div>
+                  <Layers className="w-4 h-4" />
+                  Full Season
                 </button>
-                
-                {idx < PHASE_ORDER.length - 1 && (
-                  <ArrowRight className="w-5 h-5 text-muted-foreground/30 flex-shrink-0" />
+                <button
+                  onClick={() => setViewMode('focus')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'focus' 
+                      ? 'bg-background text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Focus className="w-4 h-4" />
+                  Focus Phase
+                </button>
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'compact' 
+                      ? 'bg-background text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                  Compact
+                </button>
+              </div>
+
+              {/* Acres Editor */}
+              {editingAcres ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={acresValue}
+                    onChange={(e) => setAcresValue(Number(e.target.value))}
+                    className="w-24 px-3 py-1 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                  />
+                  <span className="text-muted-foreground">acres</span>
+                  <button onClick={handleSaveAcres} className="p-1 text-primary hover:bg-primary/10 rounded">
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => { setEditingAcres(false); setAcresValue(crop.totalAcres); }} className="p-1 text-muted-foreground hover:bg-muted rounded">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingAcres(true)}
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
+                >
+                  <span>{formatNumber(crop.totalAcres, 0)} acres</span>
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              {/* Assign Fields Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFieldAssignment(true)}
+                className="flex items-center gap-2"
+              >
+                <MapPin className="w-4 h-4" />
+                Assign Fields
+                {fieldAssignments.filter(fa => fa.cropId === crop.id).length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-muted rounded text-xs">
+                    {fieldAssignments.filter(fa => fa.cropId === crop.id).length}
+                  </span>
                 )}
-              </React.Fragment>
-            );
-          })}
+              </Button>
+              
+              {/* Export PDF Button */}
+              <ExportPdfButton
+                crop={crop}
+                products={products}
+                productMasters={productMasters}
+                priceBook={priceBook}
+                seasonYear={season.year}
+                purposes={purposes}
+                fields={fields}
+                fieldAssignments={fieldAssignments.filter(fa => fa.seasonId === season.id)}
+                fieldOverrides={fieldCropOverrides}
+              />
+            </div>
+          </div>
+
+          {/* Horizontal Timeline */}
+          <div className="flex items-center gap-2">
+            {PHASE_ORDER.map((phase, idx) => {
+              const config = PHASE_CONFIG[phase];
+              const Icon = config.icon;
+              const phaseCost = phaseCosts[phase];
+              const passCount = timingsByPhase[phase].length;
+              const isActive = activePhase === phase && viewMode === 'focus';
+              const hasTimings = passCount > 0;
+
+              return (
+                <React.Fragment key={phase}>
+                  <button
+                    onClick={() => {
+                      setActivePhase(phase);
+                      if (viewMode === 'full') {
+                        togglePhaseCollapse(phase);
+                      }
+                    }}
+                    className={`flex-1 rounded-xl p-3 transition-all ${
+                      isActive 
+                        ? `${config.accent} text-white shadow-lg scale-[1.02]` 
+                        : hasTimings
+                          ? `${config.light} hover:scale-[1.01] border ${config.border}`
+                          : 'bg-muted/50 hover:bg-muted border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : hasTimings ? config.text : 'text-muted-foreground'}`} />
+                      <span className={`font-semibold text-sm ${isActive ? 'text-white' : hasTimings ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        {config.label}
+                      </span>
+                    </div>
+                    <div className={`text-center ${isActive ? 'text-white/90' : hasTimings ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      <span className="font-bold">${phaseCost.toFixed(0)}</span>
+                      <span className="text-xs">/ac</span>
+                    </div>
+                    <div className={`text-center text-xs mt-1 ${isActive ? 'text-white/70' : 'text-muted-foreground'}`}>
+                      {passCount} pass{passCount !== 1 ? 'es' : ''}
+                    </div>
+                  </button>
+                  
+                  {idx < PHASE_ORDER.length - 1 && (
+                    <ArrowRight className="w-5 h-5 text-muted-foreground/30 flex-shrink-0" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Main Content with Tabs */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4" onScroll={handlePassesScroll}>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'passes' | 'by-field')}>
           <TabsList className="mb-4">
             <TabsTrigger value="passes">Passes</TabsTrigger>
