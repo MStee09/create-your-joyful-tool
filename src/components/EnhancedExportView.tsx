@@ -1,13 +1,19 @@
 import React, { useState, forwardRef, useMemo } from 'react';
 import { Download, FileSpreadsheet, Building2, Leaf, ShoppingCart } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, LiquidUnit, DryUnit } from '../types';
+import type { ProductMaster, PriceBookEntry } from '../types';
+import type { SimplePurchase } from '../types/simplePurchase';
 import { convertToGallons, convertToPounds, downloadCSV, formatCurrency, calculateCropCosts } from '../lib/calculations';
+import { calculateApplicationCostPerAcreWithPriceBook, getApplicationAcresPercentage } from '../lib/cropCalculations';
 
 interface EnhancedExportViewProps {
   season: Season | null;
   products: Product[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  productMasters?: ProductMaster[];
+  priceBook?: PriceBookEntry[];
+  purchases?: SimplePurchase[];
 }
 
 export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewProps>(({
