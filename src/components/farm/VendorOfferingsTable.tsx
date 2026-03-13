@@ -161,7 +161,6 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
     setFormData({ ...offering });
   };
 
-  // Handle creating a new vendor inline
   const handleCreateVendor = async () => {
     if (!newVendorName.trim() || !onCreateVendor) return;
     
@@ -173,26 +172,12 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
         contactPhone: newVendorPhone.trim() || undefined,
       });
       
-      // Set the new vendor as selected in the form
-      setFormData({ ...formData, vendorId: newVendor.id });
-      
-      // Reset and close dialog
-      setNewVendorName('');
-      setNewVendorEmail('');
-      setNewVendorPhone('');
-      setShowNewVendorDialog(false);
+      // Auto-create the offering immediately
+      addOfferingForVendor(newVendor.id, newVendor.name || newVendorName.trim());
     } catch (error) {
       console.error('Failed to create vendor:', error);
     } finally {
       setCreatingVendor(false);
-    }
-  };
-
-  const handleVendorSelectChange = (value: string) => {
-    if (value === '__new__') {
-      setShowNewVendorDialog(true);
-    } else {
-      setFormData({ ...formData, vendorId: value });
     }
   };
 
