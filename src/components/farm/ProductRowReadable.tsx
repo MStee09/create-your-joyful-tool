@@ -115,50 +115,18 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   // Check if this product has an awarded bid price
   const awardedPriceInfo = getAwardedPriceInfo(product.id, seasonYear, productMasters, priceBook);
 
-  // Calculate costs - treated (intensity) and field (budget)
-  let treatedCostPerAcre = 0;
-  
-  // Handle container-based pricing (e.g., $900/jug with 1800g per jug)
-  if (product.containerSize && product.containerUnit && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '')) {
-    const containerPrice = product.price;
-    const containerQuantity = product.containerSize;
-    
-    // Calculate price per gram
-    let pricePerGram = 0;
-    if (product.containerUnit === 'g') {
-      pricePerGram = containerPrice / containerQuantity;
-    } else if (product.containerUnit === 'lbs') {
-      pricePerGram = containerPrice / (containerQuantity * 453.592);
-    } else if (product.containerUnit === 'oz') {
-      pricePerGram = containerPrice / (containerQuantity * 28.3495);
-    }
-    
-    // If rate is in grams, use directly
-    if (application.rateUnit === 'g') {
-      treatedCostPerAcre = application.rate * pricePerGram;
-    } else {
-      // Convert to pounds and calculate
-      const pricePerPound = pricePerGram * 453.592;
-      const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
-      treatedCostPerAcre = poundsPerAcre * pricePerPound;
-    }
-  } else if (product.priceUnit === 'g') {
-    // Handle per-gram pricing
-    if (application.rateUnit === 'g') {
-      treatedCostPerAcre = application.rate * product.price;
-    } else {
-      const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
-      const gramsPerAcre = poundsPerAcre * 453.592;
-      treatedCostPerAcre = gramsPerAcre * product.price;
-    }
-  } else if (product.form === 'liquid') {
-    const gallonsPerAcre = convertToGallons(application.rate, application.rateUnit as LiquidUnit);
-    treatedCostPerAcre = gallonsPerAcre * product.price;
-  } else {
-    const poundsPerAcre = convertToPounds(application.rate, application.rateUnit as DryUnit);
-    const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-    treatedCostPerAcre = poundsPerAcre * pricePerPound;
-  }
+  // Calculate costs using the unified pricing engine
+  const treatedCostPerAcre = useMemo(() => {
+    if (!product) return 0;
+    return calculateApplicationCostPerAcreWithPriceBook(
+      application,
+      product,
+      productMasters,
+      priceBook,
+      seasonYear,
+      purchases
+    );
+  }, [application, product, productMasters, priceBook, seasonYear, purchases]);
 
   // Field average cost = treated cost × coverage fraction (budget truth)
   const fieldAvgCostPerAcre = treatedCostPerAcre * (acresPercentage / 100);
