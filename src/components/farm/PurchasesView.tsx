@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { formatCurrency } from '@/lib/calculations';
-import type { Vendor, ProductMaster, VendorOffering } from '@/types';
+import type { Vendor, ProductMaster, VendorOffering, InventoryItem } from '@/types';
 import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
 import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
 import { RecordPurchaseModal } from './RecordPurchaseModal';
@@ -16,12 +16,14 @@ interface PurchasesViewProps {
   products: ProductMaster[];
   vendorOfferings: VendorOffering[];
   priceRecords: PriceRecord[];
+  inventory: InventoryItem[];
   currentSeasonId: string;
   currentSeasonYear: number;
   onAddPurchase: (purchase: NewSimplePurchase) => Promise<SimplePurchase | null>;
   onUpdatePurchase: (id: string, updates: Partial<SimplePurchase>) => Promise<boolean>;
   onDeletePurchase: (id: string) => Promise<boolean>;
   onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
+  onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
 export const PurchasesView: React.FC<PurchasesViewProps> = ({
@@ -30,12 +32,14 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   products,
   vendorOfferings,
   priceRecords,
+  inventory,
   currentSeasonId,
   currentSeasonYear,
   onAddPurchase,
   onUpdatePurchase,
   onDeletePurchase,
   onAddPriceRecord,
+  onUpdateInventory,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<SimplePurchase | null>(null);
@@ -71,11 +75,44 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     return names.join(', ') + suffix;
   };
 
+  const addPurchaseToInventory = (purchase: SimplePurchase) => {
+    let updatedInventory = [...inventory];
+    for (const line of (purchase.lines || [])) {
+      if (!line.productId) continue;
+      const product = products.find(p => p.id === line.productId);
+      const baseUnit: 'gal' | 'lbs' = product?.form === 'liquid' ? 'gal' : 'lbs';
+      const totalQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+
+      const existingIdx = updatedInventory.findIndex(i => i.productId === line.productId);
+      if (existingIdx >= 0) {
+        updatedInventory = updatedInventory.map((item, idx) =>
+          idx === existingIdx
+            ? { ...item, quantity: item.quantity + totalQty }
+            : item
+        );
+      } else {
+        updatedInventory.push({
+          id: crypto.randomUUID(),
+          productId: line.productId,
+          quantity: totalQty,
+          unit: baseUnit,
+          packagingName: line.packageType,
+          packagingSize: line.packageSize,
+          containerCount: line.quantity,
+        });
+      }
+    }
+    onUpdateInventory(updatedInventory);
+  };
+
   const handleMarkReceived = async (purchase: SimplePurchase) => {
-    await onUpdatePurchase(purchase.id, {
+    const success = await onUpdatePurchase(purchase.id, {
       status: 'received',
       receivedDate: new Date().toISOString().split('T')[0],
     });
+    if (success) {
+      addPurchaseToInventory(purchase);
+    }
   };
 
   return (
@@ -396,12 +433,15 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         }}
         onSave={async (purchase) => {
           if (editingPurchase) {
-            // Update existing purchase
             const success = await onUpdatePurchase(editingPurchase.id, purchase);
             return success ? { ...editingPurchase, ...purchase } as SimplePurchase : null;
           } else {
-            // Create new purchase
-            return onAddPurchase(purchase);
+            const result = await onAddPurchase(purchase);
+            // Auto-add to inventory if recorded directly as 'received'
+            if (result && result.status === 'received') {
+              addPurchaseToInventory(result);
+            }
+            return result;
           }
         }}
         onCreatePriceRecords={async (records) => {
