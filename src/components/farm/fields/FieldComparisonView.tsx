@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { SOIL_TYPE_LABELS } from '@/types/field';
 import type { Field, FieldAssignment, SoilType } from '@/types/field';
 import type { Season, Crop, Product, ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { calculateFieldData, groupFieldsByCrop, calculateVariance, type FieldComparisonData, type CropGroup } from '@/lib/fieldComparisonUtils';
 
 interface FieldComparisonViewProps {
