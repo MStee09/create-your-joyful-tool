@@ -638,6 +638,7 @@ export const PassCard: React.FC<PassCardProps> = ({
                         override={override}
                         productMasters={productMasters}
                         priceBook={priceBook}
+                        purchases={purchases}
                         seasonYear={seasonYear}
                         onEdit={() => onEditApplication(app)}
                         onUpdateOverride={onUpdateApplicationOverride}
