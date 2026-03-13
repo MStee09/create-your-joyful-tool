@@ -15,7 +15,7 @@ import { FieldAssignmentModal } from './FieldAssignmentModal';
 import { CropByFieldView } from './CropByFieldView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
+import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, calculateApplicationCostPerAcreWithPriceBook, getApplicationAcresPercentage, PriceBookContext } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
 

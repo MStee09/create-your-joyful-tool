@@ -202,12 +202,11 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     }
   }
   
-  // Filter purchases to current season only
-  const seasonPurchases = purchases
-    ? purchases.filter(p => p.seasonYear === seasonYear)
-    : undefined;
+  // Purchases are expected to be pre-filtered to current season by caller
+  // (via PriceBookContext.purchases). Use them as-is.
+  const seasonPurchases = purchases;
   
-  // If we have season-scoped purchases, attempt blended pricing
+  // If we have purchases, attempt blended pricing
   if (seasonPurchases && seasonPurchases.length > 0) {
     // Try purchase-only first (always works if product has purchases)
     const purchaseOnlyPrice = calculatePurchaseOnlyUnitPrice(product.id, seasonPurchases);
