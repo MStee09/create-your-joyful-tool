@@ -1716,12 +1716,14 @@ const AppContent: React.FC = () => {
             products={productMasters || []}
             vendorOfferings={vendorOfferings || []}
             priceRecords={priceRecords || []}
+            inventory={state.inventory}
             currentSeasonId={state.currentSeasonId || ''}
             currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
             onAddPurchase={handleAddPurchase}
             onUpdatePurchase={updateSimplePurchase}
             onDeletePurchase={deleteSimplePurchase}
             onAddPriceRecord={handleAddPriceRecord}
+            onUpdateInventory={handleUpdateInventory}
           />
         );
       case 'procurement':
