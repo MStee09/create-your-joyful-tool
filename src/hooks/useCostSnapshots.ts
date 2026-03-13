@@ -14,6 +14,7 @@ export interface CostSnapshot {
 
 export function useCostSnapshots(user: User | null, seasonYear: number) {
   const [snapshots, setSnapshots] = useState<CostSnapshot[]>([]);
+  const snapshotsRef = useRef<CostSnapshot[]>([]);
   const lastSnapshotRef = useRef<Map<string, { costPerAcre: number; totalCost: number }>>(new Map());
 
   const fetchSnapshots = useCallback(async () => {
@@ -36,6 +37,7 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
         createdAt: row.created_at,
       }));
       setSnapshots(mapped);
+      snapshotsRef.current = mapped;
 
       // Initialize last snapshot cache
       const cache = new Map<string, { costPerAcre: number; totalCost: number }>();
@@ -67,12 +69,13 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     // Check if there's already a snapshot for this crop today — if so, update it
-    const existingToday = snapshots.find(
+    // Use ref for stable lookup (avoids stale closure on rapid edits)
+    const existingToday = snapshotsRef.current.find(
       s => s.cropId === cropId && s.createdAt.startsWith(today)
     );
 
     if (existingToday) {
-      // Upsert: delete today's row and insert fresh (snapshots table lacks UPDATE RLS)
+      // Upsert: delete today's row and insert fresh
       await supabase
         .from('crop_plan_cost_snapshots')
         .delete()
@@ -101,7 +104,9 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
           snapshotReason: data.snapshot_reason,
           createdAt: data.created_at,
         };
-        setSnapshots(prev => prev.map(s => s.id === existingToday.id ? snapshot : s));
+        const updated = snapshotsRef.current.map(s => s.id === existingToday.id ? snapshot : s);
+        snapshotsRef.current = updated;
+        setSnapshots(updated);
         lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
       }
     } else {
@@ -129,11 +134,13 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
           snapshotReason: data.snapshot_reason,
           createdAt: data.created_at,
         };
-        setSnapshots(prev => [...prev, snapshot]);
+        const updated = [...snapshotsRef.current, snapshot];
+        snapshotsRef.current = updated;
+        setSnapshots(updated);
         lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
       }
     }
-  }, [user, seasonYear, snapshots]);
+  }, [user, seasonYear]);
 
   const getSnapshotsForCrop = useCallback((cropId: string) => {
     return snapshots.filter(s => s.cropId === cropId);
