@@ -114,6 +114,14 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [showFieldAssignment, setShowFieldAssignment] = useState(false);
   const [activeTab, setActiveTab] = useState<'passes' | 'by-field'>('passes');
 
+  // Reset scroll-to-hide header when switching tabs
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as 'passes' | 'by-field');
+    setHeaderOffset(0);
+    headerOffsetRef.current = 0;
+    lastScrollTopRef.current = 0;
+  };
+
   // Sync acresValue when crop changes
   useEffect(() => {
     setAcresValue(crop.totalAcres);

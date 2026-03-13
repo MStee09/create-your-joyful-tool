@@ -216,7 +216,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </thead>
             <tbody className="divide-y divide-border">
               {cropSummaries.map((crop, idx) => (
-                <tr key={idx} className="hover:bg-muted/30">
+                <tr 
+                  key={idx} 
+                  className="hover:bg-muted/30 cursor-pointer transition-colors"
+                  onClick={() => {
+                    // Navigate to crop plans and select this crop
+                    onViewChange?.('crops');
+                  }}
+                >
                   <td className="px-6 py-4 font-medium text-foreground">{crop.name}</td>
                   <td className="px-6 py-4 text-right">
                     <span className="text-lg font-bold text-primary">{formatCurrency(crop.costPerAcre)}</span>

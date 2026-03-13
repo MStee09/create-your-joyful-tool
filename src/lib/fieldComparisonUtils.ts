@@ -82,7 +82,8 @@ export function calculateFieldData(
       product,
       productMasters,
       priceBook,
-      seasonYear
+      seasonYear,
+      purchases
     );
     
     // Total cost for this application on this field
