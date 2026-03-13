@@ -134,11 +134,13 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
           snapshotReason: data.snapshot_reason,
           createdAt: data.created_at,
         };
-        setSnapshots(prev => [...prev, snapshot]);
+        const updated = [...snapshotsRef.current, snapshot];
+        snapshotsRef.current = updated;
+        setSnapshots(updated);
         lastSnapshotRef.current.set(cropId, { costPerAcre, totalCost });
       }
     }
-  }, [user, seasonYear, snapshots]);
+  }, [user, seasonYear]);
 
   const getSnapshotsForCrop = useCallback((cropId: string) => {
     return snapshots.filter(s => s.cropId === cropId);
