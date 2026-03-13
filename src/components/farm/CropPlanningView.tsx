@@ -351,7 +351,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     });
   };
 
-  return (
+    const headerProgress = headerHeight > 0 ? headerOffset / headerHeight : 0;
+
+    return (
     <div className="flex flex-col h-full">
       {/* Season Overview Bar */}
       <SeasonOverviewBar
