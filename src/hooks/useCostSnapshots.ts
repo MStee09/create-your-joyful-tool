@@ -14,6 +14,7 @@ export interface CostSnapshot {
 
 export function useCostSnapshots(user: User | null, seasonYear: number) {
   const [snapshots, setSnapshots] = useState<CostSnapshot[]>([]);
+  const snapshotsRef = useRef<CostSnapshot[]>([]);
   const lastSnapshotRef = useRef<Map<string, { costPerAcre: number; totalCost: number }>>(new Map());
 
   const fetchSnapshots = useCallback(async () => {
