@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { DollarSign, Building2, ChevronDown, ChevronRight, Download, AlertCircle } from 'lucide-react';
+import { DollarSign, Building2, ChevronDown, ChevronRight, Download, AlertCircle, ShoppingCart, TrendingUp } from 'lucide-react';
 import type { Season, Product, VendorOffering, Vendor } from '../../types';
+import type { SimplePurchase } from '../../types/simplePurchase';
 import { calculatePlannedUsage } from '../../lib/calculations';
 import { 
   calculateVendorSpending, 
   formatSpendCurrency, 
   generateVendorSpendCSV,
-  type VendorSpendSummary,
 } from '../../lib/vendorSpendingUtils';
 
 interface VendorSpendViewProps {
@@ -14,6 +14,7 @@ interface VendorSpendViewProps {
   products: Product[];
   vendorOfferings: VendorOffering[];
   vendors: Vendor[];
+  purchases?: SimplePurchase[];
 }
 
 export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
@@ -21,23 +22,21 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
   products,
   vendorOfferings,
   vendors,
+  purchases = [],
 }) => {
   const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'spend' | 'name' | 'products'>('spend');
   
-  // Calculate planned usage from crop plans
   const plannedUsage = useMemo(() => 
     calculatePlannedUsage(season, products), 
     [season, products]
   );
   
-  // Calculate vendor spending
   const { vendorSpending, totals } = useMemo(() => 
-    calculateVendorSpending(plannedUsage, products, vendorOfferings, vendors),
-    [plannedUsage, products, vendorOfferings, vendors]
+    calculateVendorSpending(plannedUsage, products, vendorOfferings, vendors, purchases),
+    [plannedUsage, products, vendorOfferings, vendors, purchases]
   );
   
-  // Sort vendors
   const sortedVendors = useMemo(() => {
     const sorted = [...vendorSpending];
     switch (sortBy) {
@@ -53,11 +52,8 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
   const toggleVendor = (vendorId: string) => {
     setExpandedVendors(prev => {
       const next = new Set(prev);
-      if (next.has(vendorId)) {
-        next.delete(vendorId);
-      } else {
-        next.add(vendorId);
-      }
+      if (next.has(vendorId)) next.delete(vendorId);
+      else next.add(vendorId);
       return next;
     });
   };
@@ -77,28 +73,37 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
     if (['jug', 'bag', 'case', 'tote'].includes(unit)) {
       return `${qty.toFixed(1)} ${unit}${qty !== 1 ? 's' : ''}`;
     }
-    if (unit === 'gal') {
-      return `${qty.toFixed(1)} gal`;
-    }
-    if (unit === 'lbs') {
-      return `${Math.round(qty).toLocaleString()} lbs`;
-    }
+    if (unit === 'gal') return `${qty.toFixed(1)} gal`;
+    if (unit === 'lbs') return `${Math.round(qty).toLocaleString()} lbs`;
     return `${qty.toFixed(2)} ${unit}`;
   };
+
+  // Calculate totals by source
+  const purchaseSpend = useMemo(() => {
+    let total = 0;
+    vendorSpending.forEach(v => {
+      v.productBreakdown.forEach(p => {
+        if (p.source === 'purchase') total += p.extendedCost;
+      });
+    });
+    return total;
+  }, [vendorSpending]);
+
+  const projectedSpend = totals.totalSeasonSpend - purchaseSpend;
 
   return (
     <div className="p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-stone-800">Vendor Spend</h2>
-          <p className="text-stone-500 mt-1">
-            Projected spending by vendor for {season?.year || 'current'} season
+          <h2 className="text-3xl font-bold text-foreground">Vendor Spend</h2>
+          <p className="text-muted-foreground mt-1">
+            Spending by vendor for {season?.year || 'current'} season
           </p>
         </div>
         <button
           onClick={handleExportCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
         >
           <Download className="w-4 h-4" />
           Export CSV
@@ -106,65 +111,62 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
       </div>
       
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
               <DollarSign className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="text-sm text-stone-500">Total Season Spend</span>
+            <span className="text-sm text-muted-foreground">Total Season Spend</span>
           </div>
-          <p className="text-2xl font-bold text-stone-800">
+          <p className="text-2xl font-bold text-foreground">
             {formatSpendCurrency(totals.totalSeasonSpend)}
           </p>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-blue-600" />
+              <ShoppingCart className="w-5 h-5 text-blue-600" />
             </div>
-            <span className="text-sm text-stone-500">Vendors</span>
+            <span className="text-sm text-muted-foreground">Booked / Purchased</span>
           </div>
-          <p className="text-2xl font-bold text-stone-800">{totals.vendorCount}</p>
+          <p className="text-2xl font-bold text-foreground">{formatSpendCurrency(purchaseSpend)}</p>
+          {totals.totalSeasonSpend > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {((purchaseSpend / totals.totalSeasonSpend) * 100).toFixed(0)}% of total
+            </p>
+          )}
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-amber-600" />
+              <TrendingUp className="w-5 h-5 text-amber-600" />
             </div>
-            <span className="text-sm text-stone-500">Largest Vendor</span>
+            <span className="text-sm text-muted-foreground">Projected Remaining</span>
           </div>
-          <p className="text-2xl font-bold text-stone-800">
-            {formatSpendCurrency(totals.largestVendorSpend)}
-          </p>
-          <p className="text-xs text-stone-500 truncate">{totals.largestVendorName}</p>
+          <p className="text-2xl font-bold text-foreground">{formatSpendCurrency(projectedSpend)}</p>
         </div>
         
-        {totals.unassignedSpend > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-amber-500" />
-              </div>
-              <span className="text-sm text-stone-500">No Vendor</span>
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-stone-600" />
             </div>
-            <p className="text-2xl font-bold text-amber-600">
-              {formatSpendCurrency(totals.unassignedSpend)}
-            </p>
-            <p className="text-xs text-stone-500">{totals.unassignedProducts.length} products</p>
+            <span className="text-sm text-muted-foreground">Vendors</span>
           </div>
-        )}
+          <p className="text-2xl font-bold text-foreground">{totals.vendorCount}</p>
+        </div>
       </div>
       
       {/* Sort Controls */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-stone-500">Sort by:</span>
+        <span className="text-sm text-muted-foreground">Sort by:</span>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as 'spend' | 'name' | 'products')}
-          className="px-3 py-1 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-1 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="spend">Highest Spend</option>
           <option value="name">Vendor Name (A-Z)</option>
@@ -178,61 +180,73 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
           const isExpanded = expandedVendors.has(vendor.vendorId);
           
           return (
-            <div key={vendor.vendorId} className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-              {/* Vendor Header */}
+            <div key={vendor.vendorId} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
               <button
                 onClick={() => toggleVendor(vendor.vendorId)}
-                className="w-full flex items-center justify-between p-4 hover:bg-stone-50 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   {isExpanded ? (
-                    <ChevronDown className="w-5 h-5 text-stone-400" />
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-stone-400" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   )}
-                  <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-stone-600" />
+                  <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-stone-800">{vendor.vendorName}</h3>
-                    <p className="text-sm text-stone-500">
+                    <h3 className="font-semibold text-foreground">{vendor.vendorName}</h3>
+                    <p className="text-sm text-muted-foreground">
                       {vendor.productBreakdown.length} product{vendor.productBreakdown.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold text-stone-800">
+                  <p className="text-xl font-bold text-foreground">
                     {formatSpendCurrency(vendor.totalSpend)}
                   </p>
-                  <p className="text-xs text-stone-500">
-                    {((vendor.totalSpend / totals.totalSeasonSpend) * 100).toFixed(1)}% of total
-                  </p>
+                  {totals.totalSeasonSpend > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {((vendor.totalSpend / totals.totalSeasonSpend) * 100).toFixed(1)}% of total
+                    </p>
+                  )}
                 </div>
               </button>
               
-              {/* Product Breakdown */}
               {isExpanded && (
-                <div className="border-t border-stone-100">
+                <div className="border-t border-border">
                   <table className="w-full">
-                    <thead className="bg-stone-50">
-                      <tr className="text-xs text-stone-500 uppercase tracking-wider">
+                    <thead className="bg-muted/50">
+                      <tr className="text-xs text-muted-foreground uppercase tracking-wider">
                         <th className="text-left px-6 py-2">Product</th>
+                        <th className="text-left px-6 py-2">Source</th>
                         <th className="text-right px-6 py-2">Quantity</th>
                         <th className="text-right px-6 py-2">Price</th>
                         <th className="text-right px-6 py-2">Extended</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {vendor.productBreakdown.map(product => (
-                        <tr key={product.productId} className="border-t border-stone-50">
-                          <td className="px-6 py-3 text-stone-800">{product.productName}</td>
-                          <td className="px-6 py-3 text-right text-stone-600">
+                      {vendor.productBreakdown.map((product, idx) => (
+                        <tr key={`${product.productId}-${idx}`} className="border-t border-border/50">
+                          <td className="px-6 py-3 text-foreground">{product.productName}</td>
+                          <td className="px-6 py-3">
+                            {product.source === 'purchase' ? (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                <ShoppingCart className="w-3 h-3" /> Booked
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                <TrendingUp className="w-3 h-3" /> Projected
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-right text-muted-foreground">
                             {formatQty(product.quantityNeeded, product.unit)}
                           </td>
-                          <td className="px-6 py-3 text-right text-stone-600">
+                          <td className="px-6 py-3 text-right text-muted-foreground">
                             ${product.pricePerUnit.toFixed(2)}/{product.priceUnit}
                           </td>
-                          <td className="px-6 py-3 text-right font-medium text-stone-800">
+                          <td className="px-6 py-3 text-right font-medium text-foreground">
                             {formatSpendCurrency(product.extendedCost)}
                           </td>
                         </tr>
@@ -251,8 +265,8 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
             <div className="p-4 flex items-center gap-4">
               <AlertCircle className="w-5 h-5 text-amber-500" />
               <div>
-                <h3 className="font-semibold text-stone-800">Products Without Vendor</h3>
-                <p className="text-sm text-stone-500">
+                <h3 className="font-semibold text-foreground">Products Without Vendor</h3>
+                <p className="text-sm text-muted-foreground">
                   {totals.unassignedProducts.length} product{totals.unassignedProducts.length !== 1 ? 's' : ''} • 
                   Estimated: {formatSpendCurrency(totals.unassignedSpend)}
                 </p>
@@ -263,11 +277,11 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
                 <tbody>
                   {totals.unassignedProducts.map(product => (
                     <tr key={product.productId} className="border-t border-amber-100 first:border-t-0">
-                      <td className="px-6 py-3 text-stone-800">{product.productName}</td>
-                      <td className="px-6 py-3 text-right text-stone-600">
+                      <td className="px-6 py-3 text-foreground">{product.productName}</td>
+                      <td className="px-6 py-3 text-right text-muted-foreground">
                         {formatQty(product.quantityNeeded, product.unit)}
                       </td>
-                      <td className="px-6 py-3 text-right text-stone-500 text-sm">
+                      <td className="px-6 py-3 text-right text-muted-foreground text-sm">
                         (est. ${product.pricePerUnit.toFixed(2)}/{product.priceUnit})
                       </td>
                       <td className="px-6 py-3 text-right font-medium text-amber-600">
@@ -283,11 +297,11 @@ export const VendorSpendView: React.FC<VendorSpendViewProps> = ({
       </div>
       
       {/* Empty State */}
-      {plannedUsage.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
-          <DollarSign className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="font-semibold text-stone-800 mb-2">No Planned Usage</h3>
-          <p className="text-stone-500 max-w-md mx-auto">
+      {plannedUsage.length === 0 && purchases.length === 0 && (
+        <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center">
+          <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-semibold text-foreground mb-2">No Planned Usage</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
             Add applications to your crop plans to see projected vendor spending.
           </p>
         </div>

@@ -1,5 +1,6 @@
 import type { VendorOffering, Vendor, Product } from '../types';
 import type { PlannedUsageItem } from './calculations';
+import type { SimplePurchase } from '../types/simplePurchase';
 
 export interface VendorProductSpend {
   productId: string;
@@ -9,6 +10,7 @@ export interface VendorProductSpend {
   pricePerUnit: number;
   priceUnit: string;
   extendedCost: number;
+  source: 'purchase' | 'projected';
 }
 
 export interface VendorSpendSummary {
@@ -28,109 +30,144 @@ export interface SpendingSummaryTotals {
 }
 
 /**
- * Calculate vendor spending from planned usage
- * Maps planned product needs to preferred vendor offerings to calculate spending
+ * Calculate vendor spending from actual purchases (booked/ordered/received)
+ * and fill remaining demand with projected spending from vendor offerings
  */
 export const calculateVendorSpending = (
   plannedUsage: PlannedUsageItem[],
   products: Product[],
   vendorOfferings: VendorOffering[],
-  vendors: Vendor[]
+  vendors: Vendor[],
+  purchases: SimplePurchase[] = []
 ): { vendorSpending: VendorSpendSummary[]; totals: SpendingSummaryTotals } => {
   const vendorMap = new Map<string, VendorSpendSummary>();
   const unassignedProducts: VendorProductSpend[] = [];
-  
+
+  const getOrCreateVendor = (vendorId: string, vendorName: string): VendorSpendSummary => {
+    if (!vendorMap.has(vendorId)) {
+      vendorMap.set(vendorId, {
+        vendorId,
+        vendorName,
+        totalSpend: 0,
+        productBreakdown: [],
+      });
+    }
+    return vendorMap.get(vendorId)!;
+  };
+
+  // Step 1: Aggregate actual purchase spending by vendor × product
+  // Track purchased quantities per product (in planned-usage units) to subtract from demand
+  const purchasedByProduct = new Map<string, number>(); // productId → qty in planned units
+
+  purchases.forEach(purchase => {
+    const vendor = vendors.find(v => v.id === purchase.vendorId);
+    if (!vendor) return;
+
+    purchase.lines.forEach(line => {
+      const product = products.find(p => p.id === line.productId);
+      if (!product) return;
+
+      const vendorSummary = getOrCreateVendor(vendor.id, vendor.name);
+
+      // Use the actual purchase total price
+      vendorSummary.totalSpend += line.totalPrice;
+      vendorSummary.productBreakdown.push({
+        productId: product.id,
+        productName: product.name,
+        quantityNeeded: line.quantity,
+        unit: line.packageType || line.normalizedUnit || 'units',
+        pricePerUnit: line.unitPrice,
+        priceUnit: line.packageType || line.normalizedUnit || 'units',
+        extendedCost: line.totalPrice,
+        source: 'purchase',
+      });
+
+      // Track purchased qty in planned-usage units
+      // For container-based products, plannedUsage uses container count
+      const isContainer = ['jug', 'bag', 'case', 'tote'].includes(line.packageType || '');
+      const qtyInPlannedUnits = isContainer ? line.quantity : line.totalQuantity;
+      const prev = purchasedByProduct.get(product.id) || 0;
+      purchasedByProduct.set(product.id, prev + qtyInPlannedUnits);
+    });
+  });
+
+  // Step 2: For remaining demand not covered by purchases, project from vendor offerings
   plannedUsage.forEach(usage => {
     const product = products.find(p => p.id === usage.productId);
     if (!product) return;
-    
-    // Only use explicitly preferred offerings - commodities without a preferred vendor should be unassigned
+
+    const purchasedQty = purchasedByProduct.get(usage.productId) || 0;
+    const remainingNeed = Math.max(0, usage.totalNeeded - purchasedQty);
+
+    if (remainingNeed <= 0) return; // Fully covered by purchases
+
     const offerings = vendorOfferings.filter(o => o.productId === usage.productId);
-    // Only use preferred offerings - non-preferred offerings (like commodities) should go to unassigned
     const preferredOffering = offerings.find(o => o.isPreferred);
-    
-    // Calculate extended cost
+
     let extendedCost = 0;
     let pricePerUnit = 0;
     let priceUnit = '';
-    
+
     if (preferredOffering) {
       pricePerUnit = preferredOffering.price;
       priceUnit = preferredOffering.priceUnit;
-      
-      // Handle container-based pricing
+
       if (['jug', 'bag', 'case', 'tote'].includes(preferredOffering.priceUnit)) {
-        // Quantity is already in container units from calculatePlannedUsage
-        extendedCost = usage.totalNeeded * preferredOffering.price;
+        extendedCost = remainingNeed * preferredOffering.price;
       } else {
-        // Direct unit pricing (gal, lbs, ton)
         if (preferredOffering.priceUnit === 'ton' && usage.unit === 'lbs') {
-          // Convert lbs to tons for pricing
-          extendedCost = (usage.totalNeeded / 2000) * preferredOffering.price;
+          extendedCost = (remainingNeed / 2000) * preferredOffering.price;
         } else {
-          extendedCost = usage.totalNeeded * preferredOffering.price;
+          extendedCost = remainingNeed * preferredOffering.price;
         }
       }
-      
+
       const vendor = vendors.find(v => v.id === preferredOffering.vendorId);
       if (vendor) {
-        if (!vendorMap.has(vendor.id)) {
-          vendorMap.set(vendor.id, {
-            vendorId: vendor.id,
-            vendorName: vendor.name,
-            totalSpend: 0,
-            productBreakdown: [],
-          });
-        }
-        
-        const vendorSummary = vendorMap.get(vendor.id)!;
+        const vendorSummary = getOrCreateVendor(vendor.id, vendor.name);
         vendorSummary.totalSpend += extendedCost;
         vendorSummary.productBreakdown.push({
           productId: product.id,
           productName: product.name,
-          quantityNeeded: usage.totalNeeded,
+          quantityNeeded: remainingNeed,
           unit: usage.unit,
           pricePerUnit,
           priceUnit,
           extendedCost,
+          source: 'projected',
         });
       }
     } else {
-      // No vendor offering found - use product's estimated price if available
       const estimatedPrice = product.price || 0;
       pricePerUnit = estimatedPrice;
       priceUnit = product.priceUnit || usage.unit;
-      
-      // Handle container-based pricing for estimated
-      if (['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '')) {
-        extendedCost = usage.totalNeeded * estimatedPrice;
-      } else {
-        extendedCost = usage.totalNeeded * estimatedPrice;
-      }
-      
+
+      extendedCost = remainingNeed * estimatedPrice;
+
       unassignedProducts.push({
         productId: product.id,
         productName: product.name,
-        quantityNeeded: usage.totalNeeded,
+        quantityNeeded: remainingNeed,
         unit: usage.unit,
         pricePerUnit,
         priceUnit,
         extendedCost,
+        source: 'projected',
       });
     }
   });
-  
+
   // Sort vendors by total spend (highest first)
   const vendorSpending = Array.from(vendorMap.values())
     .sort((a, b) => b.totalSpend - a.totalSpend);
-  
+
   // Calculate totals
-  const totalSeasonSpend = vendorSpending.reduce((sum, v) => sum + v.totalSpend, 0) 
+  const totalSeasonSpend = vendorSpending.reduce((sum, v) => sum + v.totalSpend, 0)
     + unassignedProducts.reduce((sum, p) => sum + p.extendedCost, 0);
   const unassignedSpend = unassignedProducts.reduce((sum, p) => sum + p.extendedCost, 0);
-  
+
   const largestVendor = vendorSpending[0];
-  
+
   return {
     vendorSpending,
     totals: {
@@ -168,9 +205,9 @@ export const generateVendorSpendCSV = (
     `# ${seasonYear} Vendor Spending Summary`,
     `# Total Season Spend: ${formatSpendCurrency(totals.totalSeasonSpend)}`,
     '',
-    'Vendor,Product,Quantity,Unit,Price/Unit,Price Unit,Extended Cost',
+    'Vendor,Product,Quantity,Unit,Price/Unit,Price Unit,Extended Cost,Source',
   ];
-  
+
   vendorSpending.forEach(vendor => {
     vendor.productBreakdown.forEach((product, idx) => {
       const vendorName = idx === 0 ? `"${vendor.vendorName}"` : '';
@@ -182,9 +219,9 @@ export const generateVendorSpendCSV = (
         product.pricePerUnit.toFixed(2),
         product.priceUnit,
         product.extendedCost.toFixed(2),
+        product.source,
       ].join(','));
     });
-    // Vendor total row
     lines.push([
       '',
       '"VENDOR TOTAL"',
@@ -193,11 +230,11 @@ export const generateVendorSpendCSV = (
       '',
       '',
       vendor.totalSpend.toFixed(2),
+      '',
     ].join(','));
     lines.push('');
   });
-  
-  // Unassigned products
+
   if (totals.unassignedProducts.length > 0) {
     lines.push('"No Vendor Assigned"');
     totals.unassignedProducts.forEach(product => {
@@ -209,9 +246,10 @@ export const generateVendorSpendCSV = (
         product.pricePerUnit.toFixed(2),
         product.priceUnit,
         product.extendedCost.toFixed(2),
+        product.source,
       ].join(','));
     });
   }
-  
+
   return lines.join('\n');
 };
