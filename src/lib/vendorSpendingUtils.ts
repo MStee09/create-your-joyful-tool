@@ -109,16 +109,24 @@ export const calculateVendorSpending = (
     let priceUnit = '';
 
     if (preferredOffering) {
-      pricePerUnit = preferredOffering.price;
-      priceUnit = preferredOffering.priceUnit;
+      // Use offering price, but fall back to product price if offering has no quote yet
+      const effectivePrice = preferredOffering.price > 0 
+        ? preferredOffering.price 
+        : (product.price || 0);
+      const effectivePriceUnit = preferredOffering.price > 0
+        ? preferredOffering.priceUnit
+        : (product.priceUnit || usage.unit);
 
-      if (['jug', 'bag', 'case', 'tote'].includes(preferredOffering.priceUnit)) {
-        extendedCost = remainingNeed * preferredOffering.price;
+      pricePerUnit = effectivePrice;
+      priceUnit = effectivePriceUnit;
+
+      if (['jug', 'bag', 'case', 'tote'].includes(effectivePriceUnit)) {
+        extendedCost = remainingNeed * effectivePrice;
       } else {
-        if (preferredOffering.priceUnit === 'ton' && usage.unit === 'lbs') {
-          extendedCost = (remainingNeed / 2000) * preferredOffering.price;
+        if (effectivePriceUnit === 'ton' && usage.unit === 'lbs') {
+          extendedCost = (remainingNeed / 2000) * effectivePrice;
         } else {
-          extendedCost = remainingNeed * preferredOffering.price;
+          extendedCost = remainingNeed * effectivePrice;
         }
       }
 
