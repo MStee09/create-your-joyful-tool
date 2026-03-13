@@ -9,7 +9,7 @@ import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from 
 import { cn } from '@/lib/utils';
 import { getAwardedPriceInfo } from '@/lib/priceBookUtils';
 import { calculateApplicationNutrients } from '@/lib/calculations';
-import { calculateApplicationCostPerAcreWithPriceBook } from '@/lib/cropCalculations';
+import { calculateApplicationCostPerAcreWithPriceBook, getPricingSource } from '@/lib/cropCalculations';
 import {
   Tooltip,
   TooltipContent,
