@@ -36,13 +36,14 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
   onCreateVendor,
   onLogQuote,
 }) => {
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<VendorOffering>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
-  // New vendor creation state
-  const [showNewVendorDialog, setShowNewVendorDialog] = useState(false);
+  // Add vendor modal state
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [showCreateVendor, setShowCreateVendor] = useState(false);
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorEmail, setNewVendorEmail] = useState('');
   const [newVendorPhone, setNewVendorPhone] = useState('');
