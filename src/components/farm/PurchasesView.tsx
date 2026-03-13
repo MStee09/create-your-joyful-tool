@@ -32,12 +32,14 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   products,
   vendorOfferings,
   priceRecords,
+  inventory,
   currentSeasonId,
   currentSeasonYear,
   onAddPurchase,
   onUpdatePurchase,
   onDeletePurchase,
   onAddPriceRecord,
+  onUpdateInventory,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<SimplePurchase | null>(null);
