@@ -186,7 +186,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-foreground">Vendor Offerings</h4>
         <button
-          onClick={() => { setShowAddForm(true); setFormData({}); }}
+          onClick={() => setShowAddModal(true)}
           className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
         >
           <Plus className="w-4 h-4" />
@@ -194,7 +194,7 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
         </button>
       </div>
 
-      {productOfferings.length === 0 && !showAddForm && (
+      {productOfferings.length === 0 && !showAddModal && (
         <p className="text-sm text-muted-foreground py-4 text-center bg-muted/50 rounded-lg">
           No vendor offerings yet. Add a vendor to track pricing.
         </p>
