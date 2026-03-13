@@ -27,6 +27,7 @@ interface ProductRowReadableProps {
   override?: ApplicationOverride | null;
   productMasters?: ProductMaster[];
   priceBook?: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   seasonYear?: number;
   onEdit: () => void;
   onUpdateOverride?: (override: ApplicationOverride) => void;
