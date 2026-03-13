@@ -126,23 +126,38 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [collapsedPhases, setCollapsedPhases] = useState<Set<TimingBucket>>(new Set());
   const [expandedPasses, setExpandedPasses] = useState<Set<string>>(new Set());
 
-  // Auto-hide header on scroll
-  const [headerHidden, setHeaderHidden] = useState(false);
+  // Smooth scroll-to-hide header using transform
+  const collapsibleHeaderRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerOffset, setHeaderOffset] = useState(0);
+  const headerOffsetRef = useRef(0);
   const lastScrollTopRef = useRef(0);
-  const scrollThreshold = 30;
+
+  // Measure the collapsible header height with ResizeObserver
+  useEffect(() => {
+    const el = collapsibleHeaderRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setHeaderHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handlePassesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
     const delta = scrollTop - lastScrollTopRef.current;
-
-    if (delta > scrollThreshold && scrollTop > 50) {
-      setHeaderHidden(true);
-    } else if (delta < -scrollThreshold) {
-      setHeaderHidden(false);
-    }
-
     lastScrollTopRef.current = scrollTop;
-  }, []);
+
+    if (headerHeight <= 0) return;
+
+    // Proportional offset: scroll down increases, scroll up decreases
+    const newOffset = Math.max(0, Math.min(headerHeight, headerOffsetRef.current + delta));
+    headerOffsetRef.current = newOffset;
+    setHeaderOffset(newOffset);
+  }, [headerHeight]);
 
   const { purposes } = useProductIntelligence();
 
