@@ -96,6 +96,7 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   override,
   productMasters = [],
   priceBook = [],
+  purchases = [],
   seasonYear = new Date().getFullYear(),
   onEdit,
   onUpdateOverride,
