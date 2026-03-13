@@ -196,18 +196,26 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     }
   }
   
-  // If we have purchases AND a current market price, attempt blended pricing
-  if (purchases && purchases.length > 0 && currentUnitPrice !== null) {
-    const blendedPrice = calculateBlendedUnitPrice(
-      product.id,
-      purchases,
-      currentUnitPrice,
-      currentPriceUom,
-    );
-    
-    if (blendedPrice !== null) {
-      // We have actual purchases — use blended price
-      return computeCostPerAcre(blendedPrice, currentPriceUom);
+  // If we have purchases, attempt blended pricing (or pure purchase pricing if no market price)
+  if (purchases && purchases.length > 0) {
+    if (currentUnitPrice !== null) {
+      // Blended: mix actual purchase prices with current market price for remaining
+      const blendedPrice = calculateBlendedUnitPrice(
+        product.id,
+        purchases,
+        currentUnitPrice,
+        currentPriceUom,
+      );
+      
+      if (blendedPrice !== null) {
+        return computeCostPerAcre(blendedPrice, currentPriceUom);
+      }
+    } else {
+      // No market price at all — use purchase price directly if available
+      const purchaseOnlyPrice = calculatePurchaseOnlyUnitPrice(product.id, purchases);
+      if (purchaseOnlyPrice !== null) {
+        return computeCostPerAcre(purchaseOnlyPrice.price, purchaseOnlyPrice.unit);
+      }
     }
   }
   
