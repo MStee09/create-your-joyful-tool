@@ -1755,8 +1755,9 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">General Notes</label>
                 <textarea
-                  value={product.generalNotes || ''}
-                  onChange={(e) => handleUpdateNotes('generalNotes', e.target.value)}
+                  value={localGeneralNotes}
+                  onChange={(e) => setLocalGeneralNotes(e.target.value)}
+                  onBlur={() => handleUpdateNotes('generalNotes', localGeneralNotes)}
                   placeholder="Product info, storage requirements..."
                   className="w-full px-3 py-2 border border-input rounded-lg text-sm resize-none h-20 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -1764,8 +1765,9 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Mixing / Compatibility</label>
                 <textarea
-                  value={product.mixingNotes || ''}
-                  onChange={(e) => handleUpdateNotes('mixingNotes', e.target.value)}
+                  value={localMixingNotes}
+                  onChange={(e) => setLocalMixingNotes(e.target.value)}
+                  onBlur={() => handleUpdateNotes('mixingNotes', localMixingNotes)}
                   placeholder="Mix order, jar test results..."
                   className="w-full px-3 py-2 border border-input rounded-lg text-sm resize-none h-20 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -1773,8 +1775,9 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Crop Rate Notes</label>
                 <textarea
-                  value={product.cropRateNotes || ''}
-                  onChange={(e) => handleUpdateNotes('cropRateNotes', e.target.value)}
+                  value={localCropRateNotes}
+                  onChange={(e) => setLocalCropRateNotes(e.target.value)}
+                  onBlur={() => handleUpdateNotes('cropRateNotes', localCropRateNotes)}
                   placeholder="What rates worked well, observations..."
                   className="w-full px-3 py-2 border border-input rounded-lg text-sm resize-none h-20 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
