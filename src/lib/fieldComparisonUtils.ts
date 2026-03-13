@@ -5,6 +5,7 @@
 
 import type { Field, FieldAssignment } from '@/types/field';
 import type { Crop, Product, Season, ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { calculateApplicationCostPerAcreWithPriceBook, calculateApplicationNutrients, getApplicationAcresPercentage } from './cropCalculations';
 
 export interface FieldComparisonData {
