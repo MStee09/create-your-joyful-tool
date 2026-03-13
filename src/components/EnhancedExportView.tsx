@@ -90,22 +90,18 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
         const apps = crop.applications.filter(a => a.timingId === timing.id);
         apps.forEach(app => {
           const product = products.find(p => p.id === app.productId);
-          const tier = crop.tiers.find(t => t.id === app.tierId);
-          if (!product || !tier) return;
+          if (!product) return;
           
-          const tierAcres = crop.totalAcres * (tier.percentage / 100);
-          let costPerAcre = 0;
+          const acresPercentage = getApplicationAcresPercentage(app, crop);
+          const tierAcres = crop.totalAcres * (acresPercentage / 100);
+          const tierLabel = acresPercentage >= 80 ? 'Core' : acresPercentage >= 40 ? 'Selective' : 'Trial';
           
-          if (product.form === 'liquid') {
-            const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-            costPerAcre = gallonsPerAcre * product.price;
-          } else {
-            const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-            const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-            costPerAcre = poundsPerAcre * pricePerPound;
-          }
+          // Use unified pricing engine
+          const costPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+            app, product, productMasters, priceBook, season.year, purchases
+          );
           
-          csv += `"${crop.name}","${timing.name}","${product.name}",${app.rate},${app.rateUnit},"${tier.name}",${tierAcres},${costPerAcre.toFixed(2)},${(costPerAcre * tierAcres).toFixed(2)}\n`;
+          csv += `"${crop.name}","${timing.name}","${product.name}",${app.rate},${app.rateUnit},"${tierLabel}",${tierAcres},${costPerAcre.toFixed(2)},${(costPerAcre * tierAcres).toFixed(2)}\n`;
         });
       });
     });
