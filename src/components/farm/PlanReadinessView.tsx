@@ -441,27 +441,50 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2">
-      {([
-          { id: 'all', label: 'All', count: readiness.totalCount },
-          { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
-          { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
-          { id: 'ready', label: 'Ready', count: readiness.readyCount },
-        ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
+      {/* Filter Tabs + View Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+        {([
+            { id: 'all', label: 'All', count: readiness.totalCount },
+            { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
+            { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
+            { id: 'ready', label: 'Ready', count: readiness.readyCount },
+          ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setFilterTab(t.id)}
+              className={
+                'px-4 py-2 rounded-xl border text-sm font-semibold transition ' +
+                (filterTab === t.id
+                  ? 'bg-stone-900 text-white border-stone-900'
+                  : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-50')
+              }
+            >
+              {t.label} ({t.count})
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 bg-stone-100 rounded-lg p-1">
           <button
-            key={t.id}
-            onClick={() => setFilterTab(t.id)}
-            className={
-              'px-4 py-2 rounded-xl border text-sm font-semibold transition ' +
-              (filterTab === t.id
-                ? 'bg-stone-900 text-white border-stone-900'
-                : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-50')
-            }
+            onClick={() => setViewMode('product')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+              viewMode === 'product' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+            }`}
           >
-            {t.label} ({t.count})
+            <List className="w-3.5 h-3.5" />
+            By Product
           </button>
-        ))}
+          <button
+            onClick={() => setViewMode('company')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+              viewMode === 'company' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            By Company
+          </button>
+        </div>
       </div>
 
       {/* Main Table */}
