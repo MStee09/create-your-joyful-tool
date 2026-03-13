@@ -196,18 +196,26 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     }
   }
   
-  // If we have purchases AND a current market price, attempt blended pricing
-  if (purchases && purchases.length > 0 && currentUnitPrice !== null) {
-    const blendedPrice = calculateBlendedUnitPrice(
-      product.id,
-      purchases,
-      currentUnitPrice,
-      currentPriceUom,
-    );
-    
-    if (blendedPrice !== null) {
-      // We have actual purchases — use blended price
-      return computeCostPerAcre(blendedPrice, currentPriceUom);
+  // If we have purchases, attempt blended pricing (or pure purchase pricing if no market price)
+  if (purchases && purchases.length > 0) {
+    if (currentUnitPrice !== null) {
+      // Blended: mix actual purchase prices with current market price for remaining
+      const blendedPrice = calculateBlendedUnitPrice(
+        product.id,
+        purchases,
+        currentUnitPrice,
+        currentPriceUom,
+      );
+      
+      if (blendedPrice !== null) {
+        return computeCostPerAcre(blendedPrice, currentPriceUom);
+      }
+    } else {
+      // No market price at all — use purchase price directly if available
+      const purchaseOnlyPrice = calculatePurchaseOnlyUnitPrice(product.id, purchases);
+      if (purchaseOnlyPrice !== null) {
+        return computeCostPerAcre(purchaseOnlyPrice.price, purchaseOnlyPrice.unit);
+      }
     }
   }
   
@@ -483,6 +491,34 @@ export const calculateBlendedUnitPrice = (
   const remainingQty = totalDemand - purchasedQty;
   return (purchasedQty * avgPurchasedPrice + remainingQty * currentUnitPrice) / totalDemand;
 };
+
+/**
+ * Extract a unit price purely from purchase records when no market price exists.
+ * Returns the average purchase price and its unit, or null if no purchases found.
+ */
+export const calculatePurchaseOnlyUnitPrice = (
+  productId: string,
+  purchases: SimplePurchase[],
+): { price: number; unit: string } | null => {
+  let purchasedQty = 0;
+  let purchasedCost = 0;
+  let detectedUnit = 'lbs';
+
+  for (const purchase of purchases) {
+    for (const line of purchase.lines) {
+      if (line.productId !== productId) continue;
+      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      purchasedQty += lineQty;
+      purchasedCost += line.totalPrice;
+      detectedUnit = line.normalizedUnit || line.packageUnit || 'lbs';
+    }
+  }
+
+  if (purchasedQty <= 0) return null;
+
+  return { price: purchasedCost / purchasedQty, unit: detectedUnit };
+};
+
 
 /**
  * Convert a quantity from one unit to another for comparison.
