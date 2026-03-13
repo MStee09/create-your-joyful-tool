@@ -125,9 +125,16 @@ export function calculateReadinessSummary(
       getVendorName: () => undefined, // dashboard doesn't need vendor names
       getLines: (p: SimplePurchase) => p.lines || [],
       getLineProductId: (l: SimplePurchaseLine) => l.productId,
-      // For 'ordered' purchases, the remaining qty is the total quantity (not yet received)
-      // For 'received' purchases, they're already in inventory, so 0 remaining on order
-      getLineRemainingQty: (l: SimplePurchaseLine) => l.totalQuantity || (l.quantity * (l.packageSize || 1)),
+      getLineRemainingQty: (l: SimplePurchaseLine) => {
+        // For container-based products, planned usage is in containers,
+        // so return container count (quantity), not expanded volume (totalQuantity)
+        const product = products.find(p => p.id === l.productId);
+        const isContainerPricing = product && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+        if (isContainerPricing) {
+          return l.quantity;
+        }
+        return l.totalQuantity || (l.quantity * (l.packageSize || 1));
+      },
       getLineUnit: (l: SimplePurchaseLine) => l.packageUnit || l.normalizedUnit,
     },
   });

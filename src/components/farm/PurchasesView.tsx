@@ -75,11 +75,44 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     return names.join(', ') + suffix;
   };
 
+  const addPurchaseToInventory = (purchase: SimplePurchase) => {
+    let updatedInventory = [...inventory];
+    for (const line of (purchase.lines || [])) {
+      if (!line.productId) continue;
+      const product = products.find(p => p.id === line.productId);
+      const baseUnit: 'gal' | 'lbs' = product?.form === 'liquid' ? 'gal' : 'lbs';
+      const totalQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+
+      const existingIdx = updatedInventory.findIndex(i => i.productId === line.productId);
+      if (existingIdx >= 0) {
+        updatedInventory = updatedInventory.map((item, idx) =>
+          idx === existingIdx
+            ? { ...item, quantity: item.quantity + totalQty }
+            : item
+        );
+      } else {
+        updatedInventory.push({
+          id: crypto.randomUUID(),
+          productId: line.productId,
+          quantity: totalQty,
+          unit: baseUnit,
+          packagingName: line.packageType,
+          packagingSize: line.packageSize,
+          containerCount: line.quantity,
+        });
+      }
+    }
+    onUpdateInventory(updatedInventory);
+  };
+
   const handleMarkReceived = async (purchase: SimplePurchase) => {
-    await onUpdatePurchase(purchase.id, {
+    const success = await onUpdatePurchase(purchase.id, {
       status: 'received',
       receivedDate: new Date().toISOString().split('T')[0],
     });
+    if (success) {
+      addPurchaseToInventory(purchase);
+    }
   };
 
   return (
