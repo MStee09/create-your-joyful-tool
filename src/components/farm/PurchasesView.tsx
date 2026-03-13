@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { formatCurrency } from '@/lib/calculations';
-import type { Vendor, ProductMaster, VendorOffering } from '@/types';
+import type { Vendor, ProductMaster, VendorOffering, InventoryItem } from '@/types';
 import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
 import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
 import { RecordPurchaseModal } from './RecordPurchaseModal';
