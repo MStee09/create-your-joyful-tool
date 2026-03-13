@@ -106,6 +106,11 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   const [priceValue, setPriceValue] = useState(product.estimatedPrice || 0);
   const [isSuggestingRoles, setIsSuggestingRoles] = useState(false);
   
+  // Local state for notes fields (saves on blur to avoid re-render on every keystroke)
+  const [localGeneralNotes, setLocalGeneralNotes] = useState(product.generalNotes || '');
+  const [localMixingNotes, setLocalMixingNotes] = useState(product.mixingNotes || '');
+  const [localCropRateNotes, setLocalCropRateNotes] = useState(product.cropRateNotes || '');
+  
   // Inline name editing
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(product.name);
