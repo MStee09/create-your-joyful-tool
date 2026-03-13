@@ -42,7 +42,8 @@ export function calculateFieldData(
   products: Product[],
   productMasters: ProductMaster[],
   priceBook: PriceBookEntry[],
-  seasonYear: number
+  seasonYear: number,
+  purchases?: SimplePurchase[]
 ): FieldComparisonData {
   if (!assignment || !crop) {
     return {
