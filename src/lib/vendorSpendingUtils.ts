@@ -109,13 +109,13 @@ export const calculateVendorSpending = (
     let priceUnit = '';
 
     if (preferredOffering) {
-      // Use offering price, but fall back to product estimated price if offering has no quote yet
+      // Use offering price, but fall back to product price if offering has no quote yet
       const effectivePrice = preferredOffering.price > 0 
         ? preferredOffering.price 
-        : (product.price || product.estimatedPrice || 0);
+        : (product.price || 0);
       const effectivePriceUnit = preferredOffering.price > 0
         ? preferredOffering.priceUnit
-        : (product.priceUnit || product.estimatedPriceUnit || usage.unit);
+        : (product.priceUnit || usage.unit);
 
       pricePerUnit = effectivePrice;
       priceUnit = effectivePriceUnit;
