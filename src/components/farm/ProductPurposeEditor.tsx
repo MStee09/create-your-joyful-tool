@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ProductPurpose, ProductRole, ProductAnalysis } from '@/types/productIntelligence';
@@ -22,6 +22,18 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
   const [isGeneratingResearch, setIsGeneratingResearch] = useState(false);
   const [newSynergy, setNewSynergy] = useState('');
   const [newWatchOut, setNewWatchOut] = useState('');
+
+  // Local state for text fields (saves on blur)
+  const [localObjective, setLocalObjective] = useState(purpose?.primaryObjective || '');
+  const [localWhenItMatters, setLocalWhenItMatters] = useState(purpose?.whenItMatters || '');
+  const [localProof, setLocalProof] = useState(purpose?.proofRationale || '');
+
+  // Sync when purpose changes externally
+  useEffect(() => {
+    setLocalObjective(purpose?.primaryObjective || '');
+    setLocalWhenItMatters(purpose?.whenItMatters || '');
+    setLocalProof(purpose?.proofRationale || '');
+  }, [purpose?.primaryObjective, purpose?.whenItMatters, purpose?.proofRationale]);
 
   const allRoles: ProductRole[] = [
     'fertility-macro', 'fertility-micro', 'biostimulant', 
@@ -98,7 +110,6 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
 
       if (error) throw error;
 
-      // Update both fields at once to avoid overwrites
       onUpdate({
         ...purpose,
         id: purpose?.id || crypto.randomUUID(),
@@ -144,8 +155,9 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
           Primary Objective
         </label>
         <textarea
-          value={purpose?.primaryObjective || ''}
-          onChange={(e) => updateField('primaryObjective', e.target.value)}
+          value={localObjective}
+          onChange={(e) => setLocalObjective(e.target.value)}
+          onBlur={() => updateField('primaryObjective', localObjective)}
           placeholder="Why is this product in your program? (1 sentence)"
           className="w-full px-3 py-2 border border-input rounded-lg text-sm resize-none h-16 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
         />
@@ -158,8 +170,9 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
         </label>
         <input
           type="text"
-          value={purpose?.whenItMatters || ''}
-          onChange={(e) => updateField('whenItMatters', e.target.value)}
+          value={localWhenItMatters}
+          onChange={(e) => setLocalWhenItMatters(e.target.value)}
+          onBlur={() => updateField('whenItMatters', localWhenItMatters)}
           placeholder="Growth stage or timing (e.g., 'Early vegetative', 'Pre-tassel')"
           className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
         />
@@ -231,8 +244,9 @@ export const ProductPurposeEditor: React.FC<ProductPurposeEditorProps> = ({
           Proof / Rationale
         </label>
         <textarea
-          value={purpose?.proofRationale || ''}
-          onChange={(e) => updateField('proofRationale', e.target.value)}
+          value={localProof}
+          onChange={(e) => setLocalProof(e.target.value)}
+          onBlur={() => updateField('proofRationale', localProof)}
           placeholder="Why you believe in this product, trial results, etc."
           className="w-full px-3 py-2 border border-input rounded-lg text-sm resize-none h-20 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
         />
