@@ -488,96 +488,76 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-        <div className="grid grid-cols-12 bg-stone-50 px-5 py-3 text-xs font-semibold text-stone-600">
-          <div className="col-span-4">Product</div>
-          <div className="col-span-2">Need</div>
-          <div className="col-span-2">On Hand</div>
-          <div className="col-span-2">On Order</div>
-          <div className="col-span-2 text-right">Actions</div>
+      {viewMode === 'product' ? (
+        /* ── Flat product list ── */
+        <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="grid grid-cols-12 bg-stone-50 px-5 py-3 text-xs font-semibold text-stone-600">
+            <div className="col-span-4">Product</div>
+            <div className="col-span-2">Need</div>
+            <div className="col-span-2">On Hand</div>
+            <div className="col-span-2">On Order</div>
+            <div className="col-span-2 text-right">Actions</div>
+          </div>
+          <div className="divide-y divide-stone-200">
+            {filteredItems.map(item => renderProductRow(item))}
+            {filteredItems.length === 0 && renderEmptyState()}
+          </div>
         </div>
-
-        <div className="divide-y divide-stone-200">
-          {filteredItems.map(item => {
-            const p = statusPill(item.status);
-            const usages = usageMap.get(item.productId) || [];
-            const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
-            const product = products.find(pr => pr.id === item.productId);
+      ) : (
+        /* ── Grouped by company ── */
+        <div className="space-y-4">
+          {groupedByVendor.map(([key, group]) => {
+            const vendorName = group.vendor?.name || 'No Vendor Assigned';
+            const vendorContact = group.vendor?.contactEmail || group.vendor?.contactPhone || '';
+            const groupBlocking = group.items.filter(i => i.status === 'BLOCKING').length;
+            const groupOrdered = group.items.filter(i => i.status === 'ON_ORDER').length;
+            const groupReady = group.items.filter(i => i.status === 'READY').length;
 
             return (
-              <div key={item.id} className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
-                <div className="col-span-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      product?.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-                    }`}>
-                      {product?.form === 'liquid' 
-                        ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                        : <Weight className="w-5 h-5 text-amber-600" />}
-                    </div>
-                    <div>
-                      <div className="font-semibold">{item.label}</div>
-                      <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
-                          <p.icon className="w-3.5 h-3.5" />
-                          {p.label}
-                        </span>
-                        {usedIn && <span className="text-xs text-stone-500">{usedIn}</span>}
+              <div key={key} className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                {/* Vendor header */}
+                <div className="bg-stone-50 px-5 py-4 border-b border-stone-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-stone-200 rounded-lg flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-stone-600" />
                       </div>
+                      <div>
+                        <h3 className="font-semibold text-stone-800">{vendorName}</h3>
+                        {vendorContact && <p className="text-xs text-stone-500">{vendorContact}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-medium">
+                      <span className="text-stone-500">{group.items.length} product{group.items.length !== 1 ? 's' : ''}</span>
+                      {groupReady > 0 && <span className="text-emerald-600">{groupReady} ready</span>}
+                      {groupOrdered > 0 && <span className="text-amber-600">{groupOrdered} ordered</span>}
+                      {groupBlocking > 0 && <span className="text-rose-600">{groupBlocking} need to order</span>}
                     </div>
                   </div>
                 </div>
 
-                <div className="col-span-2 flex items-center">
-                  {fmt(item.requiredQty)} {item.plannedUnit}
+                {/* Product rows */}
+                <div className="grid grid-cols-12 bg-stone-50/50 px-5 py-2 text-xs font-semibold text-stone-500">
+                  <div className="col-span-4">Product</div>
+                  <div className="col-span-2">Need</div>
+                  <div className="col-span-2">On Hand</div>
+                  <div className="col-span-2">On Order</div>
+                  <div className="col-span-2 text-right">Actions</div>
                 </div>
-                <div className="col-span-2 flex items-center">
-                  {fmt(item.onHandQty)} {item.plannedUnit}
-                </div>
-                <div className="col-span-2 flex items-center">
-                  {fmt(item.onOrderQty)} {item.plannedUnit}
-                </div>
-
-                <div className="col-span-2 flex justify-end items-center gap-2">
-                  {item.status === 'BLOCKING' && (
-                    <button
-                      onClick={() => handleQuickAdd(item.productId, item.shortQty)}
-                      className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
-                    >
-                      Add {fmt(item.shortQty, 0)}
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setExplainTitle(item.label);
-                      setExplainStatus(item.status);
-                      setExplainData(item.explain);
-                      setExplainOpen(true);
-                    }}
-                    className="px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold hover:bg-stone-50"
-                  >
-                    Explain
-                  </button>
+                <div className="divide-y divide-stone-100">
+                  {group.items.map(item => renderProductRow(item))}
                 </div>
               </div>
             );
           })}
 
-          {filteredItems.length === 0 && (
-            <div className="px-5 py-12 text-center">
-              <Package className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-              <h3 className="font-semibold text-stone-800 mb-2">No items in this category</h3>
-              <p className="text-stone-500">
-                {filterTab === 'blocking' && 'Great news! No items are blocking plan execution.'}
-                {filterTab === 'on-order' && 'No items are currently on order.'}
-                {filterTab === 'ready' && 'No items are fully covered yet.'}
-                {filterTab === 'all' && 'Add products to your crop plans to see readiness status.'}
-              </p>
+          {groupedByVendor.length === 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+              {renderEmptyState()}
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Explain drawer */}
       <ExplainMathDrawer
