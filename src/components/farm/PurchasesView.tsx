@@ -16,12 +16,14 @@ interface PurchasesViewProps {
   products: ProductMaster[];
   vendorOfferings: VendorOffering[];
   priceRecords: PriceRecord[];
+  inventory: InventoryItem[];
   currentSeasonId: string;
   currentSeasonYear: number;
   onAddPurchase: (purchase: NewSimplePurchase) => Promise<SimplePurchase | null>;
   onUpdatePurchase: (id: string, updates: Partial<SimplePurchase>) => Promise<boolean>;
   onDeletePurchase: (id: string) => Promise<boolean>;
   onAddPriceRecord: (record: NewPriceRecord) => Promise<any>;
+  onUpdateInventory: (inventory: InventoryItem[]) => void;
 }
 
 export const PurchasesView: React.FC<PurchasesViewProps> = ({
