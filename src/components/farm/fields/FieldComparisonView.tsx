@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from '@/lib/calculations';
 import { SOIL_TYPE_LABELS } from '@/types/field';
 import type { Field, FieldAssignment, SoilType } from '@/types/field';
 import type { Season, Crop, Product, ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { calculateFieldData, groupFieldsByCrop, calculateVariance, type FieldComparisonData, type CropGroup } from '@/lib/fieldComparisonUtils';
 
 interface FieldComparisonViewProps {
@@ -25,6 +26,7 @@ interface FieldComparisonViewProps {
   products: Product[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   onSelectField: (fieldId: string) => void;
   onBack: () => void;
 }
@@ -37,6 +39,7 @@ export const FieldComparisonView: React.FC<FieldComparisonViewProps> = ({
   products,
   productMasters,
   priceBook,
+  purchases,
   onSelectField,
   onBack,
 }) => {
@@ -70,11 +73,12 @@ export const FieldComparisonView: React.FC<FieldComparisonViewProps> = ({
           products,
           productMasters,
           priceBook,
-          currentSeason.year
+          currentSeason.year,
+          purchases
         );
       })
       .filter(fd => fd.cropId); // Only show assigned fields
-  }, [fields, currentAssignments, crops, products, productMasters, priceBook, currentSeason]);
+  }, [fields, currentAssignments, crops, products, productMasters, priceBook, currentSeason, purchases]);
 
   // Group by crop
   const cropGroups = useMemo(() => {

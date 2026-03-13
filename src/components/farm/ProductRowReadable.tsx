@@ -9,7 +9,7 @@ import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from 
 import { cn } from '@/lib/utils';
 import { getAwardedPriceInfo } from '@/lib/priceBookUtils';
 import { calculateApplicationNutrients } from '@/lib/calculations';
-import { calculateApplicationCostPerAcreWithPriceBook } from '@/lib/cropCalculations';
+import { calculateApplicationCostPerAcreWithPriceBook, getPricingSource } from '@/lib/cropCalculations';
 import {
   Tooltip,
   TooltipContent,
@@ -116,6 +116,11 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       purchases
     );
   }, [application, product, productMasters, priceBook, seasonYear, purchases]);
+
+  // Resolve pricing source for transparency badge
+  const pricingSource = useMemo(() => {
+    return getPricingSource(product, productMasters, priceBook, seasonYear, purchases);
+  }, [product, productMasters, priceBook, seasonYear, purchases]);
 
   // Calculate nutrient contribution for this application (must be before early return)
   const applicationNutrients = useMemo(() => {
@@ -292,6 +297,18 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
                 <span className="text-primary font-semibold">
                   {formatCurrency(treatedCostPerAcre)}/ac
                 </span>
+                {pricingSource !== '—' && (
+                  <span className={cn(
+                    'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                    pricingSource === 'Blend' ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' :
+                    pricingSource === 'Booked' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' :
+                    pricingSource === 'Bid' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' :
+                    pricingSource === 'Est' ? 'bg-muted text-muted-foreground' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {pricingSource}
+                  </span>
+                )}
                 <span className="text-muted-foreground/70 text-xs">
                   {formatCurrency(totalCost)} total
                 </span>
@@ -316,6 +333,19 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                
+                {/* Pricing source badge */}
+                {pricingSource !== '—' && (
+                  <span className={cn(
+                    'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                    pricingSource === 'Blend' ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' :
+                    pricingSource === 'Booked' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' :
+                    pricingSource === 'Bid' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {pricingSource}
+                  </span>
+                )}
                 
                 {/* Treated - SECONDARY (intensity context) */}
                 <span className="text-muted-foreground">

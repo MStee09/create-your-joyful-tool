@@ -5,6 +5,7 @@
 
 import type { Field, FieldAssignment } from '@/types/field';
 import type { Crop, Product, Season, ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import { calculateApplicationCostPerAcreWithPriceBook, calculateApplicationNutrients, getApplicationAcresPercentage } from './cropCalculations';
 
 export interface FieldComparisonData {
@@ -41,7 +42,8 @@ export function calculateFieldData(
   products: Product[],
   productMasters: ProductMaster[],
   priceBook: PriceBookEntry[],
-  seasonYear: number
+  seasonYear: number,
+  purchases?: SimplePurchase[]
 ): FieldComparisonData {
   if (!assignment || !crop) {
     return {
@@ -80,7 +82,8 @@ export function calculateFieldData(
       product,
       productMasters,
       priceBook,
-      seasonYear
+      seasonYear,
+      purchases
     );
     
     // Total cost for this application on this field
