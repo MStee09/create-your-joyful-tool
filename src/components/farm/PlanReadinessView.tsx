@@ -20,6 +20,7 @@ interface PlanReadinessViewProps {
 }
 
 type FilterTab = 'blocking' | 'on-order' | 'ready' | 'all';
+type ViewMode = 'product' | 'company';
 
 const fmt = (n: number, decimals = 1) =>
   (Number.isFinite(n) ? n : 0).toLocaleString(undefined, {
