@@ -1745,6 +1745,7 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             vendorOfferings={state.vendorOfferings || []}
             vendors={state.vendors}
+            purchases={simplePurchases || []}
           />
         );
       // 'orders' case handled above in legacy redirect block
