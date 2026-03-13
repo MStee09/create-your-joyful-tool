@@ -493,7 +493,33 @@ export const calculateBlendedUnitPrice = (
 };
 
 /**
- * Convert a quantity from one unit to another for comparison.
+ * Extract a unit price purely from purchase records when no market price exists.
+ * Returns the average purchase price and its unit, or null if no purchases found.
+ */
+export const calculatePurchaseOnlyUnitPrice = (
+  productId: string,
+  purchases: SimplePurchase[],
+): { price: number; unit: string } | null => {
+  let purchasedQty = 0;
+  let purchasedCost = 0;
+  let detectedUnit = 'lbs';
+
+  for (const purchase of purchases) {
+    for (const line of purchase.lines) {
+      if (line.productId !== productId) continue;
+      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      purchasedQty += lineQty;
+      purchasedCost += line.totalPrice;
+      detectedUnit = line.normalizedUnit || line.packageUnit || 'lbs';
+    }
+  }
+
+  if (purchasedQty <= 0) return null;
+
+  return { price: purchasedCost / purchasedQty, unit: detectedUnit };
+};
+
+
  * Simplified conversion for common farm units.
  */
 const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
