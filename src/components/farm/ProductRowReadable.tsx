@@ -149,16 +149,7 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   const roles = override?.customRoles || purpose?.roles || [];
   const whyHere = override?.whyHere;
 
-  // Calculate nutrient contribution for this application
-  const applicationNutrients = useMemo(() => {
-    return calculateApplicationNutrients(
-      application.rate,
-      application.rateUnit,
-      product?.analysis,
-      product?.form || 'liquid',
-      product?.densityLbsPerGal
-    );
-  }, [application.rate, application.rateUnit, product?.analysis, product?.form, product?.densityLbsPerGal]);
+  // (applicationNutrients already computed above before early return)
 
   // Check if we have meaningful nutrients to display (>0.1 lbs/ac threshold)
   const hasNutrients = applicationNutrients.n > 0.1 || applicationNutrients.p > 0.1 || 
