@@ -104,18 +104,7 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
   const [isEditingWhyHere, setIsEditingWhyHere] = useState(false);
   const [whyHereValue, setWhyHereValue] = useState(override?.whyHere || '');
 
-  if (!product) {
-    return (
-      <div className="px-4 py-3 bg-muted/30 rounded-lg text-muted-foreground text-sm">
-        Product not found
-      </div>
-    );
-  }
-
-  // Check if this product has an awarded bid price
-  const awardedPriceInfo = getAwardedPriceInfo(product.id, seasonYear, productMasters, priceBook);
-
-  // Calculate costs using the unified pricing engine
+  // Calculate costs using the unified pricing engine (must be before early return)
   const treatedCostPerAcre = useMemo(() => {
     if (!product) return 0;
     return calculateApplicationCostPerAcreWithPriceBook(
@@ -127,6 +116,28 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
       purchases
     );
   }, [application, product, productMasters, priceBook, seasonYear, purchases]);
+
+  // Calculate nutrient contribution for this application (must be before early return)
+  const applicationNutrients = useMemo(() => {
+    return calculateApplicationNutrients(
+      application.rate,
+      application.rateUnit,
+      product?.analysis,
+      product?.form || 'liquid',
+      product?.densityLbsPerGal
+    );
+  }, [application.rate, application.rateUnit, product?.analysis, product?.form, product?.densityLbsPerGal]);
+
+  if (!product) {
+    return (
+      <div className="px-4 py-3 bg-muted/30 rounded-lg text-muted-foreground text-sm">
+        Product not found
+      </div>
+    );
+  }
+
+  // Check if this product has an awarded bid price
+  const awardedPriceInfo = getAwardedPriceInfo(product.id, seasonYear, productMasters, priceBook);
 
   // Field average cost = treated cost × coverage fraction (budget truth)
   const fieldAvgCostPerAcre = treatedCostPerAcre * (acresPercentage / 100);
