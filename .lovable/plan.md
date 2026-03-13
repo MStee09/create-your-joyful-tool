@@ -1,43 +1,59 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Fix "Add Vendor to Product" Flow
 
-## The Problem
+## Problems Identified
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+### 1. Vendor created with client-side ID never persists correctly
+In `ChemicalProductVendorsTab` and `ProductDetailView`, `onCreateVendor` builds a `Vendor` object with `crypto.randomUUID()` and calls `onAddVendor(newVendor)`. This flows to `handleUpdateVendors([...state.vendors, vendor])` which upserts the entire vendor array. The vendor IS persisted, but the `VendorOfferingsTable` only sets `formData.vendorId` to the new vendor's ID -- **it does NOT auto-submit the offering form**. The user creates a vendor, the dialog closes, the dropdown shows the new vendor selected, but they still have to click "Add Offering" manually. If they miss this, the vendor exists but no offering is created.
 
-## The Fix
+### 2. The "Add Vendor" form is confusing and incomplete
+The inline add form (lines 446-531 of `VendorOfferingsTable`) shows a `<select>` dropdown with vendors and a "Price will be set when you log a quote" message. Issues:
+- **Native `<select>` for the vendor dropdown** -- no search, no type-ahead, ugly on mobile
+- **"+ Add new vendor..." as an `<option>`** -- this is a styling hack that doesn't render styled text in native selects, and the interaction of a select triggering a dialog is janky
+- **Too many fields upfront** -- Packaging, SKU, Min Order, Freight Terms are all shown immediately. For a first-time add, users just want to pick a vendor and go. These details can be edited later via inline row editing.
+- **No feedback after vendor creation** -- the new vendor dialog closes, the select updates, but there's no toast or visual confirmation
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+### 3. Two different "add vendor" experiences exist
+- **From Product Detail → Vendors tab** uses `VendorOfferingsTable` inline form (select dropdown + optional new vendor dialog)
+- **From Vendor Detail → Add Product** uses `AddProductToVendorModal` (full modal with search, product creation, pricing)
 
-## Changes
+These two paths have different capabilities and UX patterns, creating inconsistency.
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+## Plan
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+### Simplify the "Add Vendor Offering" flow in `VendorOfferingsTable`
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+**Replace** the current inline form + native select + nested dialog with a single clean modal dialog:
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
+1. **Step 1: Pick a vendor** -- Show a searchable list (like `ProductSelectorModal` pattern) of existing vendors, filtered to exclude vendors that already have an offering for this product. Include a prominent "+ Create New Vendor" button at the top.
+2. **If creating new** -- Expand inline fields for name (required), email, phone (optional). On save, create vendor AND auto-proceed to step 2.
+3. **Step 2: Confirm** -- After vendor is selected/created, auto-create the offering with default values (price=0, no packaging) and close. Show a toast: "Added [Vendor] -- log a quote to set pricing."
 
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
+This eliminates:
+- The janky native `<select>` with `__new__` option hack
+- The multi-field form (packaging/SKU/freight shown upfront)
+- The need for users to manually click "Add Offering" after creating a vendor
 
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
+### Implementation Details
 
-## Files to Modify
+**File: `src/components/farm/VendorOfferingsTable.tsx`**
+- Replace the `showAddForm` inline section (lines 446-531) with a `Dialog` that contains:
+  - Search input filtering `vendors` list (excluding vendors already offering this product)
+  - Clickable vendor rows (name + contact info preview)
+  - "+ Create New Vendor" expandable section with name/email/phone fields
+- On vendor selection: immediately call `handleAdd()` with that vendor ID and close
+- On new vendor creation: call `onCreateVendor`, then immediately create offering with returned vendor ID
+- Remove `showNewVendorDialog` state and the separate new vendor Dialog (lines 572-638) -- fold it into the single modal
+- Show success toast after adding
 
-| File | Change |
-|------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+**File: `src/components/farm/chemical/ChemicalProductVendorsTab.tsx`** and **`src/components/farm/ProductDetailView.tsx`**
+- No changes needed -- they pass `onCreateVendor` to `VendorOfferingsTable` which will handle everything internally
+
+### Result
+- One clean modal instead of inline form + nested dialog
+- Searchable vendor list instead of native `<select>`
+- Auto-creates offering on selection (no manual "Add Offering" step)
+- Inline "create vendor" within the same modal (no second dialog)
+- Consistent with the app's existing modal patterns
 
