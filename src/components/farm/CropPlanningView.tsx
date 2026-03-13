@@ -126,23 +126,38 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const [collapsedPhases, setCollapsedPhases] = useState<Set<TimingBucket>>(new Set());
   const [expandedPasses, setExpandedPasses] = useState<Set<string>>(new Set());
 
-  // Auto-hide header on scroll
-  const [headerHidden, setHeaderHidden] = useState(false);
+  // Smooth scroll-to-hide header using transform
+  const collapsibleHeaderRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerOffset, setHeaderOffset] = useState(0);
+  const headerOffsetRef = useRef(0);
   const lastScrollTopRef = useRef(0);
-  const scrollThreshold = 30;
+
+  // Measure the collapsible header height with ResizeObserver
+  useEffect(() => {
+    const el = collapsibleHeaderRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setHeaderHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handlePassesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
     const delta = scrollTop - lastScrollTopRef.current;
-
-    if (delta > scrollThreshold && scrollTop > 50) {
-      setHeaderHidden(true);
-    } else if (delta < -scrollThreshold) {
-      setHeaderHidden(false);
-    }
-
     lastScrollTopRef.current = scrollTop;
-  }, []);
+
+    if (headerHeight <= 0) return;
+
+    // Proportional offset: scroll down increases, scroll up decreases
+    const newOffset = Math.max(0, Math.min(headerHeight, headerOffsetRef.current + delta));
+    headerOffsetRef.current = newOffset;
+    setHeaderOffset(newOffset);
+  }, [headerHeight]);
 
   const { purposes } = useProductIntelligence();
 
@@ -336,28 +351,40 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
     });
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Season Overview Bar */}
-      <SeasonOverviewBar
-        cropName={crop.name}
-        totalAcres={crop.totalAcres}
-        summary={summary}
-        crop={crop}
-        products={products}
-        purposes={purposes}
-        showInsights={showInsights}
-        onToggleInsights={() => setShowInsights(!showInsights)}
-        onUpdateCropName={(name) => onUpdate({ ...crop, name })}
-        onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
-      />
+    const headerProgress = headerHeight > 0 ? headerOffset / headerHeight : 0;
 
-      {/* Collapsible header: Cost Trend + Timeline Nav */}
+    return (
+    <div className="flex flex-col h-full">
+      {/* SeasonOverviewBar with shadow when header is hidden */}
+      <div style={{
+        boxShadow: headerProgress > 0 
+          ? `0 ${2 + headerProgress * 4}px ${4 + headerProgress * 8}px rgba(0,0,0,${0.03 + headerProgress * 0.07})` 
+          : 'none',
+        transition: 'box-shadow 0.15s ease-out',
+        position: 'relative',
+        zIndex: 11,
+      }}>
+        <SeasonOverviewBar
+          cropName={crop.name}
+          totalAcres={crop.totalAcres}
+          summary={summary}
+          crop={crop}
+          products={products}
+          purposes={purposes}
+          showInsights={showInsights}
+          onToggleInsights={() => setShowInsights(!showInsights)}
+          onUpdateCropName={(name) => onUpdate({ ...crop, name })}
+          onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
+        />
+      </div>
+
+      {/* Collapsible header: Cost Trend + Timeline Nav - smooth transform slide */}
       <div
-        className="overflow-hidden transition-all duration-300 ease-in-out"
+        ref={collapsibleHeaderRef}
         style={{
-          maxHeight: headerHidden ? 0 : 600,
-          opacity: headerHidden ? 0 : 1,
+          transform: `translateY(-${headerOffset}px)`,
+          marginBottom: `-${headerOffset}px`,
+          willChange: 'transform',
         }}
       >
         {/* Cost Trend Chart */}
