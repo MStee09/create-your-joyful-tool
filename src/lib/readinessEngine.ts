@@ -167,8 +167,14 @@ export function computeReadiness(params: {
   orders?: OrderRow[];
   inventoryAccessors: Accessors<InventoryRow>;
   orderAccessors?: Parameters<typeof indexOnOrderByProduct<OrderRow>>[0];
+  /** Units that are container-based (e.g., 'jug', 'bag', 'case', 'tote').
+   *  For these units, if the shortage is less than 1 full container and there
+   *  are items on order, status upgrades from BLOCKING to ON_ORDER. */
+  containerUnits?: string[];
 }): ReadinessSummary {
-  const { planned, inventory, orders, inventoryAccessors, orderAccessors } = params;
+  const { planned, inventory, orders, inventoryAccessors, orderAccessors, containerUnits } = params;
+
+  const containerUnitSet = new Set((containerUnits || ['jug', 'bag', 'case', 'tote']).map(u => u.toLowerCase()));
 
   const onHandIndex = indexOnHandByProduct(inventory || [], inventoryAccessors);
 
@@ -188,6 +194,20 @@ export function computeReadiness(params: {
     let status: ReadinessStatus = "BLOCKING";
     if (onHand >= required) status = "READY";
     else if (onHand + onOrder >= required) status = "ON_ORDER";
+
+    // Container tolerance: if a container-based product is BLOCKING but the
+    // shortage is less than 1 full container and there ARE items on order,
+    // upgrade to ON_ORDER. You can't buy a fraction of a container.
+    if (
+      status === "BLOCKING" &&
+      onOrder > 0 &&
+      containerUnitSet.has((p.plannedUnit || '').toLowerCase())
+    ) {
+      const shortage = required - (onHand + onOrder);
+      if (shortage > 0 && shortage < 1) {
+        status = "ON_ORDER";
+      }
+    }
 
     const shortQty = Math.max(0, required - (onHand + onOrder));
 
