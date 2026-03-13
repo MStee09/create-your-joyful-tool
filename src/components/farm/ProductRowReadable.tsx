@@ -2,12 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { MessageSquare, Edit3, Award } from 'lucide-react';
 import type { Application, Product, LiquidUnit, DryUnit, Vendor, NutrientAnalysis } from '@/types/farm';
 import type { ProductMaster, PriceBookEntry } from '@/types';
+import type { SimplePurchase } from '@/types/simplePurchase';
 import type { ProductPurpose, ProductRole, ApplicationOverride } from '@/types/productIntelligence';
 import { PRODUCT_ROLE_LABELS } from '@/types/productIntelligence';
 import { formatCurrency, formatNumber, convertToGallons, convertToPounds } from '@/utils/farmUtils';
 import { cn } from '@/lib/utils';
 import { getAwardedPriceInfo } from '@/lib/priceBookUtils';
 import { calculateApplicationNutrients } from '@/lib/calculations';
+import { calculateApplicationCostPerAcreWithPriceBook } from '@/lib/cropCalculations';
 import {
   Tooltip,
   TooltipContent,
