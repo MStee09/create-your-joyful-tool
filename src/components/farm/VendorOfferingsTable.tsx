@@ -56,30 +56,37 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
       .sort((a, b) => (a.price || 0) - (b.price || 0));
   }, [offerings, product.id]);
 
-  const handleAdd = () => {
-    if (!formData.vendorId) return;
+  // Vendors available for adding (not already offering this product)
+  const availableVendors = useMemo(() => {
+    const existingVendorIds = new Set(productOfferings.map(o => o.vendorId));
+    return vendors
+      .filter(v => !existingVendorIds.has(v.id))
+      .filter(v => !vendorSearch || v.name.toLowerCase().includes(vendorSearch.toLowerCase()));
+  }, [vendors, productOfferings, vendorSearch]);
 
+  const addOfferingForVendor = (vendorId: string, vendorName: string) => {
     const priceUnit = product.form === 'dry' ? 'lbs' : 'gal';
-
     const newOffering: VendorOffering = {
       id: generateId(),
       productId: product.id,
-      vendorId: formData.vendorId,
+      vendorId,
       price: 0,
       priceUnit,
-      containerSize: formData.containerSize !== undefined ? Number(formData.containerSize) : undefined,
-      containerUnit: formData.containerUnit,
-      packaging: formData.packaging,
-      sku: formData.sku,
-      minOrder: formData.minOrder,
-      freightTerms: formData.freightTerms,
       lastQuotedDate: undefined,
       isPreferred: productOfferings.length === 0,
     };
-
     onUpdateOfferings([...offerings, newOffering]);
-    setShowAddForm(false);
-    setFormData({});
+    resetAndCloseModal();
+    toast({ title: `Added ${vendorName}`, description: 'Log a quote to set pricing.' });
+  };
+
+  const resetAndCloseModal = () => {
+    setShowAddModal(false);
+    setVendorSearch('');
+    setShowCreateVendor(false);
+    setNewVendorName('');
+    setNewVendorEmail('');
+    setNewVendorPhone('');
   };
 
   const handleUpdate = (id: string) => {
