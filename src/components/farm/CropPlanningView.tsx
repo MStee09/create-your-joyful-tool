@@ -15,7 +15,7 @@ import { FieldAssignmentModal } from './FieldAssignmentModal';
 import { CropByFieldView } from './CropByFieldView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, PriceBookContext } from '@/lib/cropCalculations';
+import { calculateSeasonSummary, calculatePassSummary, calculateSeasonSummaryWithPriceBook, calculatePassSummaryWithPriceBook, calculateApplicationCostPerAcreWithPriceBook, getApplicationAcresPercentage, PriceBookContext } from '@/lib/cropCalculations';
 import { useProductIntelligence } from '@/hooks/useProductIntelligence';
 import { getStageOrder, TIMING_BUCKET_INFO, inferTimingBucket, inferGrowthStage } from '@/lib/growthStages';
 
@@ -757,8 +757,11 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                                     const product = products.find(p => p.id === app.productId);
                                     if (!product) return null;
                                     const vendor = vendors.find(v => v.id === product.vendorId);
-                                    const appCostPerAcre = app.rate * (product.price || 0);
-                                    const appTotal = appCostPerAcre * crop.totalAcres;
+                                    const appCostPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+                                      app, product, productMasters, priceBook, season.year, purchases
+                                    );
+                                    const acresPct = getApplicationAcresPercentage(app, crop);
+                                    const appTotal = appCostPerAcre * crop.totalAcres * (acresPct / 100);
 
                                     return (
                                       <tr 

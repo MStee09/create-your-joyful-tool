@@ -174,11 +174,12 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
   };
   
   // Determine the "current market" unit price and its UOM
+  // Hierarchy: 1. Price Book → 2. Vendor offering (via product.price if non-zero) → 3. Estimated price → 4. Legacy product.price
   let currentUnitPrice: number | null = null;
   let currentPriceUom: string = 'ton';
   
   if (productMaster) {
-    // Look for price book entry - check by specId OR productId
+    // 1. Price book entry (season-specific)
     const priceEntry = priceBook.find(pb => 
       pb.seasonYear === seasonYear && 
       (
@@ -190,36 +191,47 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
     if (priceEntry) {
       currentPriceUom = priceEntry.priceUom || priceEntry.unit || 'ton';
       currentUnitPrice = priceEntry.price;
-    } else if (productMaster.estimatedPrice && productMaster.estimatedPriceUnit) {
-      currentPriceUom = productMaster.estimatedPriceUnit;
+    } else if (product.price && product.price > 0) {
+      // 2. Vendor offering price (synced to product.price via legacy bridge)
+      currentPriceUom = product.priceUnit || (product.form === 'liquid' ? 'gal' : 'lbs');
+      currentUnitPrice = product.price;
+    } else if (productMaster.estimatedPrice && productMaster.estimatedPrice > 0) {
+      // 3. Estimated price fallback
+      currentPriceUom = productMaster.estimatedPriceUnit || productMaster.defaultUnit || 'lbs';
       currentUnitPrice = productMaster.estimatedPrice;
     }
   }
   
-  // If we have purchases, attempt blended pricing (or pure purchase pricing if no market price)
-  if (purchases && purchases.length > 0) {
-    if (currentUnitPrice !== null) {
-      // Blended: mix actual purchase prices with current market price for remaining
-      const blendedPrice = calculateBlendedUnitPrice(
-        product.id,
-        purchases,
-        currentUnitPrice,
-        currentPriceUom,
-      );
+  // Purchases are expected to be pre-filtered to current season by caller
+  // (via PriceBookContext.purchases). Use them as-is.
+  const seasonPurchases = purchases;
+  
+  // If we have purchases, attempt blended pricing
+  if (seasonPurchases && seasonPurchases.length > 0) {
+    // Try purchase-only first (always works if product has purchases)
+    const purchaseOnlyPrice = calculatePurchaseOnlyUnitPrice(product.id, seasonPurchases);
+    
+    if (purchaseOnlyPrice !== null) {
+      if (currentUnitPrice !== null) {
+        // Blended: mix actual purchase prices with current market price for remaining
+        const blendedPrice = calculateBlendedUnitPrice(
+          product.id,
+          seasonPurchases,
+          currentUnitPrice,
+          currentPriceUom,
+        );
+        
+        if (blendedPrice !== null) {
+          return computeCostPerAcre(blendedPrice, currentPriceUom);
+        }
+      }
       
-      if (blendedPrice !== null) {
-        return computeCostPerAcre(blendedPrice, currentPriceUom);
-      }
-    } else {
-      // No market price at all — use purchase price directly if available
-      const purchaseOnlyPrice = calculatePurchaseOnlyUnitPrice(product.id, purchases);
-      if (purchaseOnlyPrice !== null) {
-        return computeCostPerAcre(purchaseOnlyPrice.price, purchaseOnlyPrice.unit);
-      }
+      // No current market price — use purchase price directly
+      return computeCostPerAcre(purchaseOnlyPrice.price, purchaseOnlyPrice.unit);
     }
   }
   
-  // No blended price available — use current market price directly
+  // No purchase data — use current market price directly
   if (currentUnitPrice !== null) {
     return computeCostPerAcre(currentUnitPrice, currentPriceUom);
   }

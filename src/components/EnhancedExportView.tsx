@@ -1,13 +1,19 @@
 import React, { useState, forwardRef, useMemo } from 'react';
 import { Download, FileSpreadsheet, Building2, Leaf, ShoppingCart } from 'lucide-react';
 import type { Season, Product, Vendor, InventoryItem, LiquidUnit, DryUnit } from '../types';
+import type { ProductMaster, PriceBookEntry } from '../types';
+import type { SimplePurchase } from '../types/simplePurchase';
 import { convertToGallons, convertToPounds, downloadCSV, formatCurrency, calculateCropCosts } from '../lib/calculations';
+import { calculateApplicationCostPerAcreWithPriceBook, getApplicationAcresPercentage } from '../lib/cropCalculations';
 
 interface EnhancedExportViewProps {
   season: Season | null;
   products: Product[];
   vendors: Vendor[];
   inventory: InventoryItem[];
+  productMasters?: ProductMaster[];
+  priceBook?: PriceBookEntry[];
+  purchases?: SimplePurchase[];
 }
 
 export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewProps>(({
@@ -15,6 +21,9 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
   products,
   vendors,
   inventory,
+  productMasters = [],
+  priceBook = [],
+  purchases = [],
 }, ref) => {
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
 
@@ -81,22 +90,18 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
         const apps = crop.applications.filter(a => a.timingId === timing.id);
         apps.forEach(app => {
           const product = products.find(p => p.id === app.productId);
-          const tier = crop.tiers.find(t => t.id === app.tierId);
-          if (!product || !tier) return;
+          if (!product) return;
           
-          const tierAcres = crop.totalAcres * (tier.percentage / 100);
-          let costPerAcre = 0;
+          const acresPercentage = getApplicationAcresPercentage(app, crop);
+          const tierAcres = crop.totalAcres * (acresPercentage / 100);
+          const tierLabel = acresPercentage >= 80 ? 'Core' : acresPercentage >= 40 ? 'Selective' : 'Trial';
           
-          if (product.form === 'liquid') {
-            const gallonsPerAcre = convertToGallons(app.rate, app.rateUnit as LiquidUnit);
-            costPerAcre = gallonsPerAcre * product.price;
-          } else {
-            const poundsPerAcre = convertToPounds(app.rate, app.rateUnit as DryUnit);
-            const pricePerPound = product.priceUnit === 'ton' ? product.price / 2000 : product.price;
-            costPerAcre = poundsPerAcre * pricePerPound;
-          }
+          // Use unified pricing engine
+          const costPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+            app, product, productMasters, priceBook, season.year, purchases
+          );
           
-          csv += `"${crop.name}","${timing.name}","${product.name}",${app.rate},${app.rateUnit},"${tier.name}",${tierAcres},${costPerAcre.toFixed(2)},${(costPerAcre * tierAcres).toFixed(2)}\n`;
+          csv += `"${crop.name}","${timing.name}","${product.name}",${app.rate},${app.rateUnit},"${tierLabel}",${tierAcres},${costPerAcre.toFixed(2)},${(costPerAcre * tierAcres).toFixed(2)}\n`;
         });
       });
     });

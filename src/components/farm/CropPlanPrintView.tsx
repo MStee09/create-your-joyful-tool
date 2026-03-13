@@ -339,7 +339,8 @@ export const CropPlanPrintView: React.FC<CropPlanPrintViewProps> = ({
                             product,
                             productMasters,
                             priceBook,
-                            seasonYear
+                            seasonYear,
+                            purchases
                           );
                           
                           const acresPercent = getApplicationAcresPercentage(app, crop);
