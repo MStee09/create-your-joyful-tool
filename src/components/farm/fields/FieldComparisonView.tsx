@@ -38,6 +38,7 @@ export const FieldComparisonView: React.FC<FieldComparisonViewProps> = ({
   products,
   productMasters,
   priceBook,
+  purchases,
   onSelectField,
   onBack,
 }) => {
