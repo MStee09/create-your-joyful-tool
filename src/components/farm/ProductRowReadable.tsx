@@ -117,6 +117,11 @@ export const ProductRowReadable: React.FC<ProductRowReadableProps> = ({
     );
   }, [application, product, productMasters, priceBook, seasonYear, purchases]);
 
+  // Resolve pricing source for transparency badge
+  const pricingSource = useMemo(() => {
+    return getPricingSource(product, productMasters, priceBook, seasonYear, purchases);
+  }, [product, productMasters, priceBook, seasonYear, purchases]);
+
   // Calculate nutrient contribution for this application (must be before early return)
   const applicationNutrients = useMemo(() => {
     return calculateApplicationNutrients(
