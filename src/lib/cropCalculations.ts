@@ -240,7 +240,49 @@ export const calculateApplicationCostPerAcreWithPriceBook = (
   return calculateApplicationCostPerAcre(app, product);
 };
 
-// Calculate nutrients from an application
+// Pricing source labels for UI transparency
+export type PricingSource = 'Bid' | 'Booked' | 'Blend' | 'Est' | 'List' | '—';
+
+/**
+ * Resolve the pricing source label for a product application.
+ * Returns a short label indicating where the cost came from.
+ */
+export const getPricingSource = (
+  product: Product | undefined,
+  productMasters: ProductMaster[],
+  priceBook: PriceBookEntry[],
+  seasonYear: number,
+  purchases?: SimplePurchase[]
+): PricingSource => {
+  if (!product) return '—';
+  
+  const productMaster = productMasters.find(pm => pm.id === product.id);
+  
+  // Check for purchases
+  const hasPurchases = purchases?.some(p => 
+    p.lines.some(l => l.productId === product.id)
+  ) || false;
+  
+  // Check for price book entry
+  const hasPriceBook = productMaster && priceBook.some(pb => 
+    pb.seasonYear === seasonYear && 
+    (
+      (productMaster.commoditySpecId && (pb.specId === productMaster.commoditySpecId || pb.commoditySpecId === productMaster.commoditySpecId)) ||
+      pb.productId === product.id
+    )
+  );
+  
+  if (hasPurchases && (hasPriceBook || (product.price && product.price > 0) || (productMaster?.estimatedPrice && productMaster.estimatedPrice > 0))) {
+    return 'Blend'; // Mix of booked + market
+  }
+  if (hasPurchases) return 'Booked';
+  if (hasPriceBook) return 'Bid';
+  if (product.price && product.price > 0) return 'List';
+  if (productMaster?.estimatedPrice && productMaster.estimatedPrice > 0) return 'Est';
+  return '—';
+};
+
+
 export const calculateApplicationNutrients = (
   app: Application,
   product: Product | undefined
