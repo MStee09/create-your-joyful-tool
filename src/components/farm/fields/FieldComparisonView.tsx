@@ -25,6 +25,7 @@ interface FieldComparisonViewProps {
   products: Product[];
   productMasters: ProductMaster[];
   priceBook: PriceBookEntry[];
+  purchases?: SimplePurchase[];
   onSelectField: (fieldId: string) => void;
   onBack: () => void;
 }
