@@ -560,7 +560,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
       {/* Main Content with Tabs */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4" onScroll={handlePassesScroll}>
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'passes' | 'by-field')}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-4">
             <TabsTrigger value="passes">Passes</TabsTrigger>
             <TabsTrigger value="by-field">By Field</TabsTrigger>

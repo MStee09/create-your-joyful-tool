@@ -1641,6 +1641,7 @@ const AppContent: React.FC = () => {
             products={legacyProducts}
             productMasters={state.productMasters || []}
             priceBook={state.priceBook || []}
+            purchases={simplePurchases || []}
             onSelectField={(fieldId) => setActiveView(`field-${fieldId}`)}
             onBack={() => setActiveView('fields')}
           />

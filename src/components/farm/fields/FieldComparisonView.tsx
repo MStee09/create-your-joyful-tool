@@ -72,11 +72,12 @@ export const FieldComparisonView: React.FC<FieldComparisonViewProps> = ({
           products,
           productMasters,
           priceBook,
-          currentSeason.year
+          currentSeason.year,
+          purchases
         );
       })
       .filter(fd => fd.cropId); // Only show assigned fields
-  }, [fields, currentAssignments, crops, products, productMasters, priceBook, currentSeason]);
+  }, [fields, currentAssignments, crops, products, productMasters, priceBook, currentSeason, purchases]);
 
   // Group by crop
   const cropGroups = useMemo(() => {
