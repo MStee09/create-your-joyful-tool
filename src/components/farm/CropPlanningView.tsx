@@ -355,26 +355,36 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
     return (
     <div className="flex flex-col h-full">
-      {/* Season Overview Bar */}
-      <SeasonOverviewBar
-        cropName={crop.name}
-        totalAcres={crop.totalAcres}
-        summary={summary}
-        crop={crop}
-        products={products}
-        purposes={purposes}
-        showInsights={showInsights}
-        onToggleInsights={() => setShowInsights(!showInsights)}
-        onUpdateCropName={(name) => onUpdate({ ...crop, name })}
-        onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
-      />
+      {/* SeasonOverviewBar with shadow when header is hidden */}
+      <div style={{
+        boxShadow: headerProgress > 0 
+          ? `0 ${2 + headerProgress * 4}px ${4 + headerProgress * 8}px rgba(0,0,0,${0.03 + headerProgress * 0.07})` 
+          : 'none',
+        transition: 'box-shadow 0.15s ease-out',
+        position: 'relative',
+        zIndex: 11,
+      }}>
+        <SeasonOverviewBar
+          cropName={crop.name}
+          totalAcres={crop.totalAcres}
+          summary={summary}
+          crop={crop}
+          products={products}
+          purposes={purposes}
+          showInsights={showInsights}
+          onToggleInsights={() => setShowInsights(!showInsights)}
+          onUpdateCropName={(name) => onUpdate({ ...crop, name })}
+          onUpdateCropType={(cropType) => onUpdate({ ...crop, cropType })}
+        />
+      </div>
 
-      {/* Collapsible header: Cost Trend + Timeline Nav */}
+      {/* Collapsible header: Cost Trend + Timeline Nav - smooth transform slide */}
       <div
-        className="overflow-hidden transition-all duration-300 ease-in-out"
+        ref={collapsibleHeaderRef}
         style={{
-          maxHeight: headerHidden ? 0 : 600,
-          opacity: headerHidden ? 0 : 1,
+          transform: `translateY(-${headerOffset}px)`,
+          marginBottom: `-${headerOffset}px`,
+          willChange: 'transform',
         }}
       >
         {/* Cost Trend Chart */}
