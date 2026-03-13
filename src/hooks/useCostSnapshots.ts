@@ -37,6 +37,7 @@ export function useCostSnapshots(user: User | null, seasonYear: number) {
         createdAt: row.created_at,
       }));
       setSnapshots(mapped);
+      snapshotsRef.current = mapped;
 
       // Initialize last snapshot cache
       const cache = new Map<string, { costPerAcre: number; totalCost: number }>();
