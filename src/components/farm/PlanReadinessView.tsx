@@ -43,6 +43,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   onUpdateInventory,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('product');
 
   // Product selector modal state (for browsing all products)
   const [showProductSelector, setShowProductSelector] = useState(false);
