@@ -127,6 +127,30 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     return readiness.items.filter(i => i.status === 'BLOCKING');
   }, [readiness.items, filterTab]);
 
+  // Group filtered items by vendor/company
+  const groupedByVendor = useMemo(() => {
+    const groups = new Map<string, { vendor: Vendor | null; items: typeof filteredItems }>();
+    
+    filteredItems.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      const vendor = product?.vendorId ? vendors.find(v => v.id === product.vendorId) : null;
+      const key = vendor?.id || '__unassigned__';
+      
+      if (!groups.has(key)) {
+        groups.set(key, { vendor: vendor || null, items: [] });
+      }
+      groups.get(key)!.items.push(item);
+    });
+
+    // Sort: vendors with items first alphabetically, unassigned last
+    return Array.from(groups.entries())
+      .sort(([keyA, a], [keyB, b]) => {
+        if (keyA === '__unassigned__') return 1;
+        if (keyB === '__unassigned__') return -1;
+        return (a.vendor?.name || '').localeCompare(b.vendor?.name || '');
+      });
+  }, [filteredItems, products, vendors]);
+
   // Quick-add handler: opens modal pre-filled with product context
   const handleQuickAdd = (productId: string, shortAmount: number) => {
     const product = products.find(p => p.id === productId);
