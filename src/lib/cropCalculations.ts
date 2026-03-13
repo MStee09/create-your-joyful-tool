@@ -520,6 +520,8 @@ export const calculatePurchaseOnlyUnitPrice = (
 };
 
 
+/**
+ * Convert a quantity from one unit to another for comparison.
  * Simplified conversion for common farm units.
  */
 const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
