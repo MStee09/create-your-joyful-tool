@@ -21,6 +21,9 @@ export const EnhancedExportView = forwardRef<HTMLDivElement, EnhancedExportViewP
   products,
   vendors,
   inventory,
+  productMasters = [],
+  priceBook = [],
+  purchases = [],
 }, ref) => {
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
 
