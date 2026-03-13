@@ -757,8 +757,11 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
                                     const product = products.find(p => p.id === app.productId);
                                     if (!product) return null;
                                     const vendor = vendors.find(v => v.id === product.vendorId);
-                                    const appCostPerAcre = app.rate * (product.price || 0);
-                                    const appTotal = appCostPerAcre * crop.totalAcres;
+                                    const appCostPerAcre = calculateApplicationCostPerAcreWithPriceBook(
+                                      app, product, productMasters, priceBook, season.year, purchases
+                                    );
+                                    const acresPct = getApplicationAcresPercentage(app, crop);
+                                    const appTotal = appCostPerAcre * crop.totalAcres * (acresPct / 100);
 
                                     return (
                                       <tr 

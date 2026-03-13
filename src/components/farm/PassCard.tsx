@@ -161,8 +161,9 @@ export const PassCard: React.FC<PassCardProps> = ({
     setIsEditingName(false);
   };
   
-  // Build price book context if available
-  const priceBookContext: PriceBookContext | undefined = productMasters.length > 0 && priceBook.length > 0 
+  // Build price book context - always create when product masters exist
+  // (purchases and estimated prices should still drive cost even without price book entries)
+  const priceBookContext: PriceBookContext | undefined = productMasters.length > 0
     ? { productMasters, priceBook, seasonYear, purchases }
     : undefined;
   
