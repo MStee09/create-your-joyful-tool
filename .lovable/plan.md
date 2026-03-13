@@ -1,43 +1,51 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Fix Purchases ↔ Order Status Data Connection
 
-## The Problem
+## Problems Found
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+### 1. Unit mismatch: on-order quantities vs planned quantities
+The readiness engine compares raw numbers without unit conversion:
+- **Planned usage** for container-based products (e.g., herbicide in jugs) returns quantities in **containers** (e.g., 3.5 jugs)
+- **Purchase line `totalQuantity`** is the **expanded volume** (quantity × packageSize, e.g., 2 jugs × 1800g = 3600g)
+- The engine sees "need 3.5, have 3600 on order" → marks as READY, which is wrong (or the reverse depending on direction)
 
-## The Fix
+For standard products (gal/lbs), the units should align, but for container-based products this is completely broken.
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+### 2. "Mark Received" doesn't update inventory
+When a purchase is marked received in the Purchases view, it only updates the purchase status to `received`. It does **not** add items to inventory. So:
+- Items disappear from "on order" (filtered out by `status !== 'ordered'`)
+- Items never appear as "on hand" (no inventory records created)
+- The product shows as "Need to Order" even though it was already purchased and received
 
-## Changes
+### 3. Received purchases recorded directly also skip inventory
+The RecordPurchaseModal allows recording a purchase with `status = 'received'` directly, but it also doesn't create inventory records.
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+## Plan
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+### Fix 1: Normalize on-order quantities to match planned units (PlanReadinessView.tsx + planReadinessUtils.ts)
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+In `getLineRemainingQty`, instead of returning `totalQuantity` (base units), convert back to the same unit system that `calculatePlannedUsage` uses:
+- For container-based products: return container count (`line.quantity`) not expanded volume
+- For standard products: return `totalQuantity` as-is (already in gal/lbs)
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
+Detect container-based by checking if the product has `containerSize` and `priceUnit` in ['jug','bag','case','tote'].
 
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
+### Fix 2: Auto-add inventory when purchase is marked received (PurchasesView.tsx)
 
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
+In `handleMarkReceived`, after updating status, iterate over purchase lines and upsert inventory:
+- For each line, find existing inventory row for that product
+- If exists: add the `totalQuantity` to existing quantity
+- If not: create new inventory row with `totalQuantity`, unit, and packaging info
+- Also create an inventory transaction record for audit trail
 
-## Files to Modify
+### Fix 3: Auto-add inventory when recording a purchase as "received" (RecordPurchaseModal.tsx or FarmCalcApp.tsx)
 
-| File | Change |
-|------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+After `onSave` returns a saved purchase with `status === 'received'`, call the same inventory-add logic.
+
+### Files Modified
+- `src/components/farm/PurchasesView.tsx` — add inventory creation in `handleMarkReceived`
+- `src/components/farm/PlanReadinessView.tsx` — fix `getLineRemainingQty` to use container count for container-based products
+- `src/lib/planReadinessUtils.ts` — same fix in the utils version
+- `src/FarmCalcApp.tsx` — wire up inventory update after purchase save when status is 'received'
 
