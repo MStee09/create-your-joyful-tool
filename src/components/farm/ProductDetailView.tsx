@@ -168,6 +168,13 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   // Log quote from vendor offerings shortcut
   const [logQuoteVendorId, setLogQuoteVendorId] = useState<string | null>(null);
   
+  // Sync local notes when product changes externally (e.g. AI-generated notes)
+  useEffect(() => {
+    setLocalGeneralNotes(product.generalNotes || '');
+    setLocalMixingNotes(product.mixingNotes || '');
+    setLocalCropRateNotes(product.cropRateNotes || '');
+  }, [product.id, product.generalNotes, product.mixingNotes, product.cropRateNotes]);
+
   // Load documents from IndexedDB on mount
   useEffect(() => {
     const loadDocs = async () => {
