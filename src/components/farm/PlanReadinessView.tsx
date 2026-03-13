@@ -298,6 +298,77 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
+  // Shared row renderer
+  const renderProductRow = (item: typeof readiness.items[0]) => {
+    const p = statusPill(item.status);
+    const usages = usageMap.get(item.productId) || [];
+    const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
+    const product = products.find(pr => pr.id === item.productId);
+
+    return (
+      <div key={item.id} className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
+        <div className="col-span-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              product?.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+            }`}>
+              {product?.form === 'liquid' 
+                ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                : <Weight className="w-5 h-5 text-amber-600" />}
+            </div>
+            <div>
+              <div className="font-semibold">{item.label}</div>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
+                  <p.icon className="w-3.5 h-3.5" />
+                  {p.label}
+                </span>
+                {usedIn && <span className="text-xs text-stone-500">{usedIn}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-span-2 flex items-center">{fmt(item.requiredQty)} {item.plannedUnit}</div>
+        <div className="col-span-2 flex items-center">{fmt(item.onHandQty)} {item.plannedUnit}</div>
+        <div className="col-span-2 flex items-center">{fmt(item.onOrderQty)} {item.plannedUnit}</div>
+        <div className="col-span-2 flex justify-end items-center gap-2">
+          {item.status === 'BLOCKING' && (
+            <button
+              onClick={() => handleQuickAdd(item.productId, item.shortQty)}
+              className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
+            >
+              Add {fmt(item.shortQty, 0)}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setExplainTitle(item.label);
+              setExplainStatus(item.status);
+              setExplainData(item.explain);
+              setExplainOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold hover:bg-stone-50"
+          >
+            Explain
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEmptyState = () => (
+    <div className="px-5 py-12 text-center">
+      <Package className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+      <h3 className="font-semibold text-stone-800 mb-2">No items in this category</h3>
+      <p className="text-stone-500">
+        {filterTab === 'blocking' && 'Great news! No items are blocking plan execution.'}
+        {filterTab === 'on-order' && 'No items are currently on order.'}
+        {filterTab === 'ready' && 'No items are fully covered yet.'}
+        {filterTab === 'all' && 'Add products to your crop plans to see readiness status.'}
+      </p>
+    </div>
+  );
+
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
