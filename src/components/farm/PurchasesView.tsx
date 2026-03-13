@@ -433,12 +433,15 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         }}
         onSave={async (purchase) => {
           if (editingPurchase) {
-            // Update existing purchase
             const success = await onUpdatePurchase(editingPurchase.id, purchase);
             return success ? { ...editingPurchase, ...purchase } as SimplePurchase : null;
           } else {
-            // Create new purchase
-            return onAddPurchase(purchase);
+            const result = await onAddPurchase(purchase);
+            // Auto-add to inventory if recorded directly as 'received'
+            if (result && result.status === 'received') {
+              addPurchaseToInventory(result);
+            }
+            return result;
           }
         }}
         onCreatePriceRecords={async (records) => {
