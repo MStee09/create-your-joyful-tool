@@ -1,43 +1,52 @@
 
 
-# Fix Vendor Offerings: Make Price Read-Only, Synced from Price Records
+# Smoother Scroll-to-Hide Header in Crop Planning
 
-## The Problem
+## Problem
+The current scroll-to-hide behavior uses a binary show/hide with `maxHeight` and `opacity` transitions. This creates a jarring jump — the header either fully shows or fully hides based on a scroll threshold, and the 300ms CSS transition on `maxHeight: 600px → 0` doesn't feel smooth because `maxHeight` transitions are notoriously janky (the browser doesn't know the actual height, so it animates from an arbitrary large value).
 
-The `VendorOfferingsTable` still lets users directly edit the price, price unit, and last quoted date on vendor offerings. This creates stale/conflicting data because price records are the source of truth but the offering price can be independently changed. The `syncOfferingToLatest` logic in `ProductPriceHistory` exists but gets overwritten whenever someone clicks into the offerings table and edits a price there.
+## Solution
+Replace the `maxHeight`/`opacity` approach with a **CSS `transform: translateY()` slide** driven by scroll position. This gives:
+- GPU-accelerated animation (transforms are composited, no layout recalculation)
+- Smooth, proportional hiding as you scroll (not binary)
+- Instant response to scroll direction changes
 
-## The Fix
+### Changes to `CropPlanningView.tsx`:
 
-Vendor offerings become a **relationship + metadata** table. Price fields are read-only, always derived from the latest price record for that vendor+product pair. Users edit prices through Price History only.
+1. **Measure the header height** using a `useRef` + `useEffect` with `ResizeObserver` so we know the exact pixel height to translate.
 
-## Changes
+2. **Replace the binary `headerHidden` state** with a numeric `headerOffset` (0 to headerHeight). On scroll down, increase the offset proportionally to scroll delta. On scroll up, decrease it. Clamp between 0 and headerHeight.
 
-### 1. `VendorOfferingsTable.tsx` -- Make price columns read-only
+3. **Apply `transform: translateY(-${headerOffset}px)`** to the collapsible header div, and add a **negative `marginBottom`** equal to `-headerOffset` so the content below smoothly fills the space without a gap.
 
-- **Remove** the editable price input, price unit dropdown, and last quoted date input from edit mode
-- **Display** price, price unit, and last quoted date as read-only text (same as non-edit mode)
-- Add a small label or tooltip: "Price synced from latest price record"
-- If no price record exists (price is 0), show "No price -- log a quote" with a muted style
-- **Keep editable**: vendor selection, packaging, SKU, container size/unit, min order, freight terms, preferred star -- these are offering-specific metadata that doesn't come from price records
-- Remove the price/priceUnit/lastQuotedDate fields from the add form too -- when adding a new vendor offering, price starts at 0 and gets populated when the user logs a quote via Price History
+4. **Use `will-change: transform`** on the header for GPU compositing.
 
-### 2. `VendorOfferingsTable.tsx` -- Add "Log Quote" shortcut
+5. **Keep SeasonOverviewBar always visible** (pinned above the sliding header, unchanged).
 
-- Add a small button next to the read-only price that says "Update" or has a pencil icon
-- This triggers a callback `onLogQuote?.(vendorId)` that the parent can use to open the LogQuoteModal pre-filled with that vendor
-- New optional prop: `onLogQuote?: (vendorId: string) => void`
+6. **Add a small shadow** to the SeasonOverviewBar when header is partially/fully hidden, giving a visual cue that content is scrolled underneath.
 
-### 3. `ProductDetailView.tsx` -- Wire the Log Quote shortcut
+### Technical Details
+```
+// Instead of:
+style={{ maxHeight: headerHidden ? 0 : 600, opacity: headerHidden ? 0 : 1 }}
 
-- Add state for `logQuoteVendorId`
-- Pass `onLogQuote` to `VendorOfferingsTable` that sets this state
-- Render `LogQuoteModal` when `logQuoteVendorId` is set, pre-selecting the product and vendor
-- On save, the existing `syncOfferingToLatest` in `ProductPriceHistory` handles updating the offering price automatically
+// Use:
+const headerRef = useRef<HTMLDivElement>(null);
+const [headerHeight, setHeaderHeight] = useState(0);
+const headerOffsetRef = useRef(0);
+const [headerOffset, setHeaderOffset] = useState(0);
 
-## Files to Modify
+// On scroll:
+headerOffsetRef.current = clamp(headerOffsetRef.current + delta, 0, headerHeight);
+setHeaderOffset(headerOffsetRef.current);
 
-| File | Change |
-|------|--------|
-| `src/components/farm/VendorOfferingsTable.tsx` | Make price/priceUnit/lastQuotedDate read-only in edit mode and add form; add `onLogQuote` prop with "Update" button next to price |
-| `src/components/farm/ProductDetailView.tsx` | Wire `onLogQuote` callback to open LogQuoteModal with pre-selected vendor |
+// Style:
+style={{
+  transform: `translateY(-${headerOffset}px)`,
+  marginBottom: `-${headerOffset}px`,
+}}
+```
+
+### Files Modified
+- `src/components/farm/CropPlanningView.tsx` — replace binary hide with smooth transform-based slide
 
