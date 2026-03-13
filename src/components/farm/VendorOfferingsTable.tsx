@@ -436,95 +436,6 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
         </div>
       )}
 
-      {/* Add Form */}
-      {showAddForm && (
-        <div className="border border-border rounded-lg p-4 bg-muted/30 space-y-3">
-          <h5 className="font-medium text-sm">Add Vendor Offering</h5>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Vendor</label>
-              <select
-                value={formData.vendorId || ''}
-                onChange={(e) => handleVendorSelectChange(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              >
-                <option value="">Select vendor...</option>
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-                {onCreateVendor && (
-                  <option value="__new__" className="text-primary font-medium">
-                    + Add new vendor...
-                  </option>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Price</label>
-              <p className="text-sm text-muted-foreground italic py-2">
-                Price will be set when you log a quote via Price History
-              </p>
-            </div>
-            {/* Container size - show when price is per container */}
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Packaging</label>
-              <input
-                type="text"
-                value={formData.packaging || ''}
-                onChange={(e) => setFormData({ ...formData, packaging: e.target.value })}
-                placeholder="e.g., 2.5 gal jug"
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">SKU / Part #</label>
-              <input
-                type="text"
-                value={formData.sku || ''}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                placeholder="Optional"
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Min Order</label>
-              <input
-                type="text"
-                value={formData.minOrder || ''}
-                onChange={(e) => setFormData({ ...formData, minOrder: e.target.value })}
-                placeholder="e.g., 1 pallet, 10 cases"
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium mb-1 text-muted-foreground">Freight Terms</label>
-              <input
-                type="text"
-                value={formData.freightTerms || ''}
-                onChange={(e) => setFormData({ ...formData, freightTerms: e.target.value })}
-                placeholder="e.g., Free freight on orders over $2,000"
-                className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => { setShowAddForm(false); setFormData({}); }}
-              className="px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAdd}
-              disabled={!formData.vendorId}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
-            >
-              Add Offering
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Delete Last Vendor Confirmation Dialog */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -563,71 +474,142 @@ export const VendorOfferingsTable: React.FC<VendorOfferingsTableProps> = ({
         </div>
       )}
 
-      {/* New Vendor Dialog */}
-      <Dialog open={showNewVendorDialog} onOpenChange={setShowNewVendorDialog}>
+      {/* Add Vendor Modal */}
+      <Dialog open={showAddModal} onOpenChange={(open) => { if (!open) resetAndCloseModal(); else setShowAddModal(true); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Add New Vendor
+              <Plus className="w-5 h-5" />
+              Add Vendor to {product.name}
             </DialogTitle>
             <DialogDescription>
-              Create a new vendor to add an offering for {product.name}.
+              Select an existing vendor or create a new one.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="vendor-name">Vendor Name *</Label>
-              <Input
-                id="vendor-name"
-                value={newVendorName}
-                onChange={(e) => setNewVendorName(e.target.value)}
-                placeholder="e.g., Nutrien Ag Solutions"
-                className="mt-1.5"
-              />
+
+          {!showCreateVendor ? (
+            <div className="space-y-3 py-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={vendorSearch}
+                  onChange={(e) => setVendorSearch(e.target.value)}
+                  placeholder="Search vendors..."
+                  className="pl-9"
+                  autoFocus
+                />
+              </div>
+
+              {/* Create New Vendor button */}
+              {onCreateVendor && (
+                <button
+                  onClick={() => {
+                    setShowCreateVendor(true);
+                    setNewVendorName(vendorSearch);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors text-sm font-medium"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Create New Vendor{vendorSearch ? `: "${vendorSearch}"` : ''}
+                </button>
+              )}
+
+              {/* Vendor list */}
+              <div className="max-h-[280px] overflow-y-auto space-y-1">
+                {availableVendors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    {vendorSearch ? 'No matching vendors found' : 'All vendors already have offerings'}
+                  </p>
+                ) : (
+                  availableVendors.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => addOfferingForVendor(v.id, v.name)}
+                      className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-accent text-left transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                          {v.name}
+                        </span>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          {v.contactEmail && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                              <Mail className="w-3 h-3 shrink-0" />
+                              {v.contactEmail}
+                            </span>
+                          )}
+                          {v.contactPhone && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Phone className="w-3 h-3 shrink-0" />
+                              {v.contactPhone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Plus className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-            <div>
-              <Label htmlFor="vendor-email">Contact Email</Label>
-              <Input
-                id="vendor-email"
-                type="email"
-                value={newVendorEmail}
-                onChange={(e) => setNewVendorEmail(e.target.value)}
-                placeholder="sales@vendor.com"
-                className="mt-1.5"
-              />
+          ) : (
+            /* Create Vendor Inline Form */
+            <div className="space-y-4 py-2">
+              <div>
+                <Label htmlFor="new-vendor-name">Vendor Name *</Label>
+                <Input
+                  id="new-vendor-name"
+                  value={newVendorName}
+                  onChange={(e) => setNewVendorName(e.target.value)}
+                  placeholder="e.g., Nutrien Ag Solutions"
+                  className="mt-1.5"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-vendor-email">Contact Email</Label>
+                <Input
+                  id="new-vendor-email"
+                  type="email"
+                  value={newVendorEmail}
+                  onChange={(e) => setNewVendorEmail(e.target.value)}
+                  placeholder="sales@vendor.com"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-vendor-phone">Contact Phone</Label>
+                <Input
+                  id="new-vendor-phone"
+                  type="tel"
+                  value={newVendorPhone}
+                  onChange={(e) => setNewVendorPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="mt-1.5"
+                />
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateVendor(false);
+                    setNewVendorName('');
+                    setNewVendorEmail('');
+                    setNewVendorPhone('');
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleCreateVendor}
+                  disabled={!newVendorName.trim() || creatingVendor}
+                >
+                  {creatingVendor ? 'Creating...' : 'Create & Add'}
+                </Button>
+              </DialogFooter>
             </div>
-            <div>
-              <Label htmlFor="vendor-phone">Contact Phone</Label>
-              <Input
-                id="vendor-phone"
-                type="tel"
-                value={newVendorPhone}
-                onChange={(e) => setNewVendorPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                className="mt-1.5"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowNewVendorDialog(false);
-                setNewVendorName('');
-                setNewVendorEmail('');
-                setNewVendorPhone('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateVendor}
-              disabled={!newVendorName.trim() || creatingVendor}
-            >
-              {creatingVendor ? 'Creating...' : 'Create Vendor'}
-            </Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
