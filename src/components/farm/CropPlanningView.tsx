@@ -138,6 +138,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const collapsibleHeaderRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [headerOffset, setHeaderOffset] = useState(0);
+  const [headerAnimating, setHeaderAnimating] = useState(false);
   const headerOffsetRef = useRef(0);
   const lastScrollTopRef = useRef(0);
 
