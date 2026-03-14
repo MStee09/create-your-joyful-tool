@@ -50,7 +50,7 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
         <div>
           <h4 className="text-sm font-semibold text-foreground">Cost/Acre Trend</h4>
           <p className="text-xs text-muted-foreground">
-            {snapshots.length} snapshots since {format(new Date(first.createdAt), 'MMM d')}
+            {snapshots.length} snapshots since {format(new Date(first.date), 'MMM d')}
           </p>
         </div>
         {Math.abs(delta) >= 0.50 && (
