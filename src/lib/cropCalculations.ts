@@ -568,9 +568,28 @@ export const calculatePurchaseOnlyUnitPrice = (
     }
   }
 
+export const calculatePurchaseOnlyUnitPrice = (
+  productId: string,
+  purchases: SimplePurchase[],
+  productForm?: 'liquid' | 'dry',
+): { price: number; unit: string } | null => {
+  const baseUnit = productForm === 'liquid' ? 'gal' : 'lbs';
+  let purchasedQty = 0; // in base units
+  let purchasedCost = 0;
+
+  for (const purchase of purchases) {
+    for (const line of purchase.lines) {
+      if (line.productId !== productId) continue;
+      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      const lineUnit = line.normalizedUnit || line.packageUnit || baseUnit;
+      purchasedQty += convertQuantityToUnit(lineQty, lineUnit, baseUnit);
+      purchasedCost += line.totalPrice;
+    }
+  }
+
   if (purchasedQty <= 0) return null;
 
-  return { price: purchasedCost / purchasedQty, unit: detectedUnit };
+  return { price: purchasedCost / purchasedQty, unit: baseUnit };
 };
 
 
