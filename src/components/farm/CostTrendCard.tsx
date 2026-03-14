@@ -34,7 +34,8 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
   }
 
   const first = data[0];
-  const delta = data.length >= 2 ? currentCostPerAcre - first.cost : 0;
+  const prevPoint = data.length >= 2 ? data[data.length - 2] : null;
+  const delta = prevPoint ? currentCostPerAcre - prevPoint.cost : 0;
   const isUp = delta > 0;
 
   const reasonLabels: Record<string, string> = {
