@@ -6,6 +6,7 @@ import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage } from '@/lib/readinessEngine';
+import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
 
 /**
  * Get price per base unit (gal/lbs/g) for valuing INVENTORY quantities.
