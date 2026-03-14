@@ -574,6 +574,28 @@ export const calculatePurchaseOnlyUnitPrice = (
   return { price: purchasedCost / purchasedQty, unit: baseUnit };
 };
 
+/**
+ * Convert a purchase line's totalQuantity from its normalizedUnit to the
+ * planned-usage base unit (lbs for dry, gal for liquid).
+ * Container-based products return container count as-is.
+ */
+export const convertPurchaseLineToBaseUnit = (
+  line: { totalQuantity: number; quantity: number; packageSize?: number; packageUnit?: string; normalizedUnit?: string; productId: string },
+  product: { form?: string; priceUnit?: string } | undefined,
+): number => {
+  if (!product) return line.totalQuantity || (line.quantity * (line.packageSize || 1));
+  
+  // Container-based products: planned usage is in containers
+  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+  if (isContainerPricing) return line.quantity;
+  
+  const baseUnit = product.form === 'liquid' ? 'gal' : 'lbs';
+  const rawQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+  const lineUnit = line.normalizedUnit || line.packageUnit || baseUnit;
+  
+  return convertQuantityToUnit(rawQty, lineUnit, baseUnit);
+};
+
 
 /**
  * Convert a quantity from one unit to another for comparison.
