@@ -161,10 +161,20 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
     if (headerHeight <= 0) return;
 
-    // Proportional offset: scroll down increases, scroll up decreases
-    const newOffset = Math.max(0, Math.min(headerHeight, headerOffsetRef.current + delta));
-    headerOffsetRef.current = newOffset;
-    setHeaderOffset(newOffset);
+    // Only reveal header when scrolled all the way to the top
+    if (scrollTop <= 0) {
+      headerOffsetRef.current = 0;
+      setHeaderOffset(0);
+      return;
+    }
+
+    // Scrolling down: progressively hide the header
+    if (delta > 0) {
+      const newOffset = Math.min(headerHeight, headerOffsetRef.current + delta);
+      headerOffsetRef.current = newOffset;
+      setHeaderOffset(newOffset);
+    }
+    // Scrolling up: keep header hidden (don't reduce offset)
   }, [headerHeight]);
 
   const { purposes } = useProductIntelligence();
