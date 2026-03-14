@@ -14,6 +14,11 @@ interface CostTrendCardProps {
 export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, currentCostPerAcre }) => {
   if (snapshots.length === 0) return null;
 
+  const today = format(new Date(), 'MMM d');
+  const lastSnapshot = snapshots[snapshots.length - 1];
+  const lastIsToday = format(new Date(lastSnapshot.createdAt), 'MMM d') === today;
+
+  // Build data: historical snapshots + current live value (replace today's snapshot if exists)
   const data = snapshots.map(s => ({
     date: s.createdAt,
     label: format(new Date(s.createdAt), 'MMM d'),
@@ -21,8 +26,15 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
     reason: s.snapshotReason,
   }));
 
-  const first = snapshots[0];
-  const delta = snapshots.length >= 2 ? currentCostPerAcre - first.costPerAcre : 0;
+  // Always ensure the last point reflects the current live cost
+  if (lastIsToday) {
+    data[data.length - 1] = { ...data[data.length - 1], cost: currentCostPerAcre, reason: 'live' };
+  } else {
+    data.push({ date: new Date().toISOString(), label: today, cost: currentCostPerAcre, reason: 'live' });
+  }
+
+  const first = data[0];
+  const delta = data.length >= 2 ? currentCostPerAcre - first.cost : 0;
   const isUp = delta > 0;
 
   const reasonLabels: Record<string, string> = {
