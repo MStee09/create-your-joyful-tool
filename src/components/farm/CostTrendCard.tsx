@@ -78,7 +78,7 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
               tickLine={false}
               width={50}
               tickFormatter={(v) => `$${v}`}
-              domain={['dataMin - 5', 'dataMax + 5']}
+              domain={[(min: number) => Math.floor(min - 5), (max: number) => Math.ceil(max + 5)]}
             />
             <Tooltip
               content={({ active, payload }) => {
