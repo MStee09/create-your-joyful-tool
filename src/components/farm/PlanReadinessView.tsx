@@ -5,6 +5,7 @@ import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase'
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
 import { getInventoryUnitPrice, getPlannedUnitPrice } from '@/lib/planReadinessUtils';
+import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
 import { ExplainMathDrawer } from './ExplainMathDrawer';
 import { AddInventoryModal } from './AddInventoryModal';
 import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';

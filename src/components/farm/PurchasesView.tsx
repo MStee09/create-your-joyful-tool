@@ -9,6 +9,7 @@ import type { Vendor, ProductMaster, VendorOffering, InventoryItem } from '@/typ
 import type { SimplePurchase, NewSimplePurchase } from '@/types/simplePurchase';
 import type { NewPriceRecord, PriceRecord } from '@/types/priceRecord';
 import { RecordPurchaseModal } from './RecordPurchaseModal';
+import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
 
 interface PurchasesViewProps {
   purchases: SimplePurchase[];
