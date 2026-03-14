@@ -162,8 +162,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
     if (headerHeight <= 0) return;
 
-    // Only reveal header when scrolled all the way to the top
-    if (scrollTop <= 0) {
+    // Only reveal header when scrolled all the way to the top — animate it down
+    if (scrollTop <= 0 && headerOffsetRef.current > 0) {
+      setHeaderAnimating(true);
       headerOffsetRef.current = 0;
       setHeaderOffset(0);
       return;
