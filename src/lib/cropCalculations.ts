@@ -553,24 +553,47 @@ export const calculateBlendedUnitPrice = (
 export const calculatePurchaseOnlyUnitPrice = (
   productId: string,
   purchases: SimplePurchase[],
+  productForm?: 'liquid' | 'dry',
 ): { price: number; unit: string } | null => {
+  const baseUnit = productForm === 'liquid' ? 'gal' : 'lbs';
   let purchasedQty = 0;
   let purchasedCost = 0;
-  let detectedUnit = 'lbs';
 
   for (const purchase of purchases) {
     for (const line of purchase.lines) {
       if (line.productId !== productId) continue;
       const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
-      purchasedQty += lineQty;
+      const lineUnit = line.normalizedUnit || line.packageUnit || baseUnit;
+      purchasedQty += convertQuantityToUnit(lineQty, lineUnit, baseUnit);
       purchasedCost += line.totalPrice;
-      detectedUnit = line.normalizedUnit || line.packageUnit || 'lbs';
     }
   }
 
   if (purchasedQty <= 0) return null;
 
-  return { price: purchasedCost / purchasedQty, unit: detectedUnit };
+  return { price: purchasedCost / purchasedQty, unit: baseUnit };
+};
+
+/**
+ * Convert a purchase line's totalQuantity from its normalizedUnit to the
+ * planned-usage base unit (lbs for dry, gal for liquid).
+ * Container-based products return container count as-is.
+ */
+export const convertPurchaseLineToBaseUnit = (
+  line: { totalQuantity: number; quantity: number; packageSize?: number; packageUnit?: string; normalizedUnit?: string; productId: string },
+  product: { form?: string; priceUnit?: string } | undefined,
+): number => {
+  if (!product) return line.totalQuantity || (line.quantity * (line.packageSize || 1));
+  
+  // Container-based products: planned usage is in containers
+  const isContainerPricing = ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
+  if (isContainerPricing) return line.quantity;
+  
+  const baseUnit = product.form === 'liquid' ? 'gal' : 'lbs';
+  const rawQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+  const lineUnit = line.normalizedUnit || line.packageUnit || baseUnit;
+  
+  return convertQuantityToUnit(rawQty, lineUnit, baseUnit);
 };
 
 
@@ -578,7 +601,7 @@ export const calculatePurchaseOnlyUnitPrice = (
  * Convert a quantity from one unit to another for comparison.
  * Simplified conversion for common farm units.
  */
-const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
+export const convertQuantityToUnit = (qty: number, fromUnit: string, toUnit: string): number => {
   if (fromUnit === toUnit) return qty;
   
   // Convert everything to lbs as intermediate

@@ -6,6 +6,7 @@ import type { Season, Product, InventoryItem } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage } from '@/lib/readinessEngine';
+import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
 
 /**
  * Get price per base unit (gal/lbs/g) for valuing INVENTORY quantities.
@@ -126,14 +127,8 @@ export function calculateReadinessSummary(
       getLines: (p: SimplePurchase) => p.lines || [],
       getLineProductId: (l: SimplePurchaseLine) => l.productId,
       getLineRemainingQty: (l: SimplePurchaseLine) => {
-        // For container-based products, planned usage is in containers,
-        // so return container count (quantity), not expanded volume (totalQuantity)
         const product = products.find(p => p.id === l.productId);
-        const isContainerPricing = product && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
-        if (isContainerPricing) {
-          return l.quantity;
-        }
-        return l.totalQuantity || (l.quantity * (l.packageSize || 1));
+        return convertPurchaseLineToBaseUnit(l, product);
       },
       getLineUnit: (l: SimplePurchaseLine) => l.packageUnit || l.normalizedUnit,
     },
