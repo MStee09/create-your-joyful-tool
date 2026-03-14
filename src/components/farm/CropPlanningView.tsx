@@ -138,6 +138,7 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
   const collapsibleHeaderRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [headerOffset, setHeaderOffset] = useState(0);
+  const [headerAnimating, setHeaderAnimating] = useState(false);
   const headerOffsetRef = useRef(0);
   const lastScrollTopRef = useRef(0);
 
@@ -161,8 +162,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
 
     if (headerHeight <= 0) return;
 
-    // Only reveal header when scrolled all the way to the top
-    if (scrollTop <= 0) {
+    // Only reveal header when scrolled all the way to the top — animate it down
+    if (scrollTop <= 0 && headerOffsetRef.current > 0) {
+      setHeaderAnimating(true);
       headerOffsetRef.current = 0;
       setHeaderOffset(0);
       return;
@@ -403,7 +405,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
           transform: `translateY(-${headerOffset}px)`,
           marginBottom: `-${headerOffset}px`,
           willChange: 'transform',
+          transition: headerAnimating ? 'transform 350ms cubic-bezier(0.25, 0.1, 0.25, 1), margin-bottom 350ms cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none',
         }}
+        onTransitionEnd={() => setHeaderAnimating(false)}
       >
         {/* Cost Trend Chart */}
         <div className="px-6 pt-4">
