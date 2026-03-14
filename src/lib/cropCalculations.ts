@@ -553,28 +553,10 @@ export const calculateBlendedUnitPrice = (
 export const calculatePurchaseOnlyUnitPrice = (
   productId: string,
   purchases: SimplePurchase[],
-): { price: number; unit: string } | null => {
-  let purchasedQty = 0;
-  let purchasedCost = 0;
-  let detectedUnit = 'lbs';
-
-  for (const purchase of purchases) {
-    for (const line of purchase.lines) {
-      if (line.productId !== productId) continue;
-      const lineQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
-      purchasedQty += lineQty;
-      purchasedCost += line.totalPrice;
-      detectedUnit = line.normalizedUnit || line.packageUnit || 'lbs';
-    }
-  }
-
-export const calculatePurchaseOnlyUnitPrice = (
-  productId: string,
-  purchases: SimplePurchase[],
   productForm?: 'liquid' | 'dry',
 ): { price: number; unit: string } | null => {
   const baseUnit = productForm === 'liquid' ? 'gal' : 'lbs';
-  let purchasedQty = 0; // in base units
+  let purchasedQty = 0;
   let purchasedCost = 0;
 
   for (const purchase of purchases) {
