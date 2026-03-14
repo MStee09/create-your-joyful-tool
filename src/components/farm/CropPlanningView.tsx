@@ -405,7 +405,9 @@ export const CropPlanningView: React.FC<CropPlanningViewProps> = ({
           transform: `translateY(-${headerOffset}px)`,
           marginBottom: `-${headerOffset}px`,
           willChange: 'transform',
+          transition: headerAnimating ? 'transform 350ms cubic-bezier(0.25, 0.1, 0.25, 1), margin-bottom 350ms cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none',
         }}
+        onTransitionEnd={() => setHeaderAnimating(false)}
       >
         {/* Cost Trend Chart */}
         <div className="px-6 pt-4">
