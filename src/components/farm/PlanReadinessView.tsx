@@ -107,14 +107,8 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         getLines: (p: SimplePurchase) => p.lines || [],
         getLineProductId: (l: SimplePurchaseLine) => l.productId,
         getLineRemainingQty: (l: SimplePurchaseLine) => {
-          // For container-based products, planned usage is in containers,
-          // so return container count (quantity), not expanded volume (totalQuantity)
           const product = products.find(p => p.id === l.productId);
-          const isContainerPricing = product && ['jug', 'bag', 'case', 'tote'].includes(product.priceUnit || '');
-          if (isContainerPricing) {
-            return l.quantity; // container count matches planned usage units
-          }
-          return l.totalQuantity || (l.quantity * (l.packageSize || 1));
+          return convertPurchaseLineToBaseUnit(l, product);
         },
         getLineUnit: (l: SimplePurchaseLine) => l.packageUnit || l.normalizedUnit,
       },

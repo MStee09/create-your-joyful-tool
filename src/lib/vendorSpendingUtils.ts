@@ -83,10 +83,9 @@ export const calculateVendorSpending = (
         source: 'purchase',
       });
 
-      // Track purchased qty in planned-usage units
-      // For container-based products, plannedUsage uses container count
-      const isContainer = ['jug', 'bag', 'case', 'tote'].includes(line.packageType || '');
-      const qtyInPlannedUnits = isContainer ? line.quantity : line.totalQuantity;
+      // Track purchased qty in planned-usage units (lbs for dry, gal for liquid)
+      // convertPurchaseLineToBaseUnit handles ton→lbs, qt→gal, and container-count logic
+      const qtyInPlannedUnits = convertPurchaseLineToBaseUnit(line, product);
       const prev = purchasedByProduct.get(product.id) || 0;
       purchasedByProduct.set(product.id, prev + qtyInPlannedUnits);
     });

@@ -81,7 +81,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       if (!line.productId) continue;
       const product = products.find(p => p.id === line.productId);
       const baseUnit: 'gal' | 'lbs' = product?.form === 'liquid' ? 'gal' : 'lbs';
-      const totalQty = line.totalQuantity || (line.quantity * (line.packageSize || 1));
+      const totalQty = convertPurchaseLineToBaseUnit(line, product);
 
       const existingIdx = updatedInventory.findIndex(i => i.productId === line.productId);
       if (existingIdx >= 0) {
