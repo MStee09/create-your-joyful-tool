@@ -54,12 +54,16 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
             {snapshots.length} snapshots since {format(new Date(first.date), 'MMM d')}
           </p>
         </div>
-        {Math.abs(delta) >= 0.50 && (
+        {Math.abs(delta) < 0.01 ? (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+            — No change
+          </div>
+        ) : (
           <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
             isUp ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
           }`}>
             {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {isUp ? '+' : ''}{formatCurrency(delta)}/ac
+            {isUp ? '+' : ''}{formatCurrency(delta)}/ac vs prev
           </div>
         )}
       </div>
