@@ -1,6 +1,7 @@
 import type { VendorOffering, Vendor, Product } from '../types';
 import type { PlannedUsageItem } from './calculations';
 import type { SimplePurchase } from '../types/simplePurchase';
+import { convertPurchaseLineToBaseUnit } from './cropCalculations';
 
 export interface VendorProductSpend {
   productId: string;
