@@ -59,15 +59,21 @@ export const CostTrendCard: React.FC<CostTrendCardProps> = ({ snapshots, current
           </p>
         </div>
         {Math.abs(delta) < 0.01 ? (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
-            — No change
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+              — No change
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-0.5">vs avg across timeline</span>
           </div>
         ) : (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-            isUp ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-          }`}>
-            {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {isUp ? '+' : ''}{formatCurrency(delta)}/ac vs prev
+          <div className="flex flex-col items-end">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+              isUp ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+            }`}>
+              {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {isUp ? '+' : ''}{formatCurrency(delta)}/ac
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-0.5">vs avg across timeline</span>
           </div>
         )}
       </div>
