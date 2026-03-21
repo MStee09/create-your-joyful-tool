@@ -169,12 +169,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   }, [editingPurchase, isOpen, preselectedVendorId]);
 
   const resetForm = () => {
-    setVendorId('');
+    // Don't reset vendor/lines if preselected (Build Order flow)
+    if (!preselectedVendorId) {
+      setVendorId('');
+      setLines([]);
+    }
     setOrderDate(new Date().toISOString().split('T')[0]);
     setStatus('booked');
     setExpectedDeliveryDate('');
     setReceivedDate(new Date().toISOString().split('T')[0]);
-    setLines([]);
     setFreightCost(0);
     setFreightNotes('');
     setNotes('');

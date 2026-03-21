@@ -792,20 +792,18 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
             ) : (
               <div className="flex flex-wrap gap-4">
                 {groups.map(([key, group]) => (
-                  <div key={key} className="border border-stone-200 rounded-xl p-4 min-w-[240px] max-w-[320px] flex-1">
-                    <div className="font-semibold text-stone-800">{group.vendorName}</div>
+                  <div key={key} className="border border-rose-200 rounded-xl p-4 min-w-[280px] max-w-[320px] flex-1 flex flex-col">
+                    <div className="font-bold text-lg text-stone-800">{group.vendorName}</div>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      {group.items.length} product{group.items.length !== 1 ? 's' : ''} need ordering
+                      {group.items.length} product{group.items.length === 1 ? ' needs' : 's need'} ordering
+                      {group.totalCost > 0 && <> · Est. <span className="font-semibold text-rose-600">{formatCurrency(group.totalCost)}</span></>}
                     </p>
-                    {group.totalCost > 0 && (
-                      <p className="text-sm font-bold text-rose-600 mt-1">{formatCurrency(group.totalCost)}</p>
-                    )}
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-3 space-y-1.5 flex-1">
                       {group.items.map(item => {
                         const net = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
                         return (
                           <div key={item.id} className="flex justify-between text-xs text-stone-600">
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate">• {item.label}</span>
                             <span className="font-mono ml-2 flex-shrink-0">{fmt(net)} {item.plannedUnit}</span>
                           </div>
                         );
@@ -833,7 +831,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                           });
                           onBuildOrder(key, lines);
                         }}
-                        className="mt-3 w-full px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition"
+                        className="mt-4 w-full px-3 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition"
                       >
                         Build Order →
                       </button>
