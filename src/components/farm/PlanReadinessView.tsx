@@ -478,6 +478,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <h3 className="font-semibold text-stone-800 mb-2">No items in this category</h3>
       <p className="text-stone-500">
         {filterTab === 'blocking' && 'Great news! No items are blocking plan execution.'}
+        {filterTab === 'near-ready' && 'No items are near ready (≥95% covered).'}
         {filterTab === 'on-order' && 'No items are currently on order.'}
         {filterTab === 'ready' && 'No items are fully covered yet.'}
         {filterTab === 'all' && 'Add products to your crop plans to see readiness status.'}
