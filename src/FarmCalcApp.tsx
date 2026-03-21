@@ -1143,6 +1143,8 @@ const AppContent: React.FC = () => {
   // Phase 5: Record Application modal state
   const [showRecordApplicationModal, setShowRecordApplicationModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [buildOrderVendorId, setBuildOrderVendorId] = useState<string | null>(null);
+  const [buildOrderLines, setBuildOrderLines] = useState<PrePopulatedLine[]>([]);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
