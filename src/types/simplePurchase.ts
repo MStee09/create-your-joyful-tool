@@ -86,7 +86,7 @@ export function calculateNormalizedPrice(
   return { normalizedPrice, normalizedUnit: packageUnit };
 }
 
-// Helper to calculate line totals
+// Helper to calculate line totals (per-unit pricing model)
 export function calculateLineTotal(line: Partial<SimplePurchaseLine>): {
   totalPrice: number;
   totalQuantity: number;
@@ -96,9 +96,9 @@ export function calculateLineTotal(line: Partial<SimplePurchaseLine>): {
   const unitPrice = line.unitPrice || 0;
   const packageSize = line.packageSize || 1;
   
-  const totalPrice = quantity * unitPrice;
   const totalQuantity = quantity * packageSize;
-  const normalizedUnitPrice = packageSize > 0 ? unitPrice / packageSize : unitPrice;
+  const totalPrice = totalQuantity * unitPrice;  // Total vol × $/unit
+  const normalizedUnitPrice = unitPrice;          // Already per unit
   
   return { totalPrice, totalQuantity, normalizedUnitPrice };
 }
