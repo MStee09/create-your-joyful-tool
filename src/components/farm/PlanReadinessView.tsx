@@ -499,14 +499,14 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-5 gap-4 mt-6">
           <div className="bg-stone-50 rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
                 <Package className="w-5 h-5 text-stone-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-stone-800">{readiness.totalCount}</p>
+                <p className="text-2xl font-bold text-stone-800">{processedReadiness.totalCount}</p>
                 <p className="text-sm text-stone-500">Total Products</p>
               </div>
             </div>
@@ -518,8 +518,20 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-emerald-600">{readiness.readyCount}</p>
+                <p className="text-2xl font-bold text-emerald-600">{processedReadiness.readyCount}</p>
                 <p className="text-sm text-stone-500">Ready</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-sky-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-sky-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-sky-600">{processedReadiness.nearReadyCount}</p>
+                <p className="text-sm text-stone-500">Near Ready</p>
               </div>
             </div>
           </div>
@@ -530,7 +542,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <Truck className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-amber-600">{readiness.onOrderCount}</p>
+                <p className="text-2xl font-bold text-amber-600">{processedReadiness.onOrderCount}</p>
                 <p className="text-sm text-stone-500">Ordered</p>
               </div>
             </div>
@@ -542,7 +554,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <AlertTriangle className="w-5 h-5 text-rose-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-rose-600">{readiness.blockingCount}</p>
+                <p className="text-2xl font-bold text-rose-600">{processedReadiness.blockingCount}</p>
                 <p className="text-sm text-stone-500">Need to Order</p>
               </div>
             </div>
