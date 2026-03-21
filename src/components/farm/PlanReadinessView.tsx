@@ -354,7 +354,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       : 100;
 
     return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
-  }, [readiness.items, products, scopedPurchases]);
+  }, [processedReadiness.items, products, scopedPurchases]);
 
   // Value-based progress bar percentages
   const onHandPct = valueMetrics.plannedValue > 0 
