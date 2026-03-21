@@ -21,7 +21,7 @@ interface PlanReadinessViewProps {
   onNavigateToPurchases?: () => void;
 }
 
-type FilterTab = 'blocking' | 'on-order' | 'ready' | 'all';
+type FilterTab = 'blocking' | 'near-ready' | 'on-order' | 'ready' | 'all';
 type ViewMode = 'product' | 'company';
 
 const fmt = (n: number, decimals = 1) =>
@@ -33,6 +33,7 @@ const fmt = (n: number, decimals = 1) =>
 function statusPill(status: ReadinessStatus) {
   if (status === 'READY') return { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
   if (status === 'ON_ORDER') return { label: 'Ordered', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
+  if (status === 'NEAR_READY') return { label: 'Near Ready', cls: 'bg-sky-50 text-sky-700 border-sky-200', icon: Clock };
   return { label: 'Need to Order', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
 }
 

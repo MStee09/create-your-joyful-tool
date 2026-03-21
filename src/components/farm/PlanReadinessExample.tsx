@@ -146,14 +146,16 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function StatusPill({ status }: { status: "READY" | "ON_ORDER" | "BLOCKING" }) {
+function StatusPill({ status }: { status: "READY" | "ON_ORDER" | "NEAR_READY" | "BLOCKING" }) {
   const cls =
     status === "READY"
       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
       : status === "ON_ORDER"
         ? "bg-amber-50 text-amber-800 border-amber-200"
-        : "bg-rose-50 text-rose-800 border-rose-200";
-  const label = status === "READY" ? "Ready" : status === "ON_ORDER" ? "On order" : "Blocking";
+        : status === "NEAR_READY"
+          ? "bg-amber-50 text-amber-800 border-amber-200"
+          : "bg-rose-50 text-rose-800 border-rose-200";
+  const label = status === "READY" ? "Ready" : status === "ON_ORDER" ? "On order" : status === "NEAR_READY" ? "Near ready" : "Blocking";
   return <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${cls}`}>{label}</span>;
 }
 
