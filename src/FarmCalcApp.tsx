@@ -1742,6 +1742,10 @@ const AppContent: React.FC = () => {
             onNavigateToPurchases={() => setActiveView('purchases')}
             productMasters={state.productMasters || []}
             vendorOfferings={state.vendorOfferings || []}
+            onBuildOrder={(vendorId, lines) => {
+              setBuildOrderVendorId(vendorId);
+              setBuildOrderLines(lines);
+            }}
           />
         );
       case 'vendor-spend':
