@@ -183,10 +183,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
   // Filter items for selected tab
   const filteredItems = useMemo(() => {
-    let items = readiness.items;
+    let items = processedReadiness.items;
     if (filterTab === 'ready') items = items.filter(i => i.status === 'READY');
     else if (filterTab === 'on-order') items = items.filter(i => i.status === 'ON_ORDER');
     else if (filterTab === 'blocking') items = items.filter(i => i.status === 'BLOCKING');
+    else if (filterTab === 'near-ready') items = items.filter(i => i.status === 'NEAR_READY');
 
     // Sort by coverage % ascending — least covered (most urgent) first
     return [...items].sort((a, b) => {
@@ -194,7 +195,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       const covB = b.requiredQty > 0 ? (b.onHandQty + b.onOrderQty) / b.requiredQty : 1;
       return covA - covB;
     });
-  }, [readiness.items, filterTab]);
+  }, [processedReadiness.items, filterTab]);
 
   // Group filtered items by vendor/company
   const groupedByVendor = useMemo(() => {
