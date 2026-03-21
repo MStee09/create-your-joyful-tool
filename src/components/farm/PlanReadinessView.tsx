@@ -332,7 +332,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       });
     });
 
-    readiness.items.forEach(item => {
+    processedReadiness.items.forEach(item => {
       const product = products.find(p => p.id === item.productId);
       
       // On-hand value: inventory is in base units (gal/lbs/g)
