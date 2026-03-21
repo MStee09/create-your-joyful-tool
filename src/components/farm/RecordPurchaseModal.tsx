@@ -241,13 +241,13 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       const savedPurchase = await onSave(purchase);
       
       if (savedPurchase) {
-        // Create price records for each line
+        // Create price records for each line (unitPrice is per-unit)
         const priceRecordsToCreate: NewPriceRecord[] = purchaseLines.map(line => ({
           productId: line.productId,
           vendorId,
-          price: line.unitPrice,
+          price: line.unitPrice,               // Per-unit price ($/gal, $/lb)
           unit: line.packageUnit || 'gal',
-          normalizedPrice: line.normalizedUnitPrice,
+          normalizedPrice: line.unitPrice,      // Same as unitPrice (already per unit)
           packageType: line.packageType,
           packageSize: line.packageSize,
           packageUnit: line.packageUnit,
