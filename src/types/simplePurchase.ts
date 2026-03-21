@@ -16,14 +16,14 @@ export interface SimplePurchaseLine {
   packageSize?: number;          // Size per package (e.g., 275 gal, 1800 g)
   packageUnit?: PackageUnitType; // Unit of package contents
   
-  // Pricing - PRICE IS PER CONTAINER/PACKAGE
-  unitPrice: number;             // Price per container (e.g., $900/jug)
-  totalPrice: number;            // quantity × unitPrice (e.g., 2 jugs × $900 = $1800)
+  // Pricing - PRICE IS PER UNIT ($/gal, $/lb, $/ton)
+  unitPrice: number;             // Price per unit (e.g., $2.15/gal, $540/ton)
+  totalPrice: number;            // totalQuantity × unitPrice (e.g., 1325 gal × $2.15 = $2848.75)
   
   // Normalized (calculated for comparison/tracking)
-  totalQuantity: number;         // Total volume: quantity × packageSize (e.g., 2 × 1800g = 3600g)
+  totalQuantity: number;         // Total volume: quantity × packageSize (e.g., 5 × 265 = 1325 gal)
   normalizedUnit: PackageUnitType;
-  normalizedUnitPrice: number;   // Price per unit: unitPrice / packageSize (e.g., $900/1800g = $0.50/g)
+  normalizedUnitPrice: number;   // Same as unitPrice (already per unit)
   
   // Notes
   notes?: string;
