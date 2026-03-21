@@ -66,7 +66,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   // Form state
   const [vendorId, setVendorId] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState<'booked' | 'ordered' | 'received'>('received');
+  const [status, setStatus] = useState<'booked' | 'ordered' | 'received'>('booked');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
   const [lines, setLines] = useState<PurchaseLineInput[]>([]);
@@ -145,7 +145,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   const resetForm = () => {
     setVendorId('');
     setOrderDate(new Date().toISOString().split('T')[0]);
-    setStatus('received');
+    setStatus('booked');
     setExpectedDeliveryDate('');
     setReceivedDate(new Date().toISOString().split('T')[0]);
     setLines([]);
@@ -409,9 +409,11 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                 Received
               </Button>
             </div>
-            {status === 'booked' && (
-              <p className="text-xs text-muted-foreground">Price locked — volume reserved but not yet ordered or paid</p>
-            )}
+            <p className="text-xs text-muted-foreground italic">
+              {status === 'booked' && 'Estimated need — no firm commitment. Holds your place in vendor\'s allocation. You may use less.'}
+              {status === 'ordered' && 'Firm commitment — product is coming and an invoice will follow. You owe this.'}
+              {status === 'received' && 'Product is on your yard. Inventory will be updated.'}
+            </p>
           </div>
 
           {/* Conditional date fields */}
