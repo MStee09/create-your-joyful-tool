@@ -72,6 +72,8 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   currentSeasonId,
   currentSeasonYear,
   editingPurchase,
+  preselectedVendorId,
+  preselectedLines,
 }) => {
   // Form state
   const [vendorId, setVendorId] = useState('');
