@@ -382,6 +382,14 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               Add {fmt(item.shortQty, 0)}
             </button>
           )}
+          {item.status === 'BLOCKING' && onNavigateToPurchases && (
+            <button
+              onClick={onNavigateToPurchases}
+              className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+            >
+              Buy →
+            </button>
+          )}
           <button
             onClick={() => {
               setExplainTitle(item.label);
