@@ -86,7 +86,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     return products.filter(p => productIds.has(p.id));
   }, [vendorId, vendorOfferings, products]);
 
-  // Get last price for a product+vendor combo
+  // Get last per-unit price for a product+vendor combo
   const getLastPrice = (productId: string, currentVendorId: string): number => {
     // Find most recent price record for this product+vendor
     const records = priceRecords
@@ -94,10 +94,11 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     if (records.length > 0) {
-      return records[0].price; // Package price, not normalized
+      // Use normalizedPrice (per-unit) — this is the $/gal, $/lb value
+      return records[0].normalizedPrice || records[0].price;
     }
     
-    // Fallback: check vendor offering
+    // Fallback: check vendor offering (offering.price is already per-unit)
     const offering = vendorOfferings.find(
       o => o.productId === productId && o.vendorId === currentVendorId
     );
@@ -173,17 +174,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setLines(lines.filter(line => line.id !== id));
   };
 
-  // Calculate line total: Price is per CONTAINER, not per unit
-  // Total = Qty (number of containers) × Price (per container)
+  // Calculate line total: Price is per UNIT ($/gal, $/lb, $/ton), not per package
+  // Total = Total Volume × Price per unit
   const calculateLineTotal = (line: PurchaseLineInput) => {
-    return line.quantity * line.unitPrice;
+    return line.quantity * line.packageSize * line.unitPrice;
   };
 
-  // Calculate normalized price per unit (e.g., $/g, $/gal)
-  // This is the per-unit cost derived from container price
+  // Normalized price per unit is the same as unitPrice (already per-unit)
   const calculateNormalizedPrice = (line: PurchaseLineInput) => {
-    if (line.packageSize <= 0) return line.unitPrice;
-    return line.unitPrice / line.packageSize;
+    return line.unitPrice;
   };
 
   // Calculate total volume for a line (total units across all containers)
@@ -242,13 +241,13 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       const savedPurchase = await onSave(purchase);
       
       if (savedPurchase) {
-        // Create price records for each line
+        // Create price records for each line (unitPrice is per-unit)
         const priceRecordsToCreate: NewPriceRecord[] = purchaseLines.map(line => ({
           productId: line.productId,
           vendorId,
-          price: line.unitPrice,
+          price: line.unitPrice,               // Per-unit price ($/gal, $/lb)
           unit: line.packageUnit || 'gal',
-          normalizedPrice: line.normalizedUnitPrice,
+          normalizedPrice: line.unitPrice,      // Same as unitPrice (already per unit)
           packageType: line.packageType,
           packageSize: line.packageSize,
           packageUnit: line.packageUnit,
@@ -449,7 +448,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
               <div>Size</div>
               <div>Unit</div>
               <div>Total Vol</div>
-              <div>$/Pkg</div>
+              <div>$/Unit</div>
               <div>Total</div>
               <div></div>
             </div>

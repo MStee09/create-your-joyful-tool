@@ -16,14 +16,14 @@ export interface SimplePurchaseLine {
   packageSize?: number;          // Size per package (e.g., 275 gal, 1800 g)
   packageUnit?: PackageUnitType; // Unit of package contents
   
-  // Pricing - PRICE IS PER CONTAINER/PACKAGE
-  unitPrice: number;             // Price per container (e.g., $900/jug)
-  totalPrice: number;            // quantity × unitPrice (e.g., 2 jugs × $900 = $1800)
+  // Pricing - PRICE IS PER UNIT ($/gal, $/lb, $/ton)
+  unitPrice: number;             // Price per unit (e.g., $2.15/gal, $540/ton)
+  totalPrice: number;            // totalQuantity × unitPrice (e.g., 1325 gal × $2.15 = $2848.75)
   
   // Normalized (calculated for comparison/tracking)
-  totalQuantity: number;         // Total volume: quantity × packageSize (e.g., 2 × 1800g = 3600g)
+  totalQuantity: number;         // Total volume: quantity × packageSize (e.g., 5 × 265 = 1325 gal)
   normalizedUnit: PackageUnitType;
-  normalizedUnitPrice: number;   // Price per unit: unitPrice / packageSize (e.g., $900/1800g = $0.50/g)
+  normalizedUnitPrice: number;   // Same as unitPrice (already per unit)
   
   // Notes
   notes?: string;
@@ -66,27 +66,25 @@ export interface SimplePurchase {
 export type NewSimplePurchase = Omit<SimplePurchase, 'id' | 'createdAt' | 'updatedAt'>;
 export type NewSimplePurchaseLine = Omit<SimplePurchaseLine, 'id'>;
 
-// Helper to calculate normalized price
+// Helper to calculate normalized price (per-unit model — price IS already per unit)
 export function calculateNormalizedPrice(
   unitPrice: number,
   packageSize: number | undefined,
   packageUnit: PackageUnitType | undefined,
   productForm: 'liquid' | 'dry'
 ): { normalizedPrice: number; normalizedUnit: PackageUnitType } {
-  // If no package info, price is already normalized
-  if (!packageSize || !packageUnit) {
+  // Price is already per unit, no division needed
+  if (!packageUnit) {
     return { 
       normalizedPrice: unitPrice, 
       normalizedUnit: productForm === 'liquid' ? 'gal' : 'lbs' 
     };
   }
   
-  // Normalize to per-unit price
-  const normalizedPrice = unitPrice / packageSize;
-  return { normalizedPrice, normalizedUnit: packageUnit };
+  return { normalizedPrice: unitPrice, normalizedUnit: packageUnit };
 }
 
-// Helper to calculate line totals
+// Helper to calculate line totals (per-unit pricing model)
 export function calculateLineTotal(line: Partial<SimplePurchaseLine>): {
   totalPrice: number;
   totalQuantity: number;
@@ -96,9 +94,9 @@ export function calculateLineTotal(line: Partial<SimplePurchaseLine>): {
   const unitPrice = line.unitPrice || 0;
   const packageSize = line.packageSize || 1;
   
-  const totalPrice = quantity * unitPrice;
   const totalQuantity = quantity * packageSize;
-  const normalizedUnitPrice = packageSize > 0 ? unitPrice / packageSize : unitPrice;
+  const totalPrice = totalQuantity * unitPrice;  // Total vol × $/unit
+  const normalizedUnitPrice = unitPrice;          // Already per unit
   
   return { totalPrice, totalQuantity, normalizedUnitPrice };
 }
