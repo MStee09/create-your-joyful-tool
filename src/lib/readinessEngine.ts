@@ -12,7 +12,7 @@
 
 export type Unit = "lb" | "gal" | "ton" | "oz" | "qt" | "pt" | "each" | "bag" | "jug" | "case" | "tote" | string;
 
-export type ReadinessStatus = "READY" | "ON_ORDER" | "BLOCKING";
+export type ReadinessStatus = "READY" | "ON_ORDER" | "NEAR_READY" | "BLOCKING";
 
 export type InventoryRow = any;
 
