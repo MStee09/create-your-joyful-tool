@@ -73,6 +73,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   const [freightCost, setFreightCost] = useState(0);
   const [freightNotes, setFreightNotes] = useState('');
   const [notes, setNotes] = useState('');
+  const [poRef, setPoRef] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Filter products based on selected vendor
@@ -128,6 +129,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       setFreightCost(editingPurchase.freightCost || 0);
       setFreightNotes(editingPurchase.freightNotes || '');
       setNotes(editingPurchase.notes || '');
+      setPoRef(editingPurchase.poRef || '');
       setLines(editingPurchase.lines.map(line => ({
         id: line.id,
         productId: line.productId,
@@ -152,6 +154,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setFreightCost(0);
     setFreightNotes('');
     setNotes('');
+    setPoRef('');
   };
 
   const addLine = () => {
@@ -236,6 +239,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         subtotal,
         total,
         notes: notes || undefined,
+        poRef: poRef.trim() || undefined,
       };
 
       const savedPurchase = await onSave(purchase);
@@ -356,7 +360,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
 
         <div className="space-y-6 py-4">
           {/* Vendor & Dates Section */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Vendor *</Label>
               <Select value={vendorId} onValueChange={handleVendorChange}>
@@ -376,6 +380,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                 type="date" 
                 value={orderDate}
                 onChange={e => setOrderDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>PO / Confirmation #</Label>
+              <Input 
+                type="text"
+                placeholder="2026-0342"
+                value={poRef}
+                onChange={e => setPoRef(e.target.value)}
               />
             </div>
           </div>
