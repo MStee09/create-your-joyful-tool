@@ -744,6 +744,77 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
       </div>
 
+      {/* Order by Vendor — only when there are blocking items */}
+      {processedReadiness.blockingCount > 0 && (() => {
+        const blockingItems = processedReadiness.items.filter(i => i.status === 'BLOCKING');
+        const vendorGroups = new Map<string, { vendorName: string; items: typeof blockingItems; totalCost: number }>();
+
+        blockingItems.forEach(item => {
+          const preferred = vendorOfferings.find(vo => vo.productId === item.productId && vo.isPreferred);
+          const anyOffering = preferred || vendorOfferings.find(vo => vo.productId === item.productId);
+          const vendor = anyOffering ? vendors.find(v => v.id === anyOffering.vendorId) : null;
+          const key = vendor?.id || '__none__';
+          const vendorName = vendor?.name || 'No Vendor Assigned';
+
+          if (!vendorGroups.has(key)) {
+            vendorGroups.set(key, { vendorName, items: [], totalCost: 0 });
+          }
+          const group = vendorGroups.get(key)!;
+          group.items.push(item);
+          const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
+          const price = getBestPrice(item.productId);
+          if (price !== null) group.totalCost += netNeeded * price;
+        });
+
+        const groups = Array.from(vendorGroups.entries())
+          .filter(([key, g]) => key !== '__none__' || g.items.length > 0)
+          .sort(([a], [b]) => a === '__none__' ? 1 : b === '__none__' ? -1 : 0);
+
+        const allUnassigned = groups.length === 1 && groups[0][0] === '__none__';
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-5">
+            <h3 className="font-semibold text-stone-800 mb-3">Order by Vendor</h3>
+            {allUnassigned ? (
+              <p className="text-sm text-stone-400">Assign vendors to your products to use order consolidation.</p>
+            ) : (
+              <div className="flex flex-wrap gap-4">
+                {groups.map(([key, group]) => (
+                  <div key={key} className="border border-stone-200 rounded-xl p-4 min-w-[240px] max-w-[320px] flex-1">
+                    <div className="font-semibold text-stone-800">{group.vendorName}</div>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      {group.items.length} product{group.items.length !== 1 ? 's' : ''} need ordering
+                    </p>
+                    {group.totalCost > 0 && (
+                      <p className="text-sm font-bold text-rose-600 mt-1">{formatCurrency(group.totalCost)}</p>
+                    )}
+                    <div className="mt-2 space-y-1">
+                      {group.items.map(item => {
+                        const net = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
+                        return (
+                          <div key={item.id} className="flex justify-between text-xs text-stone-600">
+                            <span className="truncate">{item.label}</span>
+                            <span className="font-mono ml-2 flex-shrink-0">{fmt(net)} {item.plannedUnit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {key !== '__none__' && onNavigateToPurchases && (
+                      <button
+                        onClick={onNavigateToPurchases}
+                        className="mt-3 w-full px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition"
+                      >
+                        Build Order →
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Filter Tabs + View Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap gap-2">
