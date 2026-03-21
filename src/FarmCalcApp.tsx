@@ -1737,6 +1737,8 @@ const AppContent: React.FC = () => {
             purchases={simplePurchases || []}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToPurchases={() => setActiveView('purchases')}
+            productMasters={state.productMasters || []}
+            vendorOfferings={state.vendorOfferings || []}
           />
         );
       case 'vendor-spend':

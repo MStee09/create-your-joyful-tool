@@ -48,9 +48,12 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   purchases,
   onUpdateInventory,
   onNavigateToPurchases,
+  productMasters = [],
+  vendorOfferings = [],
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('product');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Product selector modal state (for browsing all products)
   const [showProductSelector, setShowProductSelector] = useState(false);
