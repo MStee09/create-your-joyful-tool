@@ -12,6 +12,16 @@ import { AddInventoryModal } from './AddInventoryModal';
 import { ProductSelectorModal, type ProductWithContext } from './ProductSelectorModal';
 import { getDefaultPackagingOptions } from '@/lib/packagingUtils';
 
+export interface PrePopulatedLine {
+  productId: string;
+  productName: string;
+  quantity: number;
+  packageType: string;
+  packageSize: number;
+  packageUnit: string;
+  unitPrice: number;
+}
+
 interface PlanReadinessViewProps {
   inventory: InventoryItem[];
   products: Product[];
@@ -22,6 +32,7 @@ interface PlanReadinessViewProps {
   onNavigateToPurchases?: () => void;
   productMasters?: ProductMaster[];
   vendorOfferings?: VendorOffering[];
+  onBuildOrder?: (vendorId: string, lines: PrePopulatedLine[]) => void;
 }
 
 type FilterTab = 'blocking' | 'near-ready' | 'on-order' | 'ready' | 'all';
