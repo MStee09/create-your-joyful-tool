@@ -374,12 +374,60 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
+  // Best price lookup for a product
+  const getBestPrice = (productId: string): number | null => {
+    const preferred = vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred);
+    if (preferred) return preferred.price;
+    const any = vendorOfferings.find(vo => vo.productId === productId);
+    if (any) return any.price;
+    const pm = productMasters.find(p => p.id === productId);
+    if (pm?.estimatedPrice) return pm.estimatedPrice;
+    return null;
+  };
+
+  // Est. Still to Spend — sum of netNeeded × bestPrice for BLOCKING items only
+  const estStillToSpend = useMemo(() => {
+    let total = 0;
+    let hasAnyPrice = false;
+    processedReadiness.items.forEach(item => {
+      if (item.status !== 'BLOCKING') return;
+      const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
+      const price = getBestPrice(item.productId);
+      if (price !== null && netNeeded > 0) {
+        total += netNeeded * price;
+        hasAnyPrice = true;
+      }
+    });
+    return hasAnyPrice ? total : null;
+  }, [processedReadiness.items, vendorOfferings, productMasters]);
+
+  // Build timing bucket lookup for usage rows
+  const timingNameToBucket = useMemo(() => {
+    const m = new Map<string, TimingBucket>();
+    if (!season) return m;
+    season.crops.forEach(crop => {
+      crop.applicationTimings.forEach(t => {
+        m.set(`${crop.name}::${t.name}`, t.timingBucket || 'IN_SEASON');
+      });
+    });
+    return m;
+  }, [season]);
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // Shared row renderer
   const renderProductRow = (item: typeof processedReadiness.items[0]) => {
     const p = statusPill(item.status);
     const usages = usageMap.get(item.productId) || [];
-    const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
     const product = products.find(pr => pr.id === item.productId);
+    const isExpanded = expandedRows.has(item.id);
 
     // Coverage calculations
     const coveragePct = item.requiredQty > 0
@@ -392,88 +440,123 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       ? (item.onOrderQty / item.requiredQty) * 100
       : 0);
 
+    // Cost calculation
+    const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
+    const bestPrice = getBestPrice(item.productId);
+    const estCost = bestPrice !== null && netNeeded > 0 ? netNeeded * bestPrice : null;
+
     return (
-      <div key={item.id} className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
-        <div className="col-span-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              product?.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
-            }`}>
-              {product?.form === 'liquid' 
-                ? <Droplets className="w-5 h-5 text-blue-600" /> 
-                : <Weight className="w-5 h-5 text-amber-600" />}
-            </div>
-            <div className="min-w-0">
-              <div className="font-semibold">{item.label}</div>
-              {productTimingBucket.get(item.productId) && (() => {
-                const bucket = productTimingBucket.get(item.productId)!;
-                const badge = BUCKET_BADGE[bucket];
-                return (
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
-                    {badge.label}
+      <div key={item.id}>
+        <div className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
+          <div className="col-span-3">
+            <div className="flex items-center gap-2">
+              {/* Expand chevron */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleRowExpand(item.id); }}
+                className="p-0.5 rounded hover:bg-stone-200 text-stone-400 flex-shrink-0"
+              >
+                {isExpanded
+                  ? <ChevronDown className="w-4 h-4" />
+                  : <ChevronRight className="w-4 h-4" />
+                }
+              </button>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                product?.form === 'liquid' ? 'bg-blue-100' : 'bg-amber-100'
+              }`}>
+                {product?.form === 'liquid' 
+                  ? <Droplets className="w-5 h-5 text-blue-600" /> 
+                  : <Weight className="w-5 h-5 text-amber-600" />}
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold">{item.label}</div>
+                {productTimingBucket.get(item.productId) && (() => {
+                  const bucket = productTimingBucket.get(item.productId)!;
+                  const badge = BUCKET_BADGE[bucket];
+                  return (
+                    <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
+                    <p.icon className="w-3.5 h-3.5" />
+                    {p.label}
                   </span>
-                );
-              })()}
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
-                  <p.icon className="w-3.5 h-3.5" />
-                  {p.label}
-                </span>
-                <span className="text-[11px] font-medium text-stone-600">
-                  {Math.round(coveragePct)}% covered
-                </span>
+                  <span className="text-[11px] font-medium text-stone-600">
+                    {Math.round(coveragePct)}% covered
+                  </span>
+                </div>
+                {/* Coverage progress bar */}
+                <div className="mt-1.5 h-1.5 w-full max-w-[180px] rounded-full bg-stone-200 overflow-hidden flex">
+                  {onHandSegment > 0 && (
+                    <div className="h-full bg-emerald-500 transition-all" style={{ width: `${onHandSegment}%` }} />
+                  )}
+                  {onOrderSegment > 0 && (
+                    <div className="h-full bg-amber-400 transition-all" style={{ width: `${onOrderSegment}%` }} />
+                  )}
+                </div>
               </div>
-              {/* Coverage progress bar */}
-              <div className="mt-1.5 h-1.5 w-full max-w-[180px] rounded-full bg-stone-200 overflow-hidden flex">
-                {onHandSegment > 0 && (
-                  <div
-                    className="h-full bg-emerald-500 transition-all"
-                    style={{ width: `${onHandSegment}%` }}
-                  />
-                )}
-                {onOrderSegment > 0 && (
-                  <div
-                    className="h-full bg-amber-400 transition-all"
-                    style={{ width: `${onOrderSegment}%` }}
-                  />
-                )}
-              </div>
-              {usedIn && <div className="mt-1 text-xs text-stone-500 truncate">{usedIn}</div>}
             </div>
           </div>
-        </div>
-        <div className="col-span-2 flex items-center">{fmt(item.requiredQty)} {item.plannedUnit}</div>
-        <div className="col-span-2 flex items-center">{fmt(item.onHandQty)} {item.plannedUnit}</div>
-        <div className="col-span-2 flex items-center">{fmt(item.onOrderQty)} {item.plannedUnit}</div>
-        <div className="col-span-2 flex justify-end items-center gap-2">
-          {item.status === 'BLOCKING' && (
+          <div className="col-span-2 flex items-center">{fmt(item.requiredQty)} {item.plannedUnit}</div>
+          <div className="col-span-1 flex items-center">{fmt(item.onHandQty)} {item.plannedUnit}</div>
+          <div className="col-span-2 flex items-center">{fmt(item.onOrderQty)} {item.plannedUnit}</div>
+          <div className="col-span-1 flex items-center text-right">
+            {estCost !== null ? (
+              <span className="text-rose-600 font-medium">{formatCurrency(estCost)}</span>
+            ) : netNeeded > 0 ? (
+              <span className="text-stone-400 text-xs">— no price</span>
+            ) : (
+              <span className="text-emerald-600 text-xs">Covered</span>
+            )}
+          </div>
+          <div className="col-span-3 flex justify-end items-center gap-2">
+            {item.status === 'BLOCKING' && (
+              <button
+                onClick={() => handleQuickAdd(item.productId, item.shortQty)}
+                className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
+              >
+                Add {fmt(item.shortQty, 0)}
+              </button>
+            )}
+            {item.status === 'BLOCKING' && onNavigateToPurchases && (
+              <button
+                onClick={onNavigateToPurchases}
+                className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+              >
+                Buy →
+              </button>
+            )}
             <button
-              onClick={() => handleQuickAdd(item.productId, item.shortQty)}
-              className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
+              onClick={() => {
+                setExplainTitle(item.label);
+                setExplainStatus(item.status);
+                setExplainData(item.explain);
+                setExplainOpen(true);
+              }}
+              className="px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold hover:bg-stone-50"
             >
-              Add {fmt(item.shortQty, 0)}
+              Explain
             </button>
-          )}
-          {item.status === 'BLOCKING' && onNavigateToPurchases && (
-            <button
-              onClick={onNavigateToPurchases}
-              className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
-            >
-              Buy →
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setExplainTitle(item.label);
-              setExplainStatus(item.status);
-              setExplainData(item.explain);
-              setExplainOpen(true);
-            }}
-            className="px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-semibold hover:bg-stone-50"
-          >
-            Explain
-          </button>
+          </div>
         </div>
+        {/* Inline crop breakdown */}
+        {isExpanded && usages.length > 0 && (
+          <div className="px-5 pb-4 pl-20 space-y-1 animate-in slide-in-from-top-1 duration-200">
+            {usages.map((u, idx) => {
+              const bucketKey = `${u.cropName}::${u.timingName}`;
+              const bucket = timingNameToBucket.get(bucketKey);
+              const bucketLabel = bucket ? BUCKET_BADGE[bucket].label : u.timingName;
+              return (
+                <div key={idx} className="flex items-center justify-between text-xs text-stone-600 py-1 border-b border-stone-100 last:border-0">
+                  <span>{u.cropName} — <span className="font-medium">{bucketLabel}</span></span>
+                  <span className="font-mono">{fmt(u.quantityNeeded)} {item.plannedUnit}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
