@@ -129,6 +129,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       setFreightCost(editingPurchase.freightCost || 0);
       setFreightNotes(editingPurchase.freightNotes || '');
       setNotes(editingPurchase.notes || '');
+      setPoRef(editingPurchase.poRef || '');
       setLines(editingPurchase.lines.map(line => ({
         id: line.id,
         productId: line.productId,
