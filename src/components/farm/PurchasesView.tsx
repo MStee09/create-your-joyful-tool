@@ -357,6 +357,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                           {new Date(purchase.receivedDate || purchase.orderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                         <span className="font-semibold text-foreground">{getVendorName(purchase.vendorId)}</span>
+                        {purchase.poRef && <span className="text-xs text-muted-foreground">PO: {purchase.poRef}</span>}
                         <span className="font-bold text-foreground">{formatCurrency(purchase.total)}</span>
                         <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                           <CheckCircle className="w-3 h-3 mr-1" />
