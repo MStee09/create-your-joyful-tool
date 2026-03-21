@@ -154,6 +154,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setFreightCost(0);
     setFreightNotes('');
     setNotes('');
+    setPoRef('');
   };
 
   const addLine = () => {
