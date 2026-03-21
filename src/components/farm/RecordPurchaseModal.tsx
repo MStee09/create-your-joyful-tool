@@ -173,17 +173,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     setLines(lines.filter(line => line.id !== id));
   };
 
-  // Calculate line total: Price is per CONTAINER, not per unit
-  // Total = Qty (number of containers) × Price (per container)
+  // Calculate line total: Price is per UNIT ($/gal, $/lb, $/ton), not per package
+  // Total = Total Volume × Price per unit
   const calculateLineTotal = (line: PurchaseLineInput) => {
-    return line.quantity * line.unitPrice;
+    return line.quantity * line.packageSize * line.unitPrice;
   };
 
-  // Calculate normalized price per unit (e.g., $/g, $/gal)
-  // This is the per-unit cost derived from container price
+  // Normalized price per unit is the same as unitPrice (already per-unit)
   const calculateNormalizedPrice = (line: PurchaseLineInput) => {
-    if (line.packageSize <= 0) return line.unitPrice;
-    return line.unitPrice / line.packageSize;
+    return line.unitPrice;
   };
 
   // Calculate total volume for a line (total units across all containers)
