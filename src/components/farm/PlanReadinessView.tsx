@@ -372,6 +372,15 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
             </div>
             <div className="min-w-0">
               <div className="font-semibold">{item.label}</div>
+              {productTimingBucket.get(item.productId) && (() => {
+                const bucket = productTimingBucket.get(item.productId)!;
+                const badge = BUCKET_BADGE[bucket];
+                return (
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                    {badge.label}
+                  </span>
+                );
+              })()}
               <div className="mt-1 flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
                   <p.icon className="w-3.5 h-3.5" />
