@@ -472,7 +472,8 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
             {lines.map(line => {
               const product = getProductInfo(line.productId);
               return (
-                <div key={line.id} className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_0.75fr_1fr_1fr_auto] gap-2 items-center">
+                <React.Fragment key={line.id}>
+                <div className="grid grid-cols-[2fr_1fr_0.5fr_0.75fr_0.5fr_0.75fr_1fr_1fr_auto] gap-2 items-center">
                   <Select 
                     value={line.productId} 
                     onValueChange={val => handleProductChange(line.id, val)}
@@ -582,6 +583,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {line.productId && line.quantity > 0 && line.packageSize > 0 && (
+                  <div className="mb-2 px-3 py-1.5 bg-muted/50 rounded text-xs text-muted-foreground">
+                    {line.quantity} × {line.packageSize} {line.packageUnit} = {calculateTotalVolume(line).toFixed(1)} {line.packageUnit} total
+                    {line.unitPrice > 0 && (
+                      <> · @ ${line.unitPrice}/{line.packageUnit} = <strong className="text-foreground">${calculateLineTotal(line).toFixed(2)}</strong></>
+                    )}
+                  </div>
+                )}
+                </React.Fragment>
               );
             })}
 
