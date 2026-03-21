@@ -1729,29 +1729,6 @@ const AppContent: React.FC = () => {
         );
       case 'procurement':
         return (
-          <DemandRollupView
-            season={currentSeason}
-            productMasters={state.productMasters || []}
-            commoditySpecs={state.commoditySpecs || []}
-            inventory={state.inventory || []}
-            onNavigateToSpecs={() => setActiveView('commodity-specs')}
-            fieldAssignments={fieldAssignments || []}
-            fieldOverrides={fieldCropOverrides || []}
-          />
-        );
-      case 'vendor-spend':
-        return (
-          <VendorSpendView
-            season={currentSeason}
-            products={legacyProducts}
-            vendorOfferings={state.vendorOfferings || []}
-            vendors={state.vendors}
-            purchases={simplePurchases || []}
-          />
-        );
-      // 'orders' case handled above in legacy redirect block
-      case 'plan-readiness':
-        return (
           <PlanReadinessView
             inventory={state.inventory}
             products={legacyProducts}
@@ -1759,8 +1736,10 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             purchases={simplePurchases || []}
             onUpdateInventory={handleUpdateInventory}
+            onNavigateToPurchases={() => setActiveView('purchases')}
           />
         );
+      case 'vendor-spend':
       case 'variance':
       case 'variance-by-pass':
       case 'alerts':
