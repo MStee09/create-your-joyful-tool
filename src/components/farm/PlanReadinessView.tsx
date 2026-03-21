@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp, Building2, List, Clock } from 'lucide-react';
+import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp, Building2, List, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season, TimingBucket } from '@/types/farm';
+import type { ProductMaster, VendorOffering } from '@/types';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
@@ -19,6 +20,8 @@ interface PlanReadinessViewProps {
   purchases: SimplePurchase[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
   onNavigateToPurchases?: () => void;
+  productMasters?: ProductMaster[];
+  vendorOfferings?: VendorOffering[];
 }
 
 type FilterTab = 'blocking' | 'near-ready' | 'on-order' | 'ready' | 'all';
