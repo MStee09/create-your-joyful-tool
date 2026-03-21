@@ -843,11 +843,12 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
                 {/* Product rows */}
                 <div className="grid grid-cols-12 bg-stone-50/50 px-5 py-2 text-xs font-semibold text-stone-500">
-                  <div className="col-span-4">Product</div>
+                  <div className="col-span-3">Product</div>
                   <div className="col-span-2">Need</div>
-                  <div className="col-span-2">On Hand</div>
+                  <div className="col-span-1">On Hand</div>
                   <div className="col-span-2">On Order</div>
-                  <div className="col-span-2 text-right">Actions</div>
+                  <div className="col-span-1">Est. Cost</div>
+                  <div className="col-span-3 text-right">Actions</div>
                 </div>
                 <div className="divide-y divide-stone-100">
                   {group.items.map(item => renderProductRow(item))}
