@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp, Building2, List } from 'lucide-react';
-import type { InventoryItem, Product, Vendor, Season } from '@/types/farm';
+import type { InventoryItem, Product, Vendor, Season, TimingBucket } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
@@ -124,6 +124,36 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     plannedUsage.forEach(u => m.set(u.productId, u.usages));
     return m;
   }, [plannedUsage]);
+
+  // Map productId → earliest timing bucket
+  const BUCKET_ORDER: TimingBucket[] = ['PRE_PLANT', 'AT_PLANTING', 'IN_SEASON', 'POST_HARVEST'];
+  const BUCKET_BADGE: Record<TimingBucket, { label: string; cls: string }> = {
+    'PRE_PLANT': { label: 'Pre-Plant', cls: 'bg-amber-100 text-amber-700' },
+    'AT_PLANTING': { label: 'At Planting', cls: 'bg-emerald-100 text-emerald-700' },
+    'IN_SEASON': { label: 'In-Season', cls: 'bg-blue-100 text-blue-700' },
+    'POST_HARVEST': { label: 'Post-Harvest', cls: 'bg-purple-100 text-purple-700' },
+  };
+
+  const productTimingBucket = useMemo(() => {
+    const m = new Map<string, TimingBucket>();
+    if (!season) return m;
+    season.crops.forEach(crop => {
+      // Build timingId → bucket map
+      const timingBucketMap = new Map<string, TimingBucket>();
+      crop.applicationTimings.forEach(t => {
+        timingBucketMap.set(t.id, t.timingBucket || 'IN_SEASON');
+      });
+      // For each application, find the product's earliest bucket
+      crop.applications.forEach(app => {
+        const bucket = timingBucketMap.get(app.timingId) || 'IN_SEASON';
+        const existing = m.get(app.productId);
+        if (!existing || BUCKET_ORDER.indexOf(bucket) < BUCKET_ORDER.indexOf(existing)) {
+          m.set(app.productId, bucket);
+        }
+      });
+    });
+    return m;
+  }, [season]);
 
   // Filter items for selected tab
   const filteredItems = useMemo(() => {
@@ -342,6 +372,15 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
             </div>
             <div className="min-w-0">
               <div className="font-semibold">{item.label}</div>
+              {productTimingBucket.get(item.productId) && (() => {
+                const bucket = productTimingBucket.get(item.productId)!;
+                const badge = BUCKET_BADGE[bucket];
+                return (
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                    {badge.label}
+                  </span>
+                );
+              })()}
               <div className="mt-1 flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
                   <p.icon className="w-3.5 h-3.5" />
