@@ -261,7 +261,7 @@ const Sidebar: React.FC<{
         {/* PROCUREMENT section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Procurement</div>
-          <NavButton id="plan-readiness" label="Order Status" icon={ClipboardCheck} />
+          <NavButton id="procurement" label="Inputs Needed" icon={ClipboardCheck} />
           <NavButton id="purchases" label="Purchases" icon={ShoppingCart} />
           <NavButton id="vendor-spend" label="Vendor Spend" icon={DollarSign} />
         </div>
@@ -1729,29 +1729,6 @@ const AppContent: React.FC = () => {
         );
       case 'procurement':
         return (
-          <DemandRollupView
-            season={currentSeason}
-            productMasters={state.productMasters || []}
-            commoditySpecs={state.commoditySpecs || []}
-            inventory={state.inventory || []}
-            onNavigateToSpecs={() => setActiveView('commodity-specs')}
-            fieldAssignments={fieldAssignments || []}
-            fieldOverrides={fieldCropOverrides || []}
-          />
-        );
-      case 'vendor-spend':
-        return (
-          <VendorSpendView
-            season={currentSeason}
-            products={legacyProducts}
-            vendorOfferings={state.vendorOfferings || []}
-            vendors={state.vendors}
-            purchases={simplePurchases || []}
-          />
-        );
-      // 'orders' case handled above in legacy redirect block
-      case 'plan-readiness':
-        return (
           <PlanReadinessView
             inventory={state.inventory}
             products={legacyProducts}
@@ -1759,8 +1736,10 @@ const AppContent: React.FC = () => {
             season={currentSeason}
             purchases={simplePurchases || []}
             onUpdateInventory={handleUpdateInventory}
+            onNavigateToPurchases={() => setActiveView('purchases')}
           />
         );
+      case 'vendor-spend':
       case 'variance':
       case 'variance-by-pass':
       case 'alerts':
