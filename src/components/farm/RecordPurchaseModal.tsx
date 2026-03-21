@@ -151,10 +151,22 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         packageUnit: line.packageUnit || 'gal',
         unitPrice: line.unitPrice,
       })));
+    } else if (preselectedVendorId && preselectedLines && preselectedLines.length > 0) {
+      resetForm();
+      setVendorId(preselectedVendorId);
+      setLines(preselectedLines.map(pl => ({
+        id: crypto.randomUUID(),
+        productId: pl.productId,
+        packageType: pl.packageType,
+        quantity: pl.quantity,
+        packageSize: pl.packageSize,
+        packageUnit: pl.packageUnit,
+        unitPrice: pl.unitPrice,
+      })));
     } else {
       resetForm();
     }
-  }, [editingPurchase, isOpen]);
+  }, [editingPurchase, isOpen, preselectedVendorId]);
 
   const resetForm = () => {
     setVendorId('');
