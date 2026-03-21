@@ -644,10 +644,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap gap-2">
         {([
-            { id: 'all', label: 'All', count: readiness.totalCount },
-            { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
-            { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
-            { id: 'ready', label: 'Ready', count: readiness.readyCount },
+            { id: 'all', label: 'All', count: processedReadiness.totalCount },
+            { id: 'blocking', label: 'Need to Order', count: processedReadiness.blockingCount },
+            { id: 'near-ready', label: 'Near Ready', count: processedReadiness.nearReadyCount },
+            { id: 'on-order', label: 'Ordered', count: processedReadiness.onOrderCount },
+            { id: 'ready', label: 'Ready', count: processedReadiness.readyCount },
           ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
             <button
               key={t.id}
