@@ -2046,6 +2046,35 @@ const AppContent: React.FC = () => {
           applicationRecords={applicationRecords || []}
         />
       )}
+
+      {/* Build Order modal from Inputs Needed vendor cards */}
+      {buildOrderVendorId && (
+        <RecordPurchaseModal
+          isOpen={!!buildOrderVendorId}
+          onClose={() => { setBuildOrderVendorId(null); setBuildOrderLines([]); }}
+          onSave={async (purchase) => {
+            const result = await handleAddPurchase(purchase);
+            if (result) {
+              setBuildOrderVendorId(null);
+              setBuildOrderLines([]);
+            }
+            return result;
+          }}
+          onCreatePriceRecords={async (records) => {
+            for (const record of records) {
+              await handleAddPriceRecord(record);
+            }
+          }}
+          vendors={state.vendors}
+          products={productMasters || []}
+          vendorOfferings={vendorOfferings || []}
+          priceRecords={priceRecords || []}
+          currentSeasonId={state.currentSeasonId || ''}
+          currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+          preselectedVendorId={buildOrderVendorId}
+          preselectedLines={buildOrderLines}
+        />
+      )}
     </div>
   );
 };
