@@ -796,11 +796,12 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         /* ── Flat product list ── */
         <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
           <div className="grid grid-cols-12 bg-stone-50 px-5 py-3 text-xs font-semibold text-stone-600">
-            <div className="col-span-4">Product</div>
+            <div className="col-span-3">Product</div>
             <div className="col-span-2">Need</div>
-            <div className="col-span-2">On Hand</div>
+            <div className="col-span-1">On Hand</div>
             <div className="col-span-2">On Order</div>
-            <div className="col-span-2 text-right">Actions</div>
+            <div className="col-span-1">Est. Cost</div>
+            <div className="col-span-3 text-right">Actions</div>
           </div>
           <div className="divide-y divide-stone-200">
             {filteredItems.map(item => renderProductRow(item))}
