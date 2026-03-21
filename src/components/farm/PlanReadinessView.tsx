@@ -43,6 +43,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   season,
   purchases,
   onUpdateInventory,
+  onNavigateToPurchases,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('product');
@@ -379,6 +380,14 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
               className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
             >
               Add {fmt(item.shortQty, 0)}
+            </button>
+          )}
+          {item.status === 'BLOCKING' && onNavigateToPurchases && (
+            <button
+              onClick={onNavigateToPurchases}
+              className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+            >
+              Buy →
             </button>
           )}
           <button
