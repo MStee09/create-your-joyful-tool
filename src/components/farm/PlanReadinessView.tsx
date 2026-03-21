@@ -369,7 +369,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
   // Shared row renderer
-  const renderProductRow = (item: typeof readiness.items[0]) => {
+  const renderProductRow = (item: typeof processedReadiness.items[0]) => {
     const p = statusPill(item.status);
     const usages = usageMap.get(item.productId) || [];
     const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
