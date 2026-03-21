@@ -316,6 +316,17 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
     const product = products.find(pr => pr.id === item.productId);
 
+    // Coverage calculations
+    const coveragePct = item.requiredQty > 0
+      ? Math.min(100, ((item.onHandQty + item.onOrderQty) / item.requiredQty) * 100)
+      : 0;
+    const onHandSegment = item.requiredQty > 0
+      ? Math.min(100, (item.onHandQty / item.requiredQty) * 100)
+      : 0;
+    const onOrderSegment = Math.min(100 - onHandSegment, item.requiredQty > 0
+      ? (item.onOrderQty / item.requiredQty) * 100
+      : 0);
+
     return (
       <div key={item.id} className="grid grid-cols-12 px-5 py-4 text-sm text-stone-800 hover:bg-stone-50">
         <div className="col-span-4">
@@ -327,15 +338,33 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 ? <Droplets className="w-5 h-5 text-blue-600" /> 
                 : <Weight className="w-5 h-5 text-amber-600" />}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="font-semibold">{item.label}</div>
               <div className="mt-1 flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${p.cls}`}>
                   <p.icon className="w-3.5 h-3.5" />
                   {p.label}
                 </span>
-                {usedIn && <span className="text-xs text-stone-500">{usedIn}</span>}
+                <span className="text-[11px] font-medium text-stone-600">
+                  {Math.round(coveragePct)}% covered
+                </span>
               </div>
+              {/* Coverage progress bar */}
+              <div className="mt-1.5 h-1.5 w-full max-w-[180px] rounded-full bg-stone-200 overflow-hidden flex">
+                {onHandSegment > 0 && (
+                  <div
+                    className="h-full bg-emerald-500 transition-all"
+                    style={{ width: `${onHandSegment}%` }}
+                  />
+                )}
+                {onOrderSegment > 0 && (
+                  <div
+                    className="h-full bg-amber-400 transition-all"
+                    style={{ width: `${onOrderSegment}%` }}
+                  />
+                )}
+              </div>
+              {usedIn && <div className="mt-1 text-xs text-stone-500 truncate">{usedIn}</div>}
             </div>
           </div>
         </div>
