@@ -261,7 +261,7 @@ const Sidebar: React.FC<{
         {/* PROCUREMENT section */}
         <div className="pt-4 mt-4 border-t border-stone-700">
           <div className="px-2 pb-2 text-xs text-stone-500 uppercase tracking-wider">Procurement</div>
-          <NavButton id="plan-readiness" label="Order Status" icon={ClipboardCheck} />
+          <NavButton id="procurement" label="Inputs Needed" icon={ClipboardCheck} />
           <NavButton id="purchases" label="Purchases" icon={ShoppingCart} />
           <NavButton id="vendor-spend" label="Vendor Spend" icon={DollarSign} />
         </div>
