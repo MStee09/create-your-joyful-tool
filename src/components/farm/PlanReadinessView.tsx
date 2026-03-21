@@ -811,9 +811,28 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                         );
                       })}
                     </div>
-                    {key !== '__none__' && onNavigateToPurchases && (
+                    {key !== '__none__' && onBuildOrder && (
                       <button
-                        onClick={onNavigateToPurchases}
+                        onClick={() => {
+                          const lines: PrePopulatedLine[] = group.items.map(item => {
+                            const net = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
+                            const product = products.find(pr => pr.id === item.productId);
+                            const offering = vendorOfferings.find(vo => vo.productId === item.productId && vo.isPreferred)
+                              || vendorOfferings.find(vo => vo.productId === item.productId);
+                            const price = getBestPrice(item.productId) || 0;
+                            const isLiquid = product?.form === 'liquid';
+                            return {
+                              productId: item.productId,
+                              productName: item.label,
+                              quantity: Math.ceil(net),
+                              packageType: offering?.packaging || (isLiquid ? 'Tote' : 'Bulk'),
+                              packageSize: offering?.containerSize || 1,
+                              packageUnit: item.plannedUnit,
+                              unitPrice: price,
+                            };
+                          });
+                          onBuildOrder(key, lines);
+                        }}
                         className="mt-3 w-full px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition"
                       >
                         Build Order →
