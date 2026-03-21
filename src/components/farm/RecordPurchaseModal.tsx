@@ -73,6 +73,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   const [freightCost, setFreightCost] = useState(0);
   const [freightNotes, setFreightNotes] = useState('');
   const [notes, setNotes] = useState('');
+  const [poRef, setPoRef] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Filter products based on selected vendor
