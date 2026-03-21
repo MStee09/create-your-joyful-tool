@@ -1,37 +1,30 @@
 
-# Unified Pricing Engine — IMPLEMENTED
 
-## Summary
-All cost calculations across the app now flow through `calculateApplicationCostPerAcreWithPriceBook()` which implements a strict hierarchy:
+# Add Per-Product Coverage % + Priority Sort to Order Status
 
-1. **Booked/purchased volume** → weighted average of actual purchase prices
-2. **Remaining unordered volume** → current system price from hierarchy:
-   - Season price book entry
-   - Vendor offering price (via `product.price`)
-   - ProductMaster `estimatedPrice`
-   - Legacy `product.price` fallback
-3. **Blended result** = `(purchasedQty × avgPurchased + remainingQty × currentPrice) / totalDemand`
-4. If no current price exists but purchases do → purchase-only average (never $0)
+## Problem
+Each product row shows raw quantities (Need / On Hand / On Order) but no visual indicator of how much of the total need is covered. When a product has partial coverage (e.g., 13 tons ordered out of 13.25 tons needed = 98% covered), it still shows a "Need to Order" badge with no sense of progress. The user's eyes see "Need to Order" and assume nothing was done.
 
-## Files Changed
+Additionally, products are unsorted — a product that's 98% covered sits next to one that's 0% covered with no distinction.
 
-| File | Change |
-|------|--------|
-| `src/lib/cropCalculations.ts` | Enhanced price hierarchy: added vendor offering price as step 2 before estimated price. Season-scoped purchase filtering. Purchase-first lookup so booked volume always has a cost. Added `getPricingSource()` resolver for UI transparency badges. |
-| `src/components/farm/PassCard.tsx` | Removed `priceBook.length > 0` gate — pricing context now created whenever `productMasters.length > 0` so purchases/estimated prices drive cost even without price book entries. |
-| `src/components/farm/ProductRowReadable.tsx` | Replaced 47 lines of raw `product.price` math with single call to `calculateApplicationCostPerAcreWithPriceBook()`. Added `purchases` prop. Added pricing source badges (Bid/Booked/Blend/Est/List). |
-| `src/components/farm/CropPlanningView.tsx` | Compact table sub-rows now use `calculateApplicationCostPerAcreWithPriceBook()` instead of `app.rate * product.price`. Reset scroll-to-hide header on tab switch. |
-| `src/components/farm/CropPlanPrintView.tsx` | Added missing `purchases` parameter to per-application cost calculation. |
-| `src/components/EnhancedExportView.tsx` | CSV export now uses unified pricing engine. Added `productMasters`, `priceBook`, `purchases` props. |
-| `src/FarmCalcApp.tsx` | Wired new props to `EnhancedExportView` and `FieldComparisonView`. |
+## Solution
 
----
+### 1. Add a coverage progress bar to each product row
+Below the status pill in each row, add a small horizontal progress bar showing % of need covered (on-hand + on-order vs required). Color-coded: green for on-hand portion, amber for on-order portion, remaining gray.
 
-# Phase 1 UX Polish — IMPLEMENTED
+Next to it, show the percentage as text: e.g., "98% covered" or "0% covered".
 
-| Fix | Files |
-|-----|-------|
-| Reset scroll-to-hide header on tab switch | `CropPlanningView.tsx` |
-| Pass `purchases` to FieldComparisonView for pricing parity | `FieldComparisonView.tsx`, `fieldComparisonUtils.ts`, `FarmCalcApp.tsx` |
-| Dashboard crop rows clickable → navigate to crop plans | `DashboardView.tsx` |
-| Pricing source indicator badges (Bid/Booked/Blend/Est/List) | `cropCalculations.ts`, `ProductRowReadable.tsx` |
+### 2. Sort by coverage ascending (least covered first)
+`filteredItems` will be sorted so products with the lowest coverage % appear at the top. This puts the most urgent items front and center. BLOCKING items naturally float to top, but within BLOCKING, a 0% covered product ranks higher than a 90% covered one.
+
+### File: `src/components/farm/PlanReadinessView.tsx`
+
+**In `filteredItems` memo** (line 127-132):
+- After filtering by tab, sort by `(onHandQty + onOrderQty) / requiredQty` ascending
+
+**In `renderProductRow`** (line 306-361):
+- Calculate `coveragePct = Math.min(100, ((item.onHandQty + item.onOrderQty) / item.requiredQty) * 100)`
+- Calculate `onHandPct` and `onOrderPct` segments
+- Add a small progress bar (h-1.5 rounded) below the status pill with green + amber segments
+- Add text label: `"{coveragePct}% covered"`
+
