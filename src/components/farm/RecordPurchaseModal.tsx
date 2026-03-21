@@ -33,6 +33,16 @@ interface RecordPurchaseModalProps {
   currentSeasonId: string;
   currentSeasonYear: number;
   editingPurchase?: SimplePurchase;
+  preselectedVendorId?: string;
+  preselectedLines?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    packageType: string;
+    packageSize: number;
+    packageUnit: string;
+    unitPrice: number;
+  }>;
 }
 
 const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Pail', 'Bulk', 'Bottle', 'Case'];
