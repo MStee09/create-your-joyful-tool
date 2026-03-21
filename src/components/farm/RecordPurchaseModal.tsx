@@ -587,7 +587,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                   <div className="mb-2 px-3 py-1.5 bg-muted/50 rounded text-xs text-muted-foreground">
                     {line.quantity} × {line.packageSize} {line.packageUnit} = {calculateTotalVolume(line).toFixed(1)} {line.packageUnit} total
                     {line.unitPrice > 0 && (
-                      <> · @ ${line.unitPrice}/{line.packageUnit} = <strong className="text-foreground">${calculateLineTotal(line).toFixed(2)}</strong></>
+                      <> · @ {formatCurrency(line.unitPrice)}/{line.packageUnit} = <strong className="text-foreground">{formatCurrency(calculateLineTotal(line))}</strong></>
                     )}
                   </div>
                 )}
