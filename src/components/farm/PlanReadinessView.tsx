@@ -61,6 +61,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   onNavigateToPurchases,
   productMasters = [],
   vendorOfferings = [],
+  onBuildOrder,
 }) => {
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('product');
