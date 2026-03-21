@@ -652,7 +652,21 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
 
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-4 gap-4 mt-4">
+        <div className="grid grid-cols-5 gap-4 mt-4">
+          {/* Est. Still to Spend — most important number */}
+          <div className="bg-rose-50 rounded-xl p-4 border border-rose-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-rose-600">
+                  {estStillToSpend !== null ? formatCurrency(estStillToSpend) : '—'}
+                </p>
+                <p className="text-xs text-stone-500">Est. Still to Spend</p>
+              </div>
+            </div>
+          </div>
           <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
