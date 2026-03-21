@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp, Building2, List } from 'lucide-react';
+import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSign, TrendingUp, Building2, List, Clock } from 'lucide-react';
 import type { InventoryItem, Product, Vendor, Season, TimingBucket } from '@/types/farm';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
 import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
@@ -21,7 +21,7 @@ interface PlanReadinessViewProps {
   onNavigateToPurchases?: () => void;
 }
 
-type FilterTab = 'blocking' | 'on-order' | 'ready' | 'all';
+type FilterTab = 'blocking' | 'near-ready' | 'on-order' | 'ready' | 'all';
 type ViewMode = 'product' | 'company';
 
 const fmt = (n: number, decimals = 1) =>
@@ -33,6 +33,7 @@ const fmt = (n: number, decimals = 1) =>
 function statusPill(status: ReadinessStatus) {
   if (status === 'READY') return { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle };
   if (status === 'ON_ORDER') return { label: 'Ordered', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Truck };
+  if (status === 'NEAR_READY') return { label: 'Near Ready', cls: 'bg-sky-50 text-sky-700 border-sky-200', icon: Clock };
   return { label: 'Need to Order', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertTriangle };
 }
 
@@ -118,6 +119,31 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     });
   }, [plannedForEngine, inventory, scopedPurchases, vendors]);
 
+  // Post-process: remap BLOCKING items with ≥95% coverage to NEAR_READY
+  const processedReadiness = useMemo(() => {
+    const items = readiness.items.map(item => {
+      if (item.status === 'BLOCKING' && item.requiredQty > 0) {
+        const coverage = (item.onHandQty + item.onOrderQty) / item.requiredQty;
+        if (coverage >= 0.95) {
+          return { ...item, status: 'NEAR_READY' as ReadinessStatus };
+        }
+      }
+      return item;
+    });
+    const readyCount = items.filter(i => i.status === 'READY').length;
+    const onOrderCount = items.filter(i => i.status === 'ON_ORDER').length;
+    const nearReadyCount = items.filter(i => i.status === 'NEAR_READY').length;
+    const blockingCount = items.filter(i => i.status === 'BLOCKING').length;
+    return {
+      ...readiness,
+      items,
+      readyCount,
+      onOrderCount,
+      nearReadyCount,
+      blockingCount,
+      totalCount: items.length,
+    };
+  }, [readiness]);
   // Helper: get usages detail for a product (so we can show "used in")
   const usageMap = useMemo(() => {
     const m = new Map<string, PlannedUsageItem['usages']>();
@@ -157,10 +183,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
   // Filter items for selected tab
   const filteredItems = useMemo(() => {
-    let items = readiness.items;
+    let items = processedReadiness.items;
     if (filterTab === 'ready') items = items.filter(i => i.status === 'READY');
     else if (filterTab === 'on-order') items = items.filter(i => i.status === 'ON_ORDER');
     else if (filterTab === 'blocking') items = items.filter(i => i.status === 'BLOCKING');
+    else if (filterTab === 'near-ready') items = items.filter(i => i.status === 'NEAR_READY');
 
     // Sort by coverage % ascending — least covered (most urgent) first
     return [...items].sort((a, b) => {
@@ -168,7 +195,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       const covB = b.requiredQty > 0 ? (b.onHandQty + b.onOrderQty) / b.requiredQty : 1;
       return covA - covB;
     });
-  }, [readiness.items, filterTab]);
+  }, [processedReadiness.items, filterTab]);
 
   // Group filtered items by vendor/company
   const groupedByVendor = useMemo(() => {
@@ -305,7 +332,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       });
     });
 
-    readiness.items.forEach(item => {
+    processedReadiness.items.forEach(item => {
       const product = products.find(p => p.id === item.productId);
       
       // On-hand value: inventory is in base units (gal/lbs/g)
@@ -327,7 +354,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       : 100;
 
     return { onHandValue, onOrderValue, plannedValue, shortValue, coveragePct };
-  }, [readiness.items, products, scopedPurchases]);
+  }, [processedReadiness.items, products, scopedPurchases]);
 
   // Value-based progress bar percentages
   const onHandPct = valueMetrics.plannedValue > 0 
@@ -342,7 +369,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
   // Shared row renderer
-  const renderProductRow = (item: typeof readiness.items[0]) => {
+  const renderProductRow = (item: typeof processedReadiness.items[0]) => {
     const p = statusPill(item.status);
     const usages = usageMap.get(item.productId) || [];
     const usedIn = usages.slice(0, 2).map(u => `${u.cropName} → ${u.timingName}`).join(' • ');
@@ -451,6 +478,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <h3 className="font-semibold text-stone-800 mb-2">No items in this category</h3>
       <p className="text-stone-500">
         {filterTab === 'blocking' && 'Great news! No items are blocking plan execution.'}
+        {filterTab === 'near-ready' && 'No items are near ready (≥95% covered).'}
         {filterTab === 'on-order' && 'No items are currently on order.'}
         {filterTab === 'ready' && 'No items are fully covered yet.'}
         {filterTab === 'all' && 'Add products to your crop plans to see readiness status.'}
@@ -472,14 +500,14 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-5 gap-4 mt-6">
           <div className="bg-stone-50 rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
                 <Package className="w-5 h-5 text-stone-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-stone-800">{readiness.totalCount}</p>
+                <p className="text-2xl font-bold text-stone-800">{processedReadiness.totalCount}</p>
                 <p className="text-sm text-stone-500">Total Products</p>
               </div>
             </div>
@@ -491,8 +519,20 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-emerald-600">{readiness.readyCount}</p>
+                <p className="text-2xl font-bold text-emerald-600">{processedReadiness.readyCount}</p>
                 <p className="text-sm text-stone-500">Ready</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-sky-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-sky-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-sky-600">{processedReadiness.nearReadyCount}</p>
+                <p className="text-sm text-stone-500">Near Ready</p>
               </div>
             </div>
           </div>
@@ -503,7 +543,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <Truck className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-amber-600">{readiness.onOrderCount}</p>
+                <p className="text-2xl font-bold text-amber-600">{processedReadiness.onOrderCount}</p>
                 <p className="text-sm text-stone-500">Ordered</p>
               </div>
             </div>
@@ -515,7 +555,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 <AlertTriangle className="w-5 h-5 text-rose-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-rose-600">{readiness.blockingCount}</p>
+                <p className="text-2xl font-bold text-rose-600">{processedReadiness.blockingCount}</p>
                 <p className="text-sm text-stone-500">Need to Order</p>
               </div>
             </div>
@@ -605,10 +645,11 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap gap-2">
         {([
-            { id: 'all', label: 'All', count: readiness.totalCount },
-            { id: 'blocking', label: 'Need to Order', count: readiness.blockingCount },
-            { id: 'on-order', label: 'Ordered', count: readiness.onOrderCount },
-            { id: 'ready', label: 'Ready', count: readiness.readyCount },
+            { id: 'all', label: 'All', count: processedReadiness.totalCount },
+            { id: 'blocking', label: 'Need to Order', count: processedReadiness.blockingCount },
+            { id: 'near-ready', label: 'Near Ready', count: processedReadiness.nearReadyCount },
+            { id: 'on-order', label: 'Ordered', count: processedReadiness.onOrderCount },
+            { id: 'ready', label: 'Ready', count: processedReadiness.readyCount },
           ] as Array<{ id: FilterTab; label: string; count: number }>).map(t => (
             <button
               key={t.id}
