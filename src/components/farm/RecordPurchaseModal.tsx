@@ -86,7 +86,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
     return products.filter(p => productIds.has(p.id));
   }, [vendorId, vendorOfferings, products]);
 
-  // Get last price for a product+vendor combo
+  // Get last per-unit price for a product+vendor combo
   const getLastPrice = (productId: string, currentVendorId: string): number => {
     // Find most recent price record for this product+vendor
     const records = priceRecords
@@ -94,10 +94,11 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     if (records.length > 0) {
-      return records[0].price; // Package price, not normalized
+      // Use normalizedPrice (per-unit) — this is the $/gal, $/lb value
+      return records[0].normalizedPrice || records[0].price;
     }
     
-    // Fallback: check vendor offering
+    // Fallback: check vendor offering (offering.price is already per-unit)
     const offering = vendorOfferings.find(
       o => o.productId === productId && o.vendorId === currentVendorId
     );
