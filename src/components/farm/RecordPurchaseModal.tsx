@@ -33,6 +33,16 @@ interface RecordPurchaseModalProps {
   currentSeasonId: string;
   currentSeasonYear: number;
   editingPurchase?: SimplePurchase;
+  preselectedVendorId?: string;
+  preselectedLines?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    packageType: string;
+    packageSize: number;
+    packageUnit: string;
+    unitPrice: number;
+  }>;
 }
 
 const PACKAGE_TYPES = ['Tote', 'Twin-pack', 'Jug', 'Bag', 'Drum', 'Pail', 'Bulk', 'Bottle', 'Case'];
@@ -62,6 +72,8 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   currentSeasonId,
   currentSeasonYear,
   editingPurchase,
+  preselectedVendorId,
+  preselectedLines,
 }) => {
   // Form state
   const [vendorId, setVendorId] = useState('');
@@ -139,10 +151,22 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         packageUnit: line.packageUnit || 'gal',
         unitPrice: line.unitPrice,
       })));
+    } else if (preselectedVendorId && preselectedLines && preselectedLines.length > 0) {
+      resetForm();
+      setVendorId(preselectedVendorId);
+      setLines(preselectedLines.map(pl => ({
+        id: crypto.randomUUID(),
+        productId: pl.productId,
+        packageType: pl.packageType,
+        quantity: pl.quantity,
+        packageSize: pl.packageSize,
+        packageUnit: pl.packageUnit as PackageUnitType,
+        unitPrice: pl.unitPrice,
+      })));
     } else {
       resetForm();
     }
-  }, [editingPurchase, isOpen]);
+  }, [editingPurchase, isOpen, preselectedVendorId]);
 
   const resetForm = () => {
     setVendorId('');

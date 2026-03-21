@@ -73,7 +73,8 @@ import { BidEventDetailView } from './components/farm/BidEventDetailView';
 import { PriceBookView } from './components/farm/PriceBookView';
 import { SettingsView } from './components/farm/SettingsView';
 import { OrdersView } from './components/farm/OrdersView';
-import { PlanReadinessView } from './components/farm/PlanReadinessView';
+import { PlanReadinessView, type PrePopulatedLine } from './components/farm/PlanReadinessView';
+import { RecordPurchaseModal } from './components/farm/RecordPurchaseModal';
 import { VendorSpendView } from './components/farm/VendorSpendView';
 import { BuyWorkflowView } from './components/farm/BuyWorkflowView';
 import { VarianceView } from './components/farm/VarianceView';
@@ -1142,6 +1143,8 @@ const AppContent: React.FC = () => {
   // Phase 5: Record Application modal state
   const [showRecordApplicationModal, setShowRecordApplicationModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [buildOrderVendorId, setBuildOrderVendorId] = useState<string | null>(null);
+  const [buildOrderLines, setBuildOrderLines] = useState<PrePopulatedLine[]>([]);
   
   // Use Supabase data when authenticated
   const supabaseData = useSupabaseData(user);
@@ -1739,6 +1742,10 @@ const AppContent: React.FC = () => {
             onNavigateToPurchases={() => setActiveView('purchases')}
             productMasters={state.productMasters || []}
             vendorOfferings={state.vendorOfferings || []}
+            onBuildOrder={(vendorId, lines) => {
+              setBuildOrderVendorId(vendorId);
+              setBuildOrderLines(lines);
+            }}
           />
         );
       case 'vendor-spend':
@@ -2037,6 +2044,35 @@ const AppContent: React.FC = () => {
           inventory={inventory || []}
           equipment={equipment || []}
           applicationRecords={applicationRecords || []}
+        />
+      )}
+
+      {/* Build Order modal from Inputs Needed vendor cards */}
+      {buildOrderVendorId && (
+        <RecordPurchaseModal
+          isOpen={!!buildOrderVendorId}
+          onClose={() => { setBuildOrderVendorId(null); setBuildOrderLines([]); }}
+          onSave={async (purchase) => {
+            const result = await handleAddPurchase(purchase);
+            if (result) {
+              setBuildOrderVendorId(null);
+              setBuildOrderLines([]);
+            }
+            return result;
+          }}
+          onCreatePriceRecords={async (records) => {
+            for (const record of records) {
+              await handleAddPriceRecord(record);
+            }
+          }}
+          vendors={state.vendors}
+          products={productMasters || []}
+          vendorOfferings={vendorOfferings || []}
+          priceRecords={priceRecords || []}
+          currentSeasonId={state.currentSeasonId || ''}
+          currentSeasonYear={currentSeason?.year || new Date().getFullYear()}
+          preselectedVendorId={buildOrderVendorId}
+          preselectedLines={buildOrderLines}
         />
       )}
     </div>
