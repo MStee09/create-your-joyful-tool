@@ -119,6 +119,31 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     });
   }, [plannedForEngine, inventory, scopedPurchases, vendors]);
 
+  // Post-process: remap BLOCKING items with ≥95% coverage to NEAR_READY
+  const processedReadiness = useMemo(() => {
+    const items = readiness.items.map(item => {
+      if (item.status === 'BLOCKING' && item.requiredQty > 0) {
+        const coverage = (item.onHandQty + item.onOrderQty) / item.requiredQty;
+        if (coverage >= 0.95) {
+          return { ...item, status: 'NEAR_READY' as ReadinessStatus };
+        }
+      }
+      return item;
+    });
+    const readyCount = items.filter(i => i.status === 'READY').length;
+    const onOrderCount = items.filter(i => i.status === 'ON_ORDER').length;
+    const nearReadyCount = items.filter(i => i.status === 'NEAR_READY').length;
+    const blockingCount = items.filter(i => i.status === 'BLOCKING').length;
+    return {
+      ...readiness,
+      items,
+      readyCount,
+      onOrderCount,
+      nearReadyCount,
+      blockingCount,
+      totalCount: items.length,
+    };
+  }, [readiness]);
   // Helper: get usages detail for a product (so we can show "used in")
   const usageMap = useMemo(() => {
     const m = new Map<string, PlannedUsageItem['usages']>();
