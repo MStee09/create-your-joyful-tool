@@ -447,7 +447,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
               <div>Size</div>
               <div>Unit</div>
               <div>Total Vol</div>
-              <div>$/Pkg</div>
+              <div>$/Unit</div>
               <div>Total</div>
               <div></div>
             </div>

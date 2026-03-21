@@ -66,24 +66,22 @@ export interface SimplePurchase {
 export type NewSimplePurchase = Omit<SimplePurchase, 'id' | 'createdAt' | 'updatedAt'>;
 export type NewSimplePurchaseLine = Omit<SimplePurchaseLine, 'id'>;
 
-// Helper to calculate normalized price
+// Helper to calculate normalized price (per-unit model — price IS already per unit)
 export function calculateNormalizedPrice(
   unitPrice: number,
   packageSize: number | undefined,
   packageUnit: PackageUnitType | undefined,
   productForm: 'liquid' | 'dry'
 ): { normalizedPrice: number; normalizedUnit: PackageUnitType } {
-  // If no package info, price is already normalized
-  if (!packageSize || !packageUnit) {
+  // Price is already per unit, no division needed
+  if (!packageUnit) {
     return { 
       normalizedPrice: unitPrice, 
       normalizedUnit: productForm === 'liquid' ? 'gal' : 'lbs' 
     };
   }
   
-  // Normalize to per-unit price
-  const normalizedPrice = unitPrice / packageSize;
-  return { normalizedPrice, normalizedUnit: packageUnit };
+  return { normalizedPrice: unitPrice, normalizedUnit: packageUnit };
 }
 
 // Helper to calculate line totals (per-unit pricing model)
