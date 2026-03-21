@@ -110,33 +110,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onNewPurchase={() => onViewChange?.('purchases')}
       />
 
-      {/* Hero Section - Total Plan Cost */}
-      <div className="bg-card rounded-xl p-8 shadow-sm border border-border mb-8">
-        <div className="text-center">
-          <p className="text-4xl font-bold text-primary mb-1">
-            {formatCurrency(stats.totalCost)}
-          </p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Total Plan Cost ({season?.year || new Date().getFullYear()})
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {formatNumber(stats.totalAcres, 0)} acres&nbsp;&nbsp;•&nbsp;&nbsp;
-            {formatCurrency(stats.costPerAcre)}/ac avg&nbsp;&nbsp;•&nbsp;&nbsp;
-            {stats.cropCount} crop{stats.cropCount !== 1 ? 's' : ''}
-          </p>
-        </div>
-      </div>
-
       {/* Plan Readiness Widget */}
       {readiness.totalProducts > 0 && (
         <div 
-          onClick={() => onViewChange?.('plan-readiness')}
+          onClick={() => onViewChange?.('procurement')}
           className={`bg-card rounded-xl p-6 shadow-sm border border-border mb-8 cursor-pointer hover:border-primary/50 transition-colors ${
             onViewChange ? '' : 'cursor-default'
           }`}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">Order Status</h3>
+            <h3 className="font-semibold text-foreground">Inputs Needed</h3>
             {readiness.blockingCount > 0 ? (
               <AlertTriangle className="w-5 h-5 text-red-500" />
             ) : (
@@ -196,6 +179,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
       )}
+
+      {/* Season Cost Summary — compact horizontal bar */}
+      <div className="bg-card rounded-xl shadow-sm border border-border mb-8 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Plan Cost</p>
+              <p className="text-xl font-bold text-primary">{formatCurrency(stats.totalCost)}</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">$/Acre Avg</p>
+              <p className="text-xl font-bold text-foreground">{formatCurrency(stats.costPerAcre)}</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Acres</p>
+              <p className="text-xl font-bold text-foreground">{formatNumber(stats.totalAcres, 0)}</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Crops</p>
+              <p className="text-xl font-bold text-foreground">{stats.cropCount}</p>
+            </div>
+          </div>
+          <span className="text-sm text-muted-foreground">{season?.year || new Date().getFullYear()}</span>
+        </div>
+      </div>
 
       {/* Crop Summary Table */}
       <div className="bg-card rounded-xl shadow-sm border border-border mb-8">
