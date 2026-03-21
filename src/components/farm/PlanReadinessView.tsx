@@ -18,6 +18,7 @@ interface PlanReadinessViewProps {
   season: Season | null;
   purchases: SimplePurchase[];
   onUpdateInventory: (inventory: InventoryItem[]) => void;
+  onNavigateToPurchases?: () => void;
 }
 
 type FilterTab = 'blocking' | 'on-order' | 'ready' | 'all';
