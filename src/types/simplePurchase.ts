@@ -56,6 +56,7 @@ export interface SimplePurchase {
   
   // Notes
   notes?: string;
+  poRef?: string;
   
   // Metadata
   createdAt?: string;

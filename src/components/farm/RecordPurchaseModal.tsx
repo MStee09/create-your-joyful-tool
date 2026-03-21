@@ -360,7 +360,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
 
         <div className="space-y-6 py-4">
           {/* Vendor & Dates Section */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Vendor *</Label>
               <Select value={vendorId} onValueChange={handleVendorChange}>
@@ -380,6 +380,15 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
                 type="date" 
                 value={orderDate}
                 onChange={e => setOrderDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>PO / Confirmation #</Label>
+              <Input 
+                type="text"
+                placeholder="2026-0342"
+                value={poRef}
+                onChange={e => setPoRef(e.target.value)}
               />
             </div>
           </div>
