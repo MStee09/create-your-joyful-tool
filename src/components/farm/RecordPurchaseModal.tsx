@@ -160,7 +160,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         packageType: pl.packageType,
         quantity: pl.quantity,
         packageSize: pl.packageSize,
-        packageUnit: pl.packageUnit,
+        packageUnit: pl.packageUnit as PackageUnitType,
         unitPrice: pl.unitPrice,
       })));
     } else {
