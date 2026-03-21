@@ -239,6 +239,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
         subtotal,
         total,
         notes: notes || undefined,
+        poRef: poRef.trim() || undefined,
       };
 
       const savedPurchase = await onSave(purchase);
