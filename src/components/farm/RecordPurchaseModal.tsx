@@ -145,7 +145,7 @@ export const RecordPurchaseModal: React.FC<RecordPurchaseModalProps> = ({
   const resetForm = () => {
     setVendorId('');
     setOrderDate(new Date().toISOString().split('T')[0]);
-    setStatus('received');
+    setStatus('booked');
     setExpectedDeliveryDate('');
     setReceivedDate(new Date().toISOString().split('T')[0]);
     setLines([]);
