@@ -802,7 +802,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
           const group = vendorGroups.get(key)!;
           group.items.push(item);
           const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-          const price = getBestPrice(item.productId);
+          const price = getBestPrice(item.productId, item.plannedUnit);
           if (price !== null) group.totalCost += netNeeded * price;
         });
 
