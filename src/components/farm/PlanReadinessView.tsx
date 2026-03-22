@@ -557,7 +557,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 onClick={() => handleQuickAdd(item.productId, item.shortQty)}
                 className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
               >
-                Add {fmt(item.shortQty, 0)}
+                Add {shortDisplay}
               </button>
             )}
             {item.status === 'BLOCKING' && onNavigateToPurchases && (
