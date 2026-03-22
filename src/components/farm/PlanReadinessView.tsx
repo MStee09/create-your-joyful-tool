@@ -845,7 +845,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                             const product = products.find(pr => pr.id === item.productId);
                             const offering = vendorOfferings.find(vo => vo.productId === item.productId && vo.isPreferred)
                               || vendorOfferings.find(vo => vo.productId === item.productId);
-                            const price = getBestPrice(item.productId) || 0;
+                            const price = offering ? offering.price : (getBestPrice(item.productId, item.plannedUnit) || 0);
                             const isLiquid = product?.form === 'liquid';
                             return {
                               productId: item.productId,
