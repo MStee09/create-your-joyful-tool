@@ -1413,6 +1413,32 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             </div>
           )}
 
+          {/* Price History */}
+          {onAddPriceRecord && (
+            <div className="bg-card rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground">Price History</h3>
+                <button
+                  onClick={() => setLogQuoteVendorId('__any__')}
+                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+                >
+                  Log Quote / Price
+                </button>
+              </div>
+              <ProductPriceHistory
+                product={product}
+                priceRecords={priceRecords}
+                vendors={vendors}
+                currentSeasonYear={currentSeasonYear}
+                onAddPriceRecord={onAddPriceRecord}
+                onUpdatePriceRecord={onUpdatePriceRecord}
+                onDeletePriceRecord={onDeletePriceRecord}
+                vendorOfferings={vendorOfferings}
+                onUpdateOfferings={onUpdateOfferings}
+              />
+            </div>
+          )}
+
           {/* Vendor Offerings */}
           <div className="bg-card rounded-xl border border-border p-6">
             <VendorOfferingsTable
@@ -1448,22 +1474,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               vendors={vendors}
               currentSeasonYear={currentSeasonYear}
               preselectedProductId={product.id}
-              preselectedVendorId={logQuoteVendorId}
-              vendorOfferings={vendorOfferings}
-              onUpdateOfferings={onUpdateOfferings}
-            />
-          )}
-
-          {/* Price History */}
-          {onAddPriceRecord && (
-            <ProductPriceHistory
-              product={product}
-              priceRecords={priceRecords}
-              vendors={vendors}
-              currentSeasonYear={currentSeasonYear}
-              onAddPriceRecord={onAddPriceRecord}
-              onUpdatePriceRecord={onUpdatePriceRecord}
-              onDeletePriceRecord={onDeletePriceRecord}
+              preselectedVendorId={logQuoteVendorId === '__any__' ? undefined : logQuoteVendorId}
               vendorOfferings={vendorOfferings}
               onUpdateOfferings={onUpdateOfferings}
             />
