@@ -427,7 +427,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     processedReadiness.items.forEach(item => {
       if (item.status !== 'BLOCKING') return;
       const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-      const price = getBestPrice(item.productId);
+      const price = getBestPrice(item.productId, item.plannedUnit);
       if (price !== null && netNeeded > 0) {
         total += netNeeded * price;
         hasAnyPrice = true;
