@@ -3,7 +3,7 @@ import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSig
 import type { InventoryItem, Product, Vendor, Season, TimingBucket } from '@/types/farm';
 import type { ProductMaster, VendorOffering } from '@/types';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
-import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
+import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency, calculateCostPerPound, calculateCostPerGallon } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
 import { getInventoryUnitPrice, getPlannedUnitPrice } from '@/lib/planReadinessUtils';
 import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
@@ -386,14 +386,37 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
-  // Best price lookup for a product
-  const getBestPrice = (productId: string): number | null => {
-    const preferred = vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred);
-    if (preferred) return preferred.price;
-    const any = vendorOfferings.find(vo => vo.productId === productId);
-    if (any) return any.price;
-    const pm = productMasters.find(p => p.id === productId);
-    if (pm?.estimatedPrice) return pm.estimatedPrice;
+  // Best price lookup — normalized to match the unit that netNeeded is expressed in
+  const getBestPrice = (productId: string, plannedUnit: string): number | null => {
+    const product = productMasters.find(p => p.id === productId);
+
+    const offering =
+      vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred) ||
+      vendorOfferings.find(vo => vo.productId === productId);
+
+    if (offering && product) {
+      if (plannedUnit === 'lbs') {
+        const cpp = calculateCostPerPound(offering as any, product as any);
+        if (cpp !== null) return cpp;
+      }
+      if (plannedUnit === 'gal') {
+        const cpg = calculateCostPerGallon(offering as any, product as any);
+        if (cpg !== null) return cpg;
+      }
+      if (plannedUnit === 'g' && offering.priceUnit === 'g') return offering.price;
+      if (plannedUnit === 'g' && offering.priceUnit === 'lbs') return offering.price / 453.592;
+      if (plannedUnit === 'oz' && offering.priceUnit === 'lbs') return offering.price / 16;
+      return offering.price;
+    }
+
+    if (product?.estimatedPrice && product?.estimatedPriceUnit) {
+      const estUnit = product.estimatedPriceUnit;
+      if (plannedUnit === 'lbs' && estUnit === 'ton') return product.estimatedPrice / 2000;
+      if (plannedUnit === 'lbs' && estUnit === 'lbs') return product.estimatedPrice;
+      if (plannedUnit === 'gal' && estUnit === 'gal') return product.estimatedPrice;
+      return product.estimatedPrice;
+    }
+
     return null;
   };
 
@@ -404,7 +427,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
     processedReadiness.items.forEach(item => {
       if (item.status !== 'BLOCKING') return;
       const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-      const price = getBestPrice(item.productId);
+      const price = getBestPrice(item.productId, item.plannedUnit);
       if (price !== null && netNeeded > 0) {
         total += netNeeded * price;
         hasAnyPrice = true;
@@ -454,8 +477,13 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
     // Cost calculation
     const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-    const bestPrice = getBestPrice(item.productId);
+    const bestPrice = getBestPrice(item.productId, item.plannedUnit);
     const estCost = bestPrice !== null && netNeeded > 0 ? netNeeded * bestPrice : null;
+
+    // Smart display for large lb shortages — show in tons
+    const shortDisplay = item.plannedUnit === 'lbs' && item.shortQty >= 2000
+      ? `${(item.shortQty / 2000).toFixed(1)} ton`
+      : `${fmt(item.shortQty, 0)} ${item.plannedUnit}`;
 
     return (
       <div key={item.id}>
@@ -529,7 +557,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                 onClick={() => handleQuickAdd(item.productId, item.shortQty)}
                 className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100"
               >
-                Add {fmt(item.shortQty, 0)}
+                Add {shortDisplay}
               </button>
             )}
             {item.status === 'BLOCKING' && onNavigateToPurchases && (
@@ -774,7 +802,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
           const group = vendorGroups.get(key)!;
           group.items.push(item);
           const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-          const price = getBestPrice(item.productId);
+          const price = getBestPrice(item.productId, item.plannedUnit);
           if (price !== null) group.totalCost += netNeeded * price;
         });
 
@@ -817,7 +845,7 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
                             const product = products.find(pr => pr.id === item.productId);
                             const offering = vendorOfferings.find(vo => vo.productId === item.productId && vo.isPreferred)
                               || vendorOfferings.find(vo => vo.productId === item.productId);
-                            const price = getBestPrice(item.productId) || 0;
+                            const price = offering ? offering.price : (getBestPrice(item.productId, item.plannedUnit) || 0);
                             const isLiquid = product?.form === 'liquid';
                             return {
                               productId: item.productId,
