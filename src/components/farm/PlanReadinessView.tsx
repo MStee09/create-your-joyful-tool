@@ -3,7 +3,7 @@ import { CheckCircle, Truck, AlertTriangle, Package, Droplets, Weight, DollarSig
 import type { InventoryItem, Product, Vendor, Season, TimingBucket } from '@/types/farm';
 import type { ProductMaster, VendorOffering } from '@/types';
 import type { SimplePurchase, SimplePurchaseLine } from '@/types/simplePurchase';
-import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency } from '@/lib/calculations';
+import { calculatePlannedUsage, type PlannedUsageItem, formatCurrency, calculateCostPerPound, calculateCostPerGallon } from '@/lib/calculations';
 import { computeReadiness, type PlannedUsage, type ReadinessExplain, type ReadinessStatus } from '@/lib/readinessEngine';
 import { getInventoryUnitPrice, getPlannedUnitPrice } from '@/lib/planReadinessUtils';
 import { convertPurchaseLineToBaseUnit } from '@/lib/cropCalculations';
