@@ -477,8 +477,13 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
 
     // Cost calculation
     const netNeeded = Math.max(0, item.requiredQty - item.onHandQty - item.onOrderQty);
-    const bestPrice = getBestPrice(item.productId);
+    const bestPrice = getBestPrice(item.productId, item.plannedUnit);
     const estCost = bestPrice !== null && netNeeded > 0 ? netNeeded * bestPrice : null;
+
+    // Smart display for large lb shortages — show in tons
+    const shortDisplay = item.plannedUnit === 'lbs' && item.shortQty >= 2000
+      ? `${(item.shortQty / 2000).toFixed(1)} ton`
+      : `${fmt(item.shortQty, 0)} ${item.plannedUnit}`;
 
     return (
       <div key={item.id}>
