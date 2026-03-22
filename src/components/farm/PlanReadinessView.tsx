@@ -386,14 +386,37 @@ export const PlanReadinessView: React.FC<PlanReadinessViewProps> = ({
   const cappedOnOrderPct = Math.min(100 - cappedOnHandPct, onOrderPct);
   const blockingPct = Math.max(0, 100 - cappedOnHandPct - cappedOnOrderPct);
 
-  // Best price lookup for a product
-  const getBestPrice = (productId: string): number | null => {
-    const preferred = vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred);
-    if (preferred) return preferred.price;
-    const any = vendorOfferings.find(vo => vo.productId === productId);
-    if (any) return any.price;
-    const pm = productMasters.find(p => p.id === productId);
-    if (pm?.estimatedPrice) return pm.estimatedPrice;
+  // Best price lookup — normalized to match the unit that netNeeded is expressed in
+  const getBestPrice = (productId: string, plannedUnit: string): number | null => {
+    const product = productMasters.find(p => p.id === productId);
+
+    const offering =
+      vendorOfferings.find(vo => vo.productId === productId && vo.isPreferred) ||
+      vendorOfferings.find(vo => vo.productId === productId);
+
+    if (offering && product) {
+      if (plannedUnit === 'lbs') {
+        const cpp = calculateCostPerPound(offering as any, product as any);
+        if (cpp !== null) return cpp;
+      }
+      if (plannedUnit === 'gal') {
+        const cpg = calculateCostPerGallon(offering as any, product as any);
+        if (cpg !== null) return cpg;
+      }
+      if (plannedUnit === 'g' && offering.priceUnit === 'g') return offering.price;
+      if (plannedUnit === 'g' && offering.priceUnit === 'lbs') return offering.price / 453.592;
+      if (plannedUnit === 'oz' && offering.priceUnit === 'lbs') return offering.price / 16;
+      return offering.price;
+    }
+
+    if (product?.estimatedPrice && product?.estimatedPriceUnit) {
+      const estUnit = product.estimatedPriceUnit;
+      if (plannedUnit === 'lbs' && estUnit === 'ton') return product.estimatedPrice / 2000;
+      if (plannedUnit === 'lbs' && estUnit === 'lbs') return product.estimatedPrice;
+      if (plannedUnit === 'gal' && estUnit === 'gal') return product.estimatedPrice;
+      return product.estimatedPrice;
+    }
+
     return null;
   };
 
