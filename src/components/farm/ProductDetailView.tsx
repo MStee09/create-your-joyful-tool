@@ -946,6 +946,14 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
         <div className="text-right space-y-2">
           <div className="flex items-center gap-3 justify-end">
+            {onAddPriceRecord && (
+              <button
+                onClick={() => setLogQuoteVendorId('__any__')}
+                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+              >
+                Log Quote / Price
+              </button>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">On Hand</p>
               <p className="text-2xl font-bold text-foreground">

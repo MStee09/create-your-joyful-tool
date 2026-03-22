@@ -1749,6 +1749,15 @@ const AppContent: React.FC = () => {
           />
         );
       case 'vendor-spend':
+        return (
+          <VendorSpendView
+            season={currentSeason}
+            products={legacyProducts}
+            vendorOfferings={state.vendorOfferings || []}
+            vendors={state.vendors}
+            purchases={simplePurchases || []}
+          />
+        );
       case 'variance':
       case 'variance-by-pass':
       case 'alerts':
